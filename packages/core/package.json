@@ -1,0 +1,28 @@
+{
+  "name": "@magentic/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev:backend": "tsx watch src/backend/server.ts",
+    "dev:worker": "tsx watch src/worker/worker.ts",
+    "start:backend": "node dist/backend/server.js",
+    "start:worker": "node dist/worker/worker.js"
+  },
+  "dependencies": {
+    "bullmq": "^5.58.5",
+    "fastify": "^5.4.0",
+    "ioredis": "^5.7.0",
+    "neo4j-driver": "^5.28.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=10"
+  }
+}
