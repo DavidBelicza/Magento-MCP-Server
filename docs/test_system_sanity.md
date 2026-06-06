@@ -36,6 +36,23 @@ Expected result:
 - No service is named `core`.
 - `magentic_backend` and `magentic_worker` both use `magentic_backend:latest`.
 - `magentic_frontend` uses `magentic_frontend:latest`.
+- `magentic_backend` and `magentic_worker` both mount `${MAGENTIC_ANALYZED_SOURCE_HOST_PATH}` as read-only.
+
+Validate the development override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml config
+```
+
+Expected result:
+
+- `magentic_backend` runs `npm run dev:backend`.
+- `magentic_worker` runs `npm run dev:worker`.
+- `magentic_backend` builds the `dev` target from `services/core/Dockerfile`.
+- `magentic_backend` and `magentic_worker` use `magentic_backend_dev:latest` in dev mode.
+- Both services mount `./packages/core/src:/app/src`.
+- Both services keep image-built `node_modules` available inside `/app`.
+- Both services keep the analyzed source mount read-only.
 
 ## Docker Build
 
@@ -52,6 +69,12 @@ Expected result:
 - npm install runs during image builds, not manually inside containers.
 
 ## Start Services
+
+Create the default analyzed source path:
+
+```bash
+mkdir -p ./www/path/to/magento/source-code
+```
 
 Start the stack:
 
@@ -146,18 +169,47 @@ Expected result:
 
 - Both containers print the same image hash.
 
-## Worker Mount Check
+## Analyzed Source Mount Checks
+
+Check the backend mount:
+
+```bash
+docker compose exec -T magentic_backend sh -lc 'test -d "$MAGENTIC_ANALYZED_SOURCE_PATH" && echo mounted'
+```
 
 Check the worker mount:
 
 ```bash
-docker compose exec -T magentic_worker sh -lc 'test -d /mnt/worker-index/test && echo mounted'
+docker compose exec -T magentic_worker sh -lc 'test -d "$MAGENTIC_ANALYZED_SOURCE_PATH" && echo mounted'
 ```
 
 Expected result:
 
 ```text
 mounted
+```
+
+Check that the mount is read-only inside the backend:
+
+```bash
+docker compose exec -T magentic_backend sh -lc 'touch "$MAGENTIC_ANALYZED_SOURCE_PATH/.magentic-write-test"'
+```
+
+Expected result:
+
+- The command fails with a read-only file system or permission error.
+
+Check that host-side changes are visible inside the worker:
+
+```bash
+touch ./www/path/to/magento/source-code/.magentic-host-sync-test
+docker compose exec -T magentic_worker sh -lc 'test -f "$MAGENTIC_ANALYZED_SOURCE_PATH/.magentic-host-sync-test" && echo synced'
+```
+
+Expected result:
+
+```text
+synced
 ```
 
 ## Cleanup

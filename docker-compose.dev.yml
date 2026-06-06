@@ -1,0 +1,25 @@
+x-magentic-core-dev-build: &magentic_core_dev_build
+  context: .
+  dockerfile: services/core/Dockerfile
+  target: dev
+
+services:
+  magentic_backend:
+    image: magentic_backend_dev:latest
+    build: *magentic_core_dev_build
+    environment:
+      NODE_ENV: development
+    command: ["npm", "run", "dev:backend"]
+    volumes:
+      - ./packages/core/src:/app/src
+      - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}:ro
+
+  magentic_worker:
+    image: magentic_backend_dev:latest
+    build: *magentic_core_dev_build
+    environment:
+      NODE_ENV: development
+    command: ["npm", "run", "dev:worker"]
+    volumes:
+      - ./packages/core/src:/app/src
+      - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}:ro

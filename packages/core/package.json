@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "dev:backend": "tsx watch src/backend/server.ts",
-    "dev:worker": "tsx watch src/worker/worker.ts",
-    "start:backend": "node dist/backend/server.js",
-    "start:worker": "node dist/worker/worker.js"
+    "dev:backend": "tsx watch src/server.ts",
+    "dev:worker": "tsx watch src/worker.ts",
+    "start:backend": "node dist/server.js",
+    "start:worker": "node dist/worker.js"
   },
   "dependencies": {
     "bullmq": "^5.58.5",

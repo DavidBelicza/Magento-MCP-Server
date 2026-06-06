@@ -1,9 +1,19 @@
-FROM node:24-alpine AS build
+FROM node:24-alpine AS deps
 
 WORKDIR /app
 
 COPY packages/core/package*.json ./
 RUN npm install
+
+FROM deps AS dev
+
+COPY packages/core/ ./
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev:backend"]
+
+FROM deps AS build
 
 COPY packages/core/ ./
 RUN npm run build

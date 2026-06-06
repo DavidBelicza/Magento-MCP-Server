@@ -23,6 +23,12 @@ Build the local packages:
 npm run build
 ```
 
+Create the local Magento source-code path that Magentic will analyze:
+
+```bash
+mkdir -p ./www/path/to/magento/source-code
+```
+
 Build the Docker images:
 
 ```bash
@@ -33,6 +39,18 @@ Start the Docker environment:
 
 ```bash
 docker compose up -d
+```
+
+Start the backend and worker in development mode:
+
+```bash
+npm run docker:dev
+```
+
+Rebuild before starting development mode:
+
+```bash
+npm run docker:dev:build
 ```
 
 Open the frontend:
@@ -53,6 +71,14 @@ Default Neo4j credentials:
 username: neo4j
 password: dev-password
 ```
+
+The default analyzed source mount is:
+
+```text
+./www/path/to/magento/source-code -> /mnt/analyzed-source
+```
+
+The mount is read-only inside the containers and host-side file changes are visible inside `magentic_backend` and `magentic_worker`.
 
 ### Useful Commands
 

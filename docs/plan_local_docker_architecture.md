@@ -167,13 +167,15 @@ Responsibilities:
 - read and write indexing-related data
 - communicate with Neo4j
 - share code from `packages/core`
-- mount local worker index data at `/mnt/worker-index`
+- read the analyzed Magento source at `/mnt/analyzed-source`
 
 Initial host mount:
 
 ```text
-./services/worker/test -> /mnt/worker-index/test
+./www/path/to/magento/source-code -> /mnt/analyzed-source
 ```
+
+The mount is read-only inside the container. Host-side file changes are visible through the bind mount.
 
 This service does not publish any host port.
 
@@ -333,7 +335,7 @@ services/frontend/Dockerfile
 services/frontend/nginx.conf
 services/redis/
 services/graphdb/
-services/worker/test/
+www/path/to/magento/source-code/
 packages/core/package.json
 packages/site/package.json
 ```

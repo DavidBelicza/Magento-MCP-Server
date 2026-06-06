@@ -7,6 +7,9 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
+    "docker:up": "docker compose up -d",
+    "docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up",
+    "docker:dev:build": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
     "dev:backend": "npm run dev:backend --workspace @magentic/core",
     "dev:worker": "npm run dev:worker --workspace @magentic/core",
     "dev:site": "npm run dev --workspace @magentic/site"
