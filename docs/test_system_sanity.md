@@ -32,7 +32,7 @@ docker compose config
 Expected result:
 
 - Compose project name is `magentic`.
-- Services are named `magentic_frontend`, `magentic_backend`, `magentic_worker`, `magentic_redis`, and `magentic_graphdb`.
+- Services are named `magentic_frontend`, `magentic_backend`, `magentic_worker`, `magentic_redis`, `magentic_postgres`, and `magentic_graphdb`.
 - No service is named `core`.
 - `magentic_backend` and `magentic_worker` both use `magentic_backend:latest`.
 - `magentic_frontend` uses `magentic_frontend:latest`.
@@ -92,6 +92,7 @@ Expected result:
 
 - `magentic_backend` is healthy.
 - `magentic_redis` is healthy.
+- `magentic_postgres` is healthy.
 - `magentic_graphdb` is healthy.
 - `magentic_frontend` publishes `8080->80`.
 - `magentic_graphdb` publishes `7474->7474` and `7687->7687`.
@@ -109,7 +110,7 @@ curl -s http://localhost:8080/api/health
 Expected response:
 
 ```json
-{"ok":true,"service":"backend","redis":"ok","graphdb":"ok"}
+{"ok":true,"service":"backend","redis":"ok","postgres":"ok","graphdb":"ok"}
 ```
 
 Check frontend deep-link fallback:

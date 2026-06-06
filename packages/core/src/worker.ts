@@ -4,9 +4,10 @@ import {
   indexPackagesQueueName,
   type IndexPackagesJob
 } from "./queue/index-packages.js";
-import { createNeo4jDriver, createRedisConnectionOptions } from "./connections.js";
+import { createNeo4jDriver, createPostgresPool, createRedisConnectionOptions } from "./connections.js";
 import { parseComposerLock } from "./processing/composer-lock/parse-composer-lock.js";
 import { saveComposerLockGraph } from "./processing/composer-lock/save-graph.js";
+import { installSchemas } from "./schema/install-schemas.js";
 
 type IndexPackagesResult = {
   composerLockPath: string;
@@ -17,6 +18,9 @@ type IndexPackagesResult = {
 };
 
 const neo4jDriver = createNeo4jDriver();
+const postgres = createPostgresPool();
+
+await installSchemas(postgres, neo4jDriver);
 
 const worker = new Worker<IndexPackagesJob, IndexPackagesResult, typeof indexPackagesJobName>(
   indexPackagesQueueName,
@@ -56,5 +60,6 @@ worker.on("failed", (job, error) => {
 
 process.on("SIGTERM", async () => {
   await worker.close();
+  await postgres.end();
   await neo4jDriver.close();
 });

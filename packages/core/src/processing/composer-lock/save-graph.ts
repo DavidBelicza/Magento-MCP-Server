@@ -39,7 +39,6 @@ export async function saveComposerLockGraph(
   const summary = await writeGraphFullReplace(driver, nodes, relationships, {
     labels: composerNodeLabels,
     relationshipTypes: composerRelationshipTypes,
-    constraintNamePrefix: "magentic",
     onProgress: options.onProgress
       ? (progress) =>
         options.onProgress?.({

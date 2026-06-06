@@ -2,7 +2,7 @@
 
 ## Goal
 
-Create a Docker-based local development architecture for Magentic. The system exposes one public HTTP entrypoint through `magentic_frontend` while keeping the backend, worker, Redis, and Neo4j services private except for explicit Neo4j browser/debug ports.
+Create a Docker-based local development architecture for Magentic. The system exposes one public HTTP entrypoint through `magentic_frontend` while keeping the backend, worker, Redis, PostgreSQL, and Neo4j services private except for explicit Neo4j browser/debug ports.
 
 The first version uses plain HTTP on localhost. HTTPS, local domains, and a shared reverse proxy can be added later.
 
@@ -17,6 +17,7 @@ The first version uses plain HTTP on localhost. HTTPS, local domains, and a shar
 │   ├── core/
 │   ├── frontend/
 │   ├── graphdb/
+│   ├── postgres/
 │   ├── redis/
 │   └── worker/
 └── packages/
@@ -59,6 +60,7 @@ Responsibilities:
 - API route handlers under `/api/*`
 - shared domain logic
 - Redis integration
+- PostgreSQL access
 - BullMQ queues and jobs
 - Neo4j access
 - worker process entrypoints
@@ -88,6 +90,7 @@ Services use the `magentic_` prefix:
 - `magentic_backend`
 - `magentic_worker`
 - `magentic_redis`
+- `magentic_postgres`
 - `magentic_graphdb`
 
 Custom images also use the `magentic_` prefix:
@@ -145,6 +148,7 @@ Responsibilities:
 - listen on port `3000` inside Docker
 - expose Fastify API routes under `/api/*`
 - communicate with `magentic_redis`
+- communicate with `magentic_postgres`
 - communicate with `magentic_graphdb`
 - optionally enqueue jobs or coordinate with `magentic_worker` before responding
 
@@ -165,6 +169,7 @@ Responsibilities:
 
 - consume indexing jobs from Redis/BullMQ
 - read and write indexing-related data
+- communicate with PostgreSQL
 - communicate with Neo4j
 - share code from `packages/core`
 - read the analyzed Magento source at `/mnt/analyzed-source`
@@ -189,6 +194,18 @@ Responsibilities:
 - short-lived coordination/cache data if needed
 
 Uses the official Redis image directly.
+
+### `magentic_postgres`
+
+Private PostgreSQL service.
+
+Responsibilities:
+
+- ordinary application storage
+- future query history records
+- future persisted metadata that does not belong in Redis or Neo4j
+
+Uses the official PostgreSQL image directly.
 
 ### `magentic_graphdb`
 
@@ -229,9 +246,9 @@ magentic_frontend / Nginx
   v
 magentic_backend / Fastify
   |
-  | Redis + Neo4j clients
+  | Redis + PostgreSQL + Neo4j clients
   v
-magentic_redis, magentic_graphdb
+magentic_redis, magentic_postgres, magentic_graphdb
 ```
 
 The worker is private:
@@ -242,6 +259,12 @@ magentic_worker
   | BullMQ
   v
 magentic_redis
+
+magentic_worker
+  |
+  | PostgreSQL
+  v
+magentic_postgres
 
 magentic_worker
   |
@@ -322,6 +345,8 @@ npm run start:worker
 
 `magentic_redis` uses the official Redis image directly from Compose.
 
+`magentic_postgres` uses the official PostgreSQL image directly from Compose.
+
 `magentic_graphdb` uses the official Neo4j image directly from Compose.
 
 ## Planned Files
@@ -334,6 +359,7 @@ services/core/Dockerfile
 services/frontend/Dockerfile
 services/frontend/nginx.conf
 services/redis/
+services/postgres/
 services/graphdb/
 www/path/to/magento/source-code/
 packages/core/package.json
@@ -344,21 +370,22 @@ packages/site/package.json
 
 The first implementation includes:
 
-- `.env.example` with documented local defaults for ports, Redis connection values, Neo4j connection values, and Node environment.
-- named Docker volumes for Redis and Neo4j.
-- health checks for backend, Redis, and Neo4j.
+- `.env.example` with documented local defaults for ports, Redis connection values, PostgreSQL connection values, Neo4j connection values, and Node environment.
+- named Docker volumes for Redis, PostgreSQL, and Neo4j.
+- health checks for backend, Redis, PostgreSQL, and Neo4j.
 - `depends_on` relationships for startup order.
-- explicit environment variable names used by backend and worker, such as `REDIS_URL`, `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`.
+- explicit environment variable names used by backend and worker, such as `REDIS_URL`, `POSTGRES_URL`, `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`.
 - npm workspaces at the root for package orchestration.
 
 ## Recommended First Implementation
 
-Start with a root `docker-compose.yml` containing five services:
+Start with a root `docker-compose.yml` containing six services:
 
 - `magentic_frontend`
 - `magentic_backend`
 - `magentic_worker`
 - `magentic_redis`
+- `magentic_postgres`
 - `magentic_graphdb`
 
 Expose the frontend to the host:
@@ -374,7 +401,7 @@ localhost:${NEO4J_HTTP_PORT:-7474} -> magentic_graphdb:7474
 localhost:${NEO4J_BOLT_PORT:-7687} -> magentic_graphdb:7687
 ```
 
-Keep backend, worker, and Redis private on the Compose network.
+Keep backend, worker, Redis, and PostgreSQL private on the Compose network.
 
 Use same-origin browser API calls:
 
@@ -388,4 +415,4 @@ Proxy those calls through Nginx:
 magentic_frontend -> magentic_backend:3000
 ```
 
-Use Redis for BullMQ communication between backend and worker, and Neo4j as the graph database used by backend and worker.
+Use Redis for BullMQ communication between backend and worker, PostgreSQL for ordinary application storage, and Neo4j as the graph database used by backend and worker.

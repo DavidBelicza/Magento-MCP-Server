@@ -1,0 +1,9 @@
+CREATE CONSTRAINT magentic_package_id IF NOT EXISTS FOR (node:Package) REQUIRE node.id IS UNIQUE;
+CREATE CONSTRAINT magentic_author_id IF NOT EXISTS FOR (node:Author) REQUIRE node.id IS UNIQUE;
+CREATE CONSTRAINT magentic_package_requires_package_identity IF NOT EXISTS FOR ()-[relationship:PACKAGE_REQUIRES_PACKAGE]-() REQUIRE relationship.identity IS UNIQUE;
+CREATE CONSTRAINT magentic_package_requires_dev_package_identity IF NOT EXISTS FOR ()-[relationship:PACKAGE_REQUIRES_DEV_PACKAGE]-() REQUIRE relationship.identity IS UNIQUE;
+CREATE CONSTRAINT magentic_package_authored_by_identity IF NOT EXISTS FOR ()-[relationship:PACKAGE_AUTHORED_BY]-() REQUIRE relationship.identity IS UNIQUE;
+CREATE CONSTRAINT magentic_package_suggests_package_identity IF NOT EXISTS FOR ()-[relationship:PACKAGE_SUGGESTS_PACKAGE]-() REQUIRE relationship.identity IS UNIQUE;
+CREATE CONSTRAINT magentic_package_replaces_package_identity IF NOT EXISTS FOR ()-[relationship:PACKAGE_REPLACES_PACKAGE]-() REQUIRE relationship.identity IS UNIQUE;
+CREATE CONSTRAINT magentic_package_provides_package_identity IF NOT EXISTS FOR ()-[relationship:PACKAGE_PROVIDES_PACKAGE]-() REQUIRE relationship.identity IS UNIQUE;
+CREATE CONSTRAINT magentic_package_conflicts_with_package_identity IF NOT EXISTS FOR ()-[relationship:PACKAGE_CONFLICTS_WITH_PACKAGE]-() REQUIRE relationship.identity IS UNIQUE;

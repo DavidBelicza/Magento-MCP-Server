@@ -1,7 +1,8 @@
 import Fastify from "fastify";
-import { createNeo4jDriver, createRedisConnection } from "./connections.js";
+import { createNeo4jDriver, createPostgresPool, createRedisConnection } from "./connections.js";
 import { readConfig } from "./config.js";
 import { createIndexPackagesQueue } from "./queue/index-packages.js";
+import { installSchemas } from "./schema/install-schemas.js";
 
 const config = readConfig();
 const app = Fastify({
@@ -9,19 +10,22 @@ const app = Fastify({
 });
 
 const redis = createRedisConnection();
+const postgres = createPostgresPool();
 const neo4jDriver = createNeo4jDriver();
 const indexPackagesQueue = createIndexPackagesQueue();
 
 app.get("/api/health", async () => {
-  const [redisStatus, neo4jStatus] = await Promise.allSettled([
+  const [redisStatus, postgresStatus, neo4jStatus] = await Promise.allSettled([
     redis.ping(),
+    postgres.query("SELECT 1"),
     neo4jDriver.verifyConnectivity()
   ]);
 
   return {
-    ok: redisStatus.status === "fulfilled" && neo4jStatus.status === "fulfilled",
+    ok: redisStatus.status === "fulfilled" && postgresStatus.status === "fulfilled" && neo4jStatus.status === "fulfilled",
     service: "backend",
     redis: redisStatus.status === "fulfilled" ? "ok" : "error",
+    postgres: postgresStatus.status === "fulfilled" ? "ok" : "error",
     graphdb: neo4jStatus.status === "fulfilled" ? "ok" : "error"
   };
 });
@@ -68,6 +72,7 @@ app.get<{ Querystring: { jobId?: string } }>("/api/index/get-status", async (req
 
 async function start() {
   try {
+    await installSchemas(postgres, neo4jDriver);
     await app.listen({
       host: "0.0.0.0",
       port: config.port
@@ -82,6 +87,7 @@ process.on("SIGTERM", async () => {
   await app.close();
   await indexPackagesQueue.close();
   await redis.quit();
+  await postgres.end();
   await neo4jDriver.close();
 });
 

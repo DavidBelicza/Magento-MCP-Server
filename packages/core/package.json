@@ -14,10 +14,12 @@
     "bullmq": "^5.58.5",
     "fastify": "^5.4.0",
     "ioredis": "^5.7.0",
-    "neo4j-driver": "^5.28.1"
+    "neo4j-driver": "^5.28.1",
+    "pg": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/pg": "^8.20.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   },

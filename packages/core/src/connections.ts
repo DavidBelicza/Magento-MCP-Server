@@ -1,6 +1,9 @@
 import { Redis } from "ioredis";
 import neo4j from "neo4j-driver";
+import pg from "pg";
 import { readConfig } from "./config.js";
+
+const { Pool } = pg;
 
 export function createRedisConnection() {
   const config = readConfig();
@@ -29,4 +32,12 @@ export function createNeo4jDriver() {
     config.neo4jUri,
     neo4j.auth.basic(config.neo4jUsername, config.neo4jPassword)
   );
+}
+
+export function createPostgresPool() {
+  const config = readConfig();
+
+  return new Pool({
+    connectionString: config.postgresUrl
+  });
 }

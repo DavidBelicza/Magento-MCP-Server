@@ -5,7 +5,6 @@ import type { GraphNodeRecord, GraphRelationshipRecord, GraphWriteProgress, Grap
 type WriteGraphFullReplaceOptions = {
   labels: string[];
   relationshipTypes: string[];
-  constraintNamePrefix: string;
   batchSize?: number;
   onProgress?: (progress: GraphWriteProgress) => Promise<void>;
   getClearingPhase?: () => string;
@@ -43,9 +42,6 @@ export async function writeGraphFullReplace(
   try {
     await reportProgress(progress, options.getClearingPhase?.() ?? "clearing-graph");
     await session.executeWrite(async (tx) => {
-      await installGraphConstraints(tx, labels, relationshipTypes, options.constraintNamePrefix);
-    });
-    await session.executeWrite(async (tx) => {
       await clearGraph(tx, labels, relationshipTypes);
     });
 
@@ -70,27 +66,6 @@ export async function writeGraphFullReplace(
     };
   } finally {
     await session.close();
-  }
-}
-
-async function installGraphConstraints(
-  tx: ManagedTransaction,
-  labels: string[],
-  relationshipTypes: string[],
-  constraintNamePrefix: string
-): Promise<void> {
-  const constraintPrefix = sanitizeConstraintNamePart(constraintNamePrefix);
-
-  for (const label of labels) {
-    await tx.run(
-      `CREATE CONSTRAINT ${constraintPrefix}_${sanitizeConstraintNamePart(label)}_id IF NOT EXISTS FOR (node:${label}) REQUIRE node.id IS UNIQUE`
-    );
-  }
-
-  for (const relationshipType of relationshipTypes) {
-    await tx.run(
-      `CREATE CONSTRAINT ${constraintPrefix}_${sanitizeConstraintNamePart(relationshipType)}_identity IF NOT EXISTS FOR ()-[relationship:${relationshipType}]-() REQUIRE relationship.identity IS UNIQUE`
-    );
   }
 }
 
@@ -212,10 +187,6 @@ function validateGraphTokens(tokens: string[]): void {
       throw new Error(`Invalid graph token: ${token}`);
     }
   }
-}
-
-function sanitizeConstraintNamePart(input: string): string {
-  return input.toLowerCase().replace(/[^a-z0-9_]/g, "_");
 }
 
 function unique<T>(items: T[]): T[] {
