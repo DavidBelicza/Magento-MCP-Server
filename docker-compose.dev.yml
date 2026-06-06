@@ -4,6 +4,19 @@ x-magentic-core-dev-build: &magentic_core_dev_build
   target: dev
 
 services:
+  magentic_frontend:
+    image: magentic_frontend_dev:latest
+    build:
+      context: .
+      dockerfile: services/frontend/Dockerfile
+      target: dev
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
+    volumes:
+      - ./packages/site/src:/app/src
+      - ./packages/site/index.html:/app/index.html
+      - ./packages/site/vite.config.ts:/app/vite.config.ts
+      - ./packages/site/postcss.config.js:/app/postcss.config.js
+
   magentic_backend:
     image: magentic_backend_dev:latest
     build: *magentic_core_dev_build

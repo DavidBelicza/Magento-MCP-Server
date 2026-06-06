@@ -1,9 +1,19 @@
-FROM node:24-alpine AS build
+FROM node:24-alpine AS deps
 
 WORKDIR /app
 
 COPY packages/site/package*.json ./
 RUN npm install
+
+FROM deps AS dev
+
+COPY packages/site/ ./
+
+EXPOSE 80
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
+
+FROM deps AS build
 
 COPY packages/site/ ./
 RUN npm run build
