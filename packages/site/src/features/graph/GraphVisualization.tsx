@@ -1,7 +1,5 @@
-import cytoscape from 'cytoscape'
-import type { Core, ElementDefinition } from 'cytoscape'
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
-import type { MockAuthorPackages } from './graphMockData'
+import ForceGraph2D from 'react-force-graph-2d'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 
 export type GraphVisualizationNode = {
   id: string
@@ -23,8 +21,37 @@ export type GraphVisualizationData = {
   relationships: GraphVisualizationRelationship[]
 }
 
+type ForceGraphNode = {
+  id: string
+  label: string
+  type: string
+  val: number
+  color: string
+  x?: number
+  y?: number
+}
+
+type GraphViewportBounds = {
+  bottom: number
+  left: number
+  right: number
+  top: number
+}
+
+type ForceGraphLink = {
+  id: string
+  source: string | ForceGraphNode
+  target: string | ForceGraphNode
+  type: string
+  color: string
+}
+
+type ForceGraphData = {
+  nodes: ForceGraphNode[]
+  links: ForceGraphLink[]
+}
+
 type GraphVisualizationProps = {
-  authors?: MockAuthorPackages[]
   graph?: GraphVisualizationData
 }
 
@@ -32,14 +59,24 @@ export type GraphVisualizationHandle = {
   resetView: () => void
 }
 
-export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisualizationProps>(({ authors = [], graph }, ref) => {
+export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisualizationProps>(({ graph }, ref) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const graphRef = useRef<Core | null>(null)
-  const elements = useMemo(() => (graph ? createGraphElements(graph) : createAuthorPackageElements(authors)), [authors, graph])
+  const graphRef = useRef<any>(undefined)
+  const selectedNodeIdRef = useRef<string | null>(null)
+  const adjacencyRef = useRef<Adjacency | null>(null)
+  const viewportBoundsRef = useRef<GraphViewportBounds | null>(null)
+  const lastNodeClickTimeRef = useRef(0)
+  const pointerDownRef = useRef<{ x: number; y: number } | null>(null)
+  const [size, setSize] = useState({ width: 1, height: 1 })
+  const graphData = useMemo(() => (graph ? createForceGraphData(graph) : createEmptyGraphData()), [graph])
+  const adjacency = useMemo(() => createAdjacency(graphData), [graphData])
+  const simulationProfile = useMemo(() => getSimulationProfile(graphData.nodes.length), [graphData.nodes.length])
+  const getSelectedNodeId = useCallback(() => selectedNodeIdRef.current, [])
+  adjacencyRef.current = adjacency
 
   useImperativeHandle(ref, () => ({
     resetView: () => {
-      graphRef.current?.fit(undefined, 32)
+      graphRef.current?.zoomToFit(360, 32)
     },
   }))
 
@@ -48,158 +85,425 @@ export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisu
       return undefined
     }
 
-    graphRef.current = cytoscape({
-      container: containerRef.current,
-      elements,
-      layout: {
-        name: 'cose',
-        animate: false,
-        fit: true,
-        padding: 32,
-        nodeRepulsion: 9000,
-        idealEdgeLength: 72,
-      },
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': '#ffffff',
-            'border-color': '#d1d5db',
-            'border-width': 1,
-            color: '#374151',
-            'font-size': '8px',
-            height: '18px',
-            label: 'data(label)',
-            'overlay-opacity': 0,
-            shape: 'ellipse',
-            'text-background-color': '#ffffff',
-            'text-background-opacity': 0.72,
-            'text-background-padding': '2px',
-            'text-max-width': '82px',
-            'text-valign': 'bottom',
-            'text-wrap': 'wrap',
-            width: '18px',
-          },
-        },
-        {
-          selector: 'node[type = "author"]',
-          style: {
-            'background-color': '#00e676',
-            'border-color': '#009f52',
-            'border-width': 2,
-            color: '#111827',
-            'font-size': '10px',
-            'font-weight': 700,
-            height: 'mapData(packageCount, 1, 40, 34, 64)',
-            width: 'mapData(packageCount, 1, 40, 34, 64)',
-          },
-        },
-        {
-          selector: 'node[type = "package"]',
-          style: {
-            'background-color': '#fff7ed',
-            'border-color': '#ff4e08',
-          },
-        },
-        {
-          selector: 'node[type = "composer-package"]',
-          style: {
-            'background-color': '#fff7ed',
-            'border-color': '#ff4e08',
-          },
-        },
-        {
-          selector: 'node[type = "composer-author"]',
-          style: {
-            'background-color': '#00e676',
-            'border-color': '#009f52',
-            'border-width': 2,
-            color: '#111827',
-            'font-size': '10px',
-            'font-weight': 700,
-            height: 42,
-            width: 42,
-          },
-        },
-        {
-          selector: 'edge',
-          style: {
-            'curve-style': 'bezier',
-            'line-color': '#cbd5e1',
-            opacity: 0.64,
-            'target-arrow-color': '#cbd5e1',
-            'target-arrow-shape': 'triangle',
-            width: 1,
-          },
-        },
-      ],
+    const observer = new ResizeObserver(([entry]) => {
+      const { height, width } = entry.contentRect
+
+      setSize({
+        height: Math.max(1, Math.floor(height)),
+        width: Math.max(1, Math.floor(width)),
+      })
     })
+
+    observer.observe(containerRef.current)
 
     return () => {
-      graphRef.current?.destroy()
-      graphRef.current = null
+      observer.disconnect()
     }
-  }, [elements])
+  }, [])
 
-  return <div ref={containerRef} className="h-full w-full" />
-})
+  const setSelectedNodeId = useCallback((nodeId: string | null) => {
+    if (selectedNodeIdRef.current === nodeId) {
+      return
+    }
 
-function createAuthorPackageElements(authors: MockAuthorPackages[]): ElementDefinition[] {
-  const packageNodes = new Map<string, ElementDefinition>()
-  const elements: ElementDefinition[] = []
+    selectedNodeIdRef.current = nodeId
+    requestGraphRedraw(graphRef.current)
+  }, [])
 
-  for (const author of authors) {
-    elements.push({
-      data: {
-        id: author.id,
-        label: author.name,
-        packageCount: author.packages.length,
-        type: 'author',
-      },
-    })
+  useEffect(() => {
+    setSelectedNodeId(null)
 
-    for (const composerPackage of author.packages) {
-      if (!packageNodes.has(composerPackage.id)) {
-        packageNodes.set(composerPackage.id, {
-          data: {
-            id: composerPackage.id,
-            label: composerPackage.name,
-            type: 'package',
-          },
-        })
+    const fitTimeout = window.setTimeout(() => {
+      graphRef.current?.zoomToFit(480, 32)
+    }, 600)
+
+    return () => {
+      window.clearTimeout(fitTimeout)
+    }
+  }, [graphData, setSelectedNodeId])
+
+  const clearSelection = useCallback(() => {
+    setSelectedNodeId(null)
+  }, [setSelectedNodeId])
+
+  const getLinkColorForRender = useCallback((link: ForceGraphLink) => getRenderedLinkColor(link, getSelectedNodeId()), [getSelectedNodeId])
+
+  const getLinkWidthForRender = useCallback((link: ForceGraphLink) => getRenderedLinkWidth(link, getSelectedNodeId()), [getSelectedNodeId])
+
+  const drawNodeForRender = useCallback(
+    (node: ForceGraphNode, canvas: CanvasRenderingContext2D, globalScale: number) => {
+      const currentAdjacency = adjacencyRef.current
+      const selectionState = currentAdjacency ? getNodeSelectionState(node, getSelectedNodeId(), currentAdjacency) : null
+
+      drawNode(node, canvas, globalScale, selectionState, viewportBoundsRef.current)
+    },
+    [getSelectedNodeId],
+  )
+
+  const updateViewportBounds = useCallback(() => {
+    viewportBoundsRef.current = getViewportBounds(graphRef.current, size)
+  }, [size])
+
+  const paintNodePointerAreaForRender = useCallback(
+    (node: ForceGraphNode, color: string, canvas: CanvasRenderingContext2D, globalScale: number) => {
+      paintNodePointerArea(node, color, canvas, globalScale)
+    },
+    [],
+  )
+
+  const getNodeCanvasObjectMode = useCallback(() => 'replace', [])
+
+  const handleNodeClick = useCallback(
+    (node: ForceGraphNode) => {
+      const nodeId = String(node.id)
+      const nextNodeId = selectedNodeIdRef.current === nodeId ? null : nodeId
+
+      lastNodeClickTimeRef.current = Date.now()
+      setSelectedNodeId(nextNodeId)
+    },
+    [setSelectedNodeId],
+  )
+
+  const handleBackgroundClick = useCallback(() => {
+    if (Date.now() - lastNodeClickTimeRef.current < 80) {
+      return
+    }
+
+    clearSelection()
+  }, [clearSelection])
+
+  const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    pointerDownRef.current = { x: event.clientX, y: event.clientY }
+  }, [])
+
+  const handlePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const pointerDown = pointerDownRef.current
+
+      pointerDownRef.current = null
+
+      if (!pointerDown) {
+        return
       }
 
-      elements.push({
-        data: {
-          id: `${composerPackage.id}->${author.id}`,
-          source: composerPackage.id,
-          target: author.id,
-        },
-      })
+      const movedDistance = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y)
+
+      if (movedDistance > 4) {
+        return
+      }
+
+      window.setTimeout(() => {
+        if (Date.now() - lastNodeClickTimeRef.current < 120) {
+          return
+        }
+
+        clearSelection()
+      }, 32)
+    },
+    [clearSelection],
+  )
+
+  return (
+    <div ref={containerRef} className="h-full w-full" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
+      <ForceGraph2D
+        ref={graphRef}
+        graphData={graphData}
+        width={size.width}
+        height={size.height}
+        backgroundColor="rgba(255,255,255,0)"
+        nodeId="id"
+        nodeLabel="label"
+        nodeVal="val"
+        nodeColor="color"
+        nodeRelSize={3.2}
+        linkSource="source"
+        linkTarget="target"
+        linkColor={getLinkColorForRender}
+        linkWidth={getLinkWidthForRender}
+        linkDirectionalArrowLength={0}
+        d3AlphaDecay={simulationProfile.alphaDecay}
+        d3VelocityDecay={simulationProfile.velocityDecay}
+        cooldownTime={simulationProfile.cooldownTime}
+        warmupTicks={0}
+        autoPauseRedraw
+        enableNodeDrag
+        nodeCanvasObject={drawNodeForRender}
+        nodeCanvasObjectMode={getNodeCanvasObjectMode}
+        nodePointerAreaPaint={paintNodePointerAreaForRender}
+        onRenderFramePre={updateViewportBounds}
+        onNodeClick={handleNodeClick}
+        onBackgroundClick={handleBackgroundClick}
+      />
+    </div>
+  )
+})
+
+function createEmptyGraphData(): ForceGraphData {
+  return {
+    nodes: [],
+    links: [],
+  }
+}
+
+function createForceGraphData(graph: GraphVisualizationData): ForceGraphData {
+  return {
+    nodes: graph.nodes.map((node) => ({
+      id: node.id,
+      label: getNodeLabel(node),
+      type: node.type,
+      val: getNodeValue(node.type),
+      color: getNodeColor(node.type),
+    })),
+    links: graph.relationships.map((relationship) => ({
+      id: relationship.id,
+      source: relationship.startNodeId,
+      target: relationship.endNodeId,
+      type: relationship.type,
+      color: getLinkColor(relationship.type),
+    })),
+  }
+}
+
+function getSimulationProfile(nodeCount: number): { alphaDecay: number; cooldownTime: number; velocityDecay: number } {
+  if (nodeCount > 2000) {
+    return {
+      alphaDecay: 0.06,
+      cooldownTime: 2000,
+      velocityDecay: 0.45,
     }
   }
 
-  return [...packageNodes.values(), ...elements]
+  return {
+    alphaDecay: 0.028,
+    cooldownTime: 12000,
+    velocityDecay: 0.34,
+  }
 }
 
-function createGraphElements(graph: GraphVisualizationData): ElementDefinition[] {
-  return [
-    ...graph.nodes.map((node) => ({
-      data: {
-        id: node.id,
-        label: getNodeLabel(node),
-        type: node.type,
-      },
-    })),
-    ...graph.relationships.map((relationship) => ({
-      data: {
-        id: relationship.id,
-        source: relationship.startNodeId,
-        target: relationship.endNodeId,
-        label: relationship.type,
-      },
-    })),
-  ]
+type ForceGraphInstance = {
+  centerAt?: {
+    (): { x: number; y: number }
+    (x: number, y: number): unknown
+  }
+  screen2GraphCoords?: (x: number, y: number) => { x: number; y: number }
+}
+
+function requestGraphRedraw(graph: ForceGraphInstance | undefined) {
+  if (!graph?.centerAt) {
+    return
+  }
+
+  const center = graph.centerAt()
+
+  graph.centerAt(center.x, center.y)
+}
+
+function getViewportBounds(graph: ForceGraphInstance | undefined, size: { height: number; width: number }): GraphViewportBounds | null {
+  if (!graph?.screen2GraphCoords) {
+    return null
+  }
+
+  const topLeft = graph.screen2GraphCoords(0, 0)
+  const bottomRight = graph.screen2GraphCoords(size.width, size.height)
+
+  return {
+    bottom: Math.max(topLeft.y, bottomRight.y),
+    left: Math.min(topLeft.x, bottomRight.x),
+    right: Math.max(topLeft.x, bottomRight.x),
+    top: Math.min(topLeft.y, bottomRight.y),
+  }
+}
+
+type Adjacency = {
+  linksByNodeId: Map<string, Set<string>>
+  neighborsByNodeId: Map<string, Set<string>>
+}
+
+type NodeSelectionState = 'connected' | 'selected' | 'unrelated'
+
+function createAdjacency(graphData: ForceGraphData): Adjacency {
+  const linksByNodeId = new Map<string, Set<string>>()
+  const neighborsByNodeId = new Map<string, Set<string>>()
+
+  for (const node of graphData.nodes) {
+    linksByNodeId.set(node.id, new Set())
+    neighborsByNodeId.set(node.id, new Set())
+  }
+
+  for (const link of graphData.links) {
+    const sourceId = getLinkNodeId(link.source)
+    const targetId = getLinkNodeId(link.target)
+
+    linksByNodeId.get(sourceId)?.add(link.id)
+    linksByNodeId.get(targetId)?.add(link.id)
+    neighborsByNodeId.get(sourceId)?.add(targetId)
+    neighborsByNodeId.get(targetId)?.add(sourceId)
+  }
+
+  return {
+    linksByNodeId,
+    neighborsByNodeId,
+  }
+}
+
+function getNodeSelectionState(node: ForceGraphNode, selectedNodeId: string | null, adjacency: Adjacency): NodeSelectionState | null {
+  if (!selectedNodeId) {
+    return null
+  }
+
+  if (node.id === selectedNodeId) {
+    return 'selected'
+  }
+
+  if (adjacency.neighborsByNodeId.get(selectedNodeId)?.has(node.id)) {
+    return 'connected'
+  }
+
+  return 'unrelated'
+}
+
+function drawNode(
+  node: ForceGraphNode,
+  canvas: CanvasRenderingContext2D,
+  globalScale: number,
+  selectionState: NodeSelectionState | null,
+  viewportBounds: GraphViewportBounds | null,
+) {
+  const radius = getNodeRadius(node)
+  const x = node.x ?? 0
+  const y = node.y ?? 0
+  const isSelected = selectionState === 'selected'
+  const isConnected = selectionState === 'connected'
+  const isUnrelated = selectionState === 'unrelated'
+
+  if (viewportBounds && !isNodeInViewport(x, y, radius, viewportBounds, globalScale)) {
+    return
+  }
+
+  canvas.globalAlpha = isUnrelated ? 0.1 : 1
+
+  if (isSelected) {
+    canvas.beginPath()
+    canvas.arc(x, y, radius + 5 / globalScale, 0, 2 * Math.PI, false)
+    canvas.fillStyle = 'rgba(17, 24, 39, 0.16)'
+    canvas.fill()
+  }
+
+  canvas.beginPath()
+  canvas.arc(x, y, radius, 0, 2 * Math.PI, false)
+  canvas.fillStyle = isSelected ? getNodeBorderColor(node.type) : node.color
+  canvas.fill()
+  canvas.lineWidth = (isConnected ? 4.5 : isSelected ? 3 : 1) / globalScale
+  canvas.strokeStyle = getNodeBorderColor(node.type)
+  canvas.stroke()
+  canvas.globalAlpha = 1
+
+  if (globalScale < 1.15 && !isSelected && !isConnected) {
+    return
+  }
+
+  const fontSize = Math.max(8 / globalScale, 3.8)
+
+  canvas.font = `600 ${fontSize}px Inter, ui-sans-serif, system-ui, sans-serif`
+  canvas.textAlign = 'center'
+  canvas.textBaseline = 'top'
+  canvas.fillStyle = '#374151'
+  canvas.fillText(truncateLabel(node.label), x, y + radius + 2 / globalScale)
+}
+
+function isNodeInViewport(x: number, y: number, radius: number, bounds: GraphViewportBounds, globalScale: number): boolean {
+  const margin = radius + 40 / globalScale
+
+  return x >= bounds.left - margin && x <= bounds.right + margin && y >= bounds.top - margin && y <= bounds.bottom + margin
+}
+
+function paintNodePointerArea(node: ForceGraphNode, color: string, canvas: CanvasRenderingContext2D, globalScale: number) {
+  const radius = getNodeRadius(node) + 3 / globalScale
+
+  canvas.beginPath()
+  canvas.arc(node.x ?? 0, node.y ?? 0, radius, 0, 2 * Math.PI, false)
+  canvas.fillStyle = color
+  canvas.fill()
+}
+
+function getNodeRadius(node: ForceGraphNode): number {
+  return Math.sqrt(Math.max(node.val, 1)) * 3.2
+}
+
+function getRenderedLinkColor(link: ForceGraphLink, selectedNodeId: string | null): string {
+  if (!selectedNodeId) {
+    return link.color
+  }
+
+  if (isLinkConnectedToNode(link, selectedNodeId)) {
+    return getHighlightedLinkColor(link.type)
+  }
+
+  return 'rgba(148, 163, 184, 0.045)'
+}
+
+function getRenderedLinkWidth(link: ForceGraphLink, selectedNodeId: string | null): number {
+  if (!selectedNodeId) {
+    return 0.7
+  }
+
+  return isLinkConnectedToNode(link, selectedNodeId) ? 2.6 : 0.2
+}
+
+function isLinkConnectedToNode(link: ForceGraphLink, nodeId: string): boolean {
+  return getLinkNodeId(link.source) === nodeId || getLinkNodeId(link.target) === nodeId
+}
+
+function getLinkNodeId(node: string | ForceGraphNode): string {
+  return typeof node === 'string' ? node : node.id
+}
+
+function truncateLabel(label: string): string {
+  if (label.length <= 34) {
+    return label
+  }
+
+  return `${label.slice(0, 31)}...`
+}
+
+function getNodeValue(type: string): number {
+  if (type === 'composer-author') {
+    return 8
+  }
+
+  return 3
+}
+
+function getNodeColor(type: string): string {
+  if (type === 'composer-author' || type === 'author') {
+    return '#00e676'
+  }
+
+  if (type === 'composer-package' || type === 'package') {
+    return '#ffb38a'
+  }
+
+  return '#d1d5db'
+}
+
+function getNodeBorderColor(type: string): string {
+  if (type === 'composer-author' || type === 'author') {
+    return '#009f52'
+  }
+
+  if (type === 'composer-package' || type === 'package') {
+    return '#ff4e08'
+  }
+
+  return '#9ca3af'
+}
+
+function getLinkColor(type: string): string {
+  return 'rgba(148, 163, 184, 0.28)'
+}
+
+function getHighlightedLinkColor(type: string): string {
+  return 'rgba(99, 102, 241, 0.68)'
 }
 
 function getNodeLabel(node: GraphVisualizationNode): string {

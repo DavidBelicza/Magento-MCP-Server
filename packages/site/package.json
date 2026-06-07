@@ -10,9 +10,9 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.6.0",
-    "cytoscape": "^3.34.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-force-graph-2d": "^1.29.1",
     "react-router-dom": "^7.6.3",
     "vite": "^7.0.0"
   },

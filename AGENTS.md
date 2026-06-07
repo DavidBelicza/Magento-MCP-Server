@@ -5,7 +5,7 @@
 Magentic is a Docker-based, self-hosted MCP server for agentic AI workflows. It uses an npm workspace monorepo with two application packages:
 
 - `packages/core`: Fastify backend, BullMQ worker, Redis queues, PostgreSQL storage, Neo4j graph writes, startup schema installation.
-- `packages/site`: React, Vite, Tailwind frontend with routed views and Cytoscape graph visualization.
+- `packages/site`: React, Vite, Tailwind frontend with routed views and React Force Graph 2D visualization.
 
 The main architecture notes are in `docs/plan_local_docker_architecture.md`. Runtime sanity checks are in `docs/test_system_sanity.md`.
 
@@ -66,7 +66,7 @@ Important site paths:
 - `src/app/App.tsx`: app shell, routing, fixed sidebar/top bar layout.
 - `src/app/navigation.ts`: navigation IDs and route paths.
 - `src/components/`: shared UI components.
-- `src/features/graph/`: Cytoscape graph visualization and mock graph data.
+- `src/features/graph/`: React Force Graph 2D graph visualization.
 - `src/views/`: route views.
 
 The frontend uses same-origin `/api/*` calls. In dev, Vite proxies `/api` to `magentic_backend:3000`.

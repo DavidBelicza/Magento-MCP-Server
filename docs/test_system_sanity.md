@@ -267,7 +267,7 @@ Expected result:
 - The Graph page loads the saved query history detail.
 - The header shows a shortened title derived from the saved query description.
 - The node and edge counts reflect the saved `structuredResult`.
-- Cytoscape renders the saved graph when the stored result contains graph nodes and relationships.
+- React Force Graph 2D renders the saved graph when the stored result contains graph nodes and relationships.
 - Saved results without graph nodes or relationships show an empty-state message instead of a blank canvas.
 
 Check the Graph page without an explicit query history ID:
