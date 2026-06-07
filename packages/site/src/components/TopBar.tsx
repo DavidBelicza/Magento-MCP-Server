@@ -6,7 +6,7 @@ export const TopBar: React.FC<{ activeLabel: string }> = ({ activeLabel }) => {
   const health = useBackendHealth()
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between bg-white/72 px-4 backdrop-blur md:px-6">
+    <header className="flex h-16 shrink-0 items-center justify-between px-4 backdrop-blur md:px-6">
       <div className="min-w-0">
         <h1 className="truncate text-lg font-bold tracking-wide text-[#111827]">{activeLabel}</h1>
         <p className="truncate text-xs text-[#4b5563]">Local graph workspace</p>

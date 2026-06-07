@@ -3,18 +3,39 @@ import type { Core, ElementDefinition } from 'cytoscape'
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import type { MockAuthorPackages } from './graphMockData'
 
+export type GraphVisualizationNode = {
+  id: string
+  type: string
+  labels?: string[]
+  properties: Record<string, unknown>
+}
+
+export type GraphVisualizationRelationship = {
+  id: string
+  type: string
+  startNodeId: string
+  endNodeId: string
+  properties: Record<string, unknown>
+}
+
+export type GraphVisualizationData = {
+  nodes: GraphVisualizationNode[]
+  relationships: GraphVisualizationRelationship[]
+}
+
 type GraphVisualizationProps = {
-  authors: MockAuthorPackages[]
+  authors?: MockAuthorPackages[]
+  graph?: GraphVisualizationData
 }
 
 export type GraphVisualizationHandle = {
   resetView: () => void
 }
 
-export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisualizationProps>(({ authors }, ref) => {
+export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisualizationProps>(({ authors = [], graph }, ref) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const graphRef = useRef<Core | null>(null)
-  const elements = useMemo(() => createElements(authors), [authors])
+  const elements = useMemo(() => (graph ? createGraphElements(graph) : createAuthorPackageElements(authors)), [authors, graph])
 
   useImperativeHandle(ref, () => ({
     resetView: () => {
@@ -81,6 +102,26 @@ export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisu
           },
         },
         {
+          selector: 'node[type = "composer-package"]',
+          style: {
+            'background-color': '#fff7ed',
+            'border-color': '#ff4e08',
+          },
+        },
+        {
+          selector: 'node[type = "composer-author"]',
+          style: {
+            'background-color': '#00e676',
+            'border-color': '#009f52',
+            'border-width': 2,
+            color: '#111827',
+            'font-size': '10px',
+            'font-weight': 700,
+            height: 42,
+            width: 42,
+          },
+        },
+        {
           selector: 'edge',
           style: {
             'curve-style': 'bezier',
@@ -103,7 +144,7 @@ export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisu
   return <div ref={containerRef} className="h-full w-full" />
 })
 
-function createElements(authors: MockAuthorPackages[]): ElementDefinition[] {
+function createAuthorPackageElements(authors: MockAuthorPackages[]): ElementDefinition[] {
   const packageNodes = new Map<string, ElementDefinition>()
   const elements: ElementDefinition[] = []
 
@@ -139,4 +180,44 @@ function createElements(authors: MockAuthorPackages[]): ElementDefinition[] {
   }
 
   return [...packageNodes.values(), ...elements]
+}
+
+function createGraphElements(graph: GraphVisualizationData): ElementDefinition[] {
+  return [
+    ...graph.nodes.map((node) => ({
+      data: {
+        id: node.id,
+        label: getNodeLabel(node),
+        type: node.type,
+      },
+    })),
+    ...graph.relationships.map((relationship) => ({
+      data: {
+        id: relationship.id,
+        source: relationship.startNodeId,
+        target: relationship.endNodeId,
+        label: relationship.type,
+      },
+    })),
+  ]
+}
+
+function getNodeLabel(node: GraphVisualizationNode): string {
+  const name = node.properties.name
+  const packageName = node.properties.packageName
+  const id = node.properties.id
+
+  if (typeof name === 'string' && name.trim()) {
+    return name
+  }
+
+  if (typeof packageName === 'string' && packageName.trim()) {
+    return packageName
+  }
+
+  if (typeof id === 'string' && id.trim()) {
+    return id
+  }
+
+  return node.labels?.[0] ?? node.type
 }

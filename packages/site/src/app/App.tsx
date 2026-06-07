@@ -59,7 +59,7 @@ export function App() {
           </nav>
         </div>
         <section className="relative z-10 min-h-0 flex-1 overflow-auto px-4 pb-5 md:px-6 md:pb-6">
-          <div className="min-h-full pt-0">
+          <div className="h-full min-h-full pt-0">
             <Routes>
               <Route path="/" element={<WelcomeView />} />
               <Route path="/graph" element={<GraphView />} />

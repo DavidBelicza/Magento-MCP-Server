@@ -134,6 +134,166 @@ Expected result:
 
 - HTTP status is `200`.
 
+## Graph Search Endpoint Checks
+
+Check a basic read-only graph search:
+
+```bash
+curl -s -X POST http://localhost:8080/api/graph/search \
+  -H 'Content-Type: application/json' \
+  -d '{"description":"Return a constant from Neo4j to verify graph search","cypherQuery":"RETURN 1 AS answer"}'
+```
+
+Expected response:
+
+- `ok` is `true`.
+- `historyId` is present.
+- `result.columns` is `["answer"]`.
+- `result.rows` contains `{"answer":1}`.
+- `structuredResult.nodes` and `structuredResult.relationships` are present.
+
+Check graph path extraction when graph data is available:
+
+```bash
+curl -s -X POST http://localhost:8080/api/graph/search \
+  -H 'Content-Type: application/json' \
+  -d '{"description":"Return one graph path to verify node and relationship extraction","cypherQuery":"MATCH path = (fromNode)-[relationship]->(toNode) RETURN path LIMIT 1"}'
+```
+
+Expected result when indexed graph data exists:
+
+- `ok` is `true`.
+- `result.graph.nodes` contains normalized graph nodes.
+- `result.graph.relationships` contains normalized graph relationships.
+- `structuredResult` contains domain-aware node and relationship types for known graph entities.
+
+Check read-only validation:
+
+```bash
+curl -s -o /tmp/magentic_graph_search_unsafe.out -w '%{http_code}' \
+  -X POST http://localhost:8080/api/graph/search \
+  -H 'Content-Type: application/json' \
+  -d '{"description":"Attempt an unsafe write query","cypherQuery":"CREATE (n:UnsafeTest) RETURN n"}'
+```
+
+Expected result:
+
+- HTTP status is `400`.
+- The response body reports that the query is not allowed.
+
+Check required description validation:
+
+```bash
+curl -s -o /tmp/magentic_graph_search_missing_description.out -w '%{http_code}' \
+  -X POST http://localhost:8080/api/graph/search \
+  -H 'Content-Type: application/json' \
+  -d '{"cypherQuery":"RETURN 1 AS answer"}'
+```
+
+Expected result:
+
+- HTTP status is `400`.
+- The response body reports that `description` is required.
+
+Check query history persistence using the `historyId` returned from a successful graph search:
+
+```bash
+docker compose exec -T magentic_postgres psql -U magentic -d magentic \
+  -c "SELECT id, description, cypher_query, result FROM query_history WHERE id = '<history-id>';"
+```
+
+Expected result:
+
+- The row exists.
+- `description` and `cypher_query` match the request.
+- `result` stores the raw normalized graph search response as JSONB.
+
+Check the query history list endpoint:
+
+```bash
+curl -s http://localhost:8080/api/graph/get-query-history
+```
+
+Expected response:
+
+- `ok` is `true`.
+- `items` contains at most 20 records.
+- Records are ordered newest-first.
+- Each item contains `id`, `createdAt`, `description`, `nodeCount`, and `relationshipCount`.
+- Items do not include `cypherQuery` or `result`.
+
+Check a saved query history detail using an `id` returned from the list endpoint:
+
+```bash
+curl -s http://localhost:8080/api/graph/get-query-history/<history-id>
+```
+
+Expected response:
+
+- `ok` is `true`.
+- `id`, `createdAt`, and `description` describe the saved query.
+- `result` contains the stored raw normalized graph search result.
+- `structuredResult` is rebuilt from the stored raw result.
+- The response does not include `cypherQuery`.
+
+Check the Query History frontend tab:
+
+```text
+http://localhost:8080/history
+```
+
+Expected result:
+
+- The page lists recent query history records from PostgreSQL.
+- The page does not show a duplicated inner `Query History` or `Sessions` heading.
+- Rows use a table-like layout with Query, Graph, Created, and Action columns.
+- Each row shows a title derived from the first 10 words of the description.
+- The description is one line while collapsed.
+- The full description is shown after using the `More` control without rendering a duplicate description.
+- The `More` control is hidden when there is no additional description text to reveal.
+- Each row shows either graph node/edge counts or `No graph data`.
+- Query history UUIDs are not displayed in the row.
+- Each history item links to `/graph?queryHistoryId=<history-id>`.
+- The selected query preview panel is not shown.
+
+Check a saved query graph page using an `id` returned from the list endpoint:
+
+```text
+http://localhost:8080/graph?queryHistoryId=<history-id>
+```
+
+Expected result:
+
+- The Graph page loads the saved query history detail.
+- The header shows a shortened title derived from the saved query description.
+- The node and edge counts reflect the saved `structuredResult`.
+- Cytoscape renders the saved graph when the stored result contains graph nodes and relationships.
+- Saved results without graph nodes or relationships show an empty-state message instead of a blank canvas.
+
+Check the Graph page without an explicit query history ID:
+
+```text
+http://localhost:8080/graph
+```
+
+Expected result:
+
+- The page automatically loads the latest query history item.
+- The URL is updated to `/graph?queryHistoryId=<latest-history-id>`.
+- The graph panel fills the available page height while preserving page padding.
+
+Check the Graph page with a missing query history ID:
+
+```text
+http://localhost:8080/graph?queryHistoryId=00000000-0000-0000-0000-000000000000
+```
+
+Expected result:
+
+- The graph canvas is not rendered.
+- The page shows a query-history-not-found message.
+- The page includes a link back to Query History.
+
 ## Container npm Checks
 
 Check npm inside the backend container:

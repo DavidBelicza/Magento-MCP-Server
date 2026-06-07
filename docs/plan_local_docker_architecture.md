@@ -150,6 +150,8 @@ Responsibilities:
 - communicate with `magentic_redis`
 - communicate with `magentic_postgres`
 - communicate with `magentic_graphdb`
+- execute read-only graph search requests through `/api/graph/search`
+- store graph search descriptions, generated Cypher queries, and raw normalized results in PostgreSQL `query_history`
 - optionally enqueue jobs or coordinate with `magentic_worker` before responding
 
 The backend service does not publish a host port. It is reachable only inside the Docker Compose network.
@@ -202,7 +204,7 @@ Private PostgreSQL service.
 Responsibilities:
 
 - ordinary application storage
-- future query history records
+- graph search query history records
 - future persisted metadata that does not belong in Redis or Neo4j
 
 Uses the official PostgreSQL image directly.
@@ -416,3 +418,59 @@ magentic_frontend -> magentic_backend:3000
 ```
 
 Use Redis for BullMQ communication between backend and worker, PostgreSQL for ordinary application storage, and Neo4j as the graph database used by backend and worker.
+
+## Graph Search API
+
+The backend exposes a general graph search endpoint through the frontend proxy:
+
+```text
+POST /api/graph/search
+```
+
+Expected request body:
+
+```json
+{
+  "description": "Count graph nodes by label",
+  "cypherQuery": "MATCH (node) RETURN labels(node) AS labels, count(node) AS count ORDER BY count DESC LIMIT 10"
+}
+```
+
+The `description` is the English user question or goal that led to the generated Cypher query. It is required because graph search history is intended to preserve both the user intent and the generated query.
+
+The endpoint executes read-only Cypher against Neo4j, stores the raw normalized result in PostgreSQL `query_history`, and returns both:
+
+- `result`: raw normalized rows plus extracted graph nodes and relationships.
+- `structuredResult`: domain-aware graph entities built from known node labels and relationship types, such as Composer packages, authors, and Composer package relationships.
+
+The raw normalized `result` is the persisted audit/history payload. `structuredResult` is an API convenience layer that can evolve as new graph domains are added.
+
+Recent graph search history can be listed through:
+
+```text
+GET /api/graph/get-query-history
+```
+
+This endpoint returns the 20 most recent records ordered newest-first. It returns only query-history metadata needed by the frontend Query History tab:
+
+- `id`
+- `createdAt`
+- `description`
+- `nodeCount`
+- `relationshipCount`
+
+It does not return generated Cypher or stored graph result JSON.
+
+A single saved graph search can be loaded by ID through:
+
+```text
+GET /api/graph/get-query-history/:id
+```
+
+This endpoint returns the saved raw normalized `result` and rebuilds `structuredResult` from that stored result. The frontend Graph page uses this endpoint when opened with a query-history ID:
+
+```text
+/graph?queryHistoryId=<query-history-id>
+```
+
+The Query History tab links each listed history item to that Graph page URL. When `/graph` is opened without a query-history ID, the frontend loads the latest query history item and replaces the URL with `/graph?queryHistoryId=<latest-query-history-id>`. Missing or invalid query-history IDs show an error state with a link back to Query History instead of rendering an empty graph canvas.

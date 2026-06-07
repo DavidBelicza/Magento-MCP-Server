@@ -1,31 +1,253 @@
-import React from 'react'
-import { Panel, SectionHeader } from '../components/Panel'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Panel } from '../components/Panel'
+
+type QueryHistoryItem = {
+  id: string
+  createdAt: string
+  description: string
+  nodeCount: number
+  relationshipCount: number
+}
+
+type QueryHistoryResponse =
+  | {
+      ok: true
+      items: QueryHistoryItem[]
+    }
+  | {
+      ok: false
+      error: string
+    }
 
 export const QueryHistoryView: React.FC = () => {
-  const rows = ['Bundle product dependencies', 'Top package authors', 'Magento framework neighborhood']
+  const [items, setItems] = useState<QueryHistoryItem[]>([])
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadQueryHistory() {
+      try {
+        const response = await fetch('/api/graph/get-query-history')
+        const body = (await response.json()) as QueryHistoryResponse
+
+        if (!isMounted) {
+          return
+        }
+
+        if (!response.ok || !body.ok) {
+          setError(body.ok ? 'Query history could not be loaded' : body.error)
+          setStatus('error')
+          return
+        }
+
+        setItems(body.items)
+        setStatus('ready')
+      } catch {
+        if (isMounted) {
+          setError('Query history could not be loaded')
+          setStatus('error')
+        }
+      }
+    }
+
+    void loadQueryHistory()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const itemCountLabel = useMemo(() => {
+    if (status === 'loading') {
+      return 'Loading'
+    }
+
+    if (status === 'error') {
+      return 'Unavailable'
+    }
+
+    return `${items.length} recent ${items.length === 1 ? 'query' : 'queries'}`
+  }, [items.length, status])
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((currentIds) => {
+      const nextIds = new Set(currentIds)
+
+      if (nextIds.has(id)) {
+        nextIds.delete(id)
+      } else {
+        nextIds.add(id)
+      }
+
+      return nextIds
+    })
+  }
 
   return (
-    <section className="grid min-h-full grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <section className="min-h-full">
       <Panel className="p-5">
-        <SectionHeader title="Query History" eyebrow="Sessions" />
-        <div className="mt-5 divide-y divide-[#e5e7eb] overflow-hidden rounded-lg border border-[#e5e7eb]">
-          {rows.map((row, index) => (
-            <button
-              type="button"
-              key={row}
-              className="flex w-full items-center justify-between bg-white px-4 py-3 text-left text-sm font-medium text-[#111827] transition hover:bg-[#fff0e8] hover:text-[#ff4e08] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#00e676]/45"
-            >
-              <span>{row}</span>
-              <span className="text-xs text-[#4b5563]">Session {index + 1}</span>
-            </button>
-          ))}
+        <div className="flex justify-end">
+          <div className="rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-xs font-semibold text-[#4b5563]">
+            {itemCountLabel}
+          </div>
         </div>
-      </Panel>
 
-      <Panel className="p-5">
-        <SectionHeader title="Preview" eyebrow="Selected query" />
-        <div className="mt-5 h-40 rounded-lg border border-dashed border-[#9ca3af] bg-white" />
+        <div className="mt-5 overflow-hidden rounded-lg border border-[#e5e7eb]">
+          {status === 'loading' ? (
+            <QueryHistoryMessage title="Loading query history" />
+          ) : null}
+
+          {status === 'error' ? (
+            <QueryHistoryMessage title={error ?? 'Query history could not be loaded'} />
+          ) : null}
+
+          {status === 'ready' && items.length === 0 ? (
+            <QueryHistoryMessage title="No query history yet" />
+          ) : null}
+
+          {status === 'ready' && items.length > 0 ? (
+            <div>
+              <div className="hidden grid-cols-[minmax(0,1fr)_150px_170px_110px] gap-4 border-b border-[#e5e7eb] bg-[#f9fafb] px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#6b7280] lg:grid">
+                <div>Query</div>
+                <div>Graph</div>
+                <div>Created</div>
+                <div>Action</div>
+              </div>
+              {items.map((item, index) => (
+                <QueryHistoryRow
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  isExpanded={expandedIds.has(item.id)}
+                  onToggle={() => toggleExpanded(item.id)}
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
       </Panel>
     </section>
   )
+}
+
+const QueryHistoryRow: React.FC<{
+  item: QueryHistoryItem
+  index: number
+  isExpanded: boolean
+  onToggle: () => void
+}> = ({ item, index, isExpanded, onToggle }) => {
+  const title = createTitle(item.description)
+  const descriptionRef = useRef<HTMLParagraphElement | null>(null)
+  const [canExpand, setCanExpand] = useState(false)
+  const [expandedHeight, setExpandedHeight] = useState(0)
+
+  useEffect(() => {
+    const description = descriptionRef.current
+
+    if (!description) {
+      return
+    }
+
+    function updateDescriptionState() {
+      if (!description) {
+        return
+      }
+
+      setCanExpand(description.scrollHeight > 24 + 1)
+      setExpandedHeight(description.scrollHeight)
+    }
+
+    updateDescriptionState()
+    window.addEventListener('resize', updateDescriptionState)
+
+    return () => {
+      window.removeEventListener('resize', updateDescriptionState)
+    }
+  }, [item.description, isExpanded])
+
+  return (
+    <article
+      className={[
+        'grid gap-3 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_150px_170px_110px] lg:gap-4',
+        index % 2 === 0 ? 'bg-white' : 'bg-[#f9fafb]'
+      ].join(' ')}
+    >
+      <div className="min-w-0">
+        <h3 className="truncate text-sm font-bold">
+          <Link
+            to={`/graph?queryHistoryId=${encodeURIComponent(item.id)}`}
+            className="text-[#111827] transition hover:text-[#ff4e08] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
+          >
+            {title}
+          </Link>
+        </h3>
+        <div
+          className="mt-1 overflow-hidden transition-[height] duration-200 ease-out"
+          style={{ height: isExpanded ? expandedHeight : 24 }}
+        >
+          <p
+            ref={descriptionRef}
+            className="text-sm leading-6 text-[#4b5563]"
+          >
+            {item.description}
+          </p>
+        </div>
+        {canExpand || isExpanded ? (
+          <button
+            type="button"
+            className="mt-1 text-xs font-bold text-[#ff4e08] transition hover:text-[#c93400] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
+            onClick={onToggle}
+          >
+            {isExpanded ? 'Less' : 'More'}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="text-xs font-semibold text-[#111827] lg:pt-1">
+        <span className="mr-2 font-bold uppercase tracking-[0.12em] text-[#6b7280] lg:hidden">Graph</span>
+        {item.nodeCount > 0 || item.relationshipCount > 0
+          ? `${item.nodeCount} nodes / ${item.relationshipCount} edges`
+          : 'No graph data'}
+      </div>
+
+      <div className="text-xs font-semibold text-[#111827] lg:pt-1">
+        <span className="mr-2 font-bold uppercase tracking-[0.12em] text-[#6b7280] lg:hidden">Created</span>
+        {formatTimestamp(item.createdAt)}
+      </div>
+
+      <div className="lg:pt-0.5">
+        <Link
+          to={`/graph?queryHistoryId=${encodeURIComponent(item.id)}`}
+          className="inline-flex h-7 items-center rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-bold text-[#ff4e08] transition hover:border-[#ff4e08] hover:bg-[#fff0e8] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
+        >
+          Open graph
+        </Link>
+      </div>
+    </article>
+  )
+}
+
+const QueryHistoryMessage: React.FC<{ title: string }> = ({ title }) => (
+  <div className="bg-white px-4 py-8 text-center text-sm font-medium text-[#4b5563]">{title}</div>
+)
+
+function createTitle(description: string): string {
+  const words = description.trim().split(/\s+/).filter(Boolean)
+
+  if (words.length <= 10) {
+    return description
+  }
+
+  return `${words.slice(0, 10).join(' ')}...`
+}
+
+function formatTimestamp(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value))
 }
