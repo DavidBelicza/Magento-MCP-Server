@@ -1,7 +1,11 @@
-x-magentic-core-dev-build: &magentic_core_dev_build
+x-magentic-backend-dev-build: &magentic_backend_dev_build
   context: .
-  dockerfile: services/core/Dockerfile
+  dockerfile: services/backend/Dockerfile
   target: dev
+
+x-magentic-analyzer-php-dev-build: &magentic_analyzer_php_dev_build
+  context: .
+  dockerfile: services/analyzer-php/Dockerfile
 
 services:
   magentic_frontend:
@@ -19,7 +23,7 @@ services:
 
   magentic_backend:
     image: magentic_backend_dev:latest
-    build: *magentic_core_dev_build
+    build: *magentic_backend_dev_build
     environment:
       NODE_ENV: development
     command: ["npm", "run", "dev:backend"]
@@ -29,10 +33,23 @@ services:
 
   magentic_worker:
     image: magentic_backend_dev:latest
-    build: *magentic_core_dev_build
+    build: *magentic_backend_dev_build
     environment:
       NODE_ENV: development
     command: ["npm", "run", "dev:worker"]
     volumes:
       - ./packages/core/src:/app/src
+      - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}:ro
+
+  magentic_analyzer_php:
+    image: magentic_analyzer_php_dev:latest
+    build: *magentic_analyzer_php_dev_build
+    command:
+      [
+        "sh",
+        "-c",
+        "composer install --no-interaction --no-progress --prefer-dist && trap 'exit 0' TERM INT; while sleep 3600; do :; done"
+      ]
+    volumes:
+      - ./packages/php-analyzer:/app
       - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}:ro

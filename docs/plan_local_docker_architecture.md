@@ -2,7 +2,7 @@
 
 ## Goal
 
-Create a Docker-based local development architecture for Magentic. The system exposes one public HTTP entrypoint through `magentic_frontend` while keeping the backend, worker, Redis, PostgreSQL, and Neo4j services private except for explicit Neo4j browser/debug ports.
+Create a Docker-based local development architecture for Magentic. The system exposes one public HTTP entrypoint through `magentic_frontend` while keeping the backend, worker, PHP analyzer, Redis, PostgreSQL, and Neo4j services private except for explicit Neo4j browser/debug ports.
 
 The first version uses plain HTTP on localhost. HTTPS, local domains, and a shared reverse proxy can be added later.
 
@@ -14,7 +14,8 @@ The first version uses plain HTTP on localhost. HTTPS, local domains, and a shar
 ├── docs/
 │   └── plan_local_docker_architecture.md
 ├── services/
-│   ├── core/
+│   ├── analyzer-php/
+│   ├── backend/
 │   ├── frontend/
 │   ├── graphdb/
 │   ├── postgres/
@@ -22,6 +23,7 @@ The first version uses plain HTTP on localhost. HTTPS, local domains, and a shar
 │   └── worker/
 └── packages/
     ├── core/
+    ├── php-analyzer/
     └── site/
 ```
 
@@ -29,7 +31,7 @@ The first version uses plain HTTP on localhost. HTTPS, local domains, and a shar
 
 `services/` contains Docker service definitions, runtime configuration, Dockerfiles, entrypoint scripts, and service-specific infrastructure files.
 
-`packages/` contains application source packages. Each package is a separate Node.js project.
+`packages/` contains application source packages. `packages/core` and `packages/site` are Node.js projects. `packages/php-analyzer` is a Composer-based PHP CLI project.
 
 The root directory contains the primary `docker-compose.yml`, root `package.json`, and root `package-lock.json`. The root Node files are intentional because the project uses npm workspaces. They allow root-level commands such as `npm run build --workspaces` while keeping `packages/core` and `packages/site` as separate packages.
 
@@ -44,6 +46,14 @@ node:24-alpine
 ```
 
 This requirement is for Node.js 24 LTS. npm is bundled with the official Node image. The `magentic_backend` image and `magentic_frontend` runtime image are both based on `node:24-alpine`, so npm commands can be run inside those containers through Docker Compose.
+
+The PHP analyzer runtime uses the official PHP 8.5 CLI image line:
+
+```text
+php:8.5-cli-alpine
+```
+
+Composer is copied into the analyzer image from the official Composer image. Production image builds run `composer install` from `packages/php-analyzer/composer.lock`. In development mode, the analyzer package is bind-mounted into `/app`, and Composer install runs on container startup so local `packages/php-analyzer/vendor` is available for editor support while remaining ignored by Git.
 
 ## Application Packages
 
@@ -80,6 +90,21 @@ Responsibilities:
 
 The browser application should never call the backend container directly. It should call relative URLs such as `/api/health`, and Nginx should proxy those requests to the backend service.
 
+### `packages/php-analyzer`
+
+PHP Composer package used by:
+
+- `magentic_analyzer_php`
+
+Responsibilities:
+
+- provide PHP CLI commands through Symfony Console
+- parse PHP source code with `nikic/php-parser`
+- expose the `magentic:parse` command through `bin/php-analyzer`
+- read the analyzed source at `/mnt/analyzed-source`
+
+The package name is `magentic/php-analyzer`. PHP source uses the PSR-4 namespace `Magentic\PhpAnalyzer\`.
+
 ## Docker Compose Services
 
 The Compose project name is explicitly set to `magentic`.
@@ -89,6 +114,7 @@ Services use the `magentic_` prefix:
 - `magentic_frontend`
 - `magentic_backend`
 - `magentic_worker`
+- `magentic_analyzer_php`
 - `magentic_redis`
 - `magentic_postgres`
 - `magentic_graphdb`
@@ -97,6 +123,7 @@ Custom images also use the `magentic_` prefix:
 
 - `magentic_frontend:latest`
 - `magentic_backend:latest`
+- `magentic_analyzer_php:latest`
 
 ### `magentic_frontend`
 
@@ -183,6 +210,29 @@ Initial host mount:
 ```
 
 The mount is read-only inside the container. Host-side file changes are visible through the bind mount.
+
+This service does not publish any host port.
+
+### `magentic_analyzer_php`
+
+Private PHP analyzer service.
+
+Technology:
+
+- `magentic_analyzer_php:latest`
+- PHP 8.5 CLI
+- Composer
+- Symfony Console
+- `nikic/php-parser`
+
+Responsibilities:
+
+- provide PHP command-line analysis tooling
+- run commands from `packages/php-analyzer/bin/php-analyzer`
+- expose `magentic:parse` as the initial analyzer command
+- read the analyzed source at `/mnt/analyzed-source`
+
+The analyzed source mount is read-only inside the container. The analyzer application source itself lives in `packages/php-analyzer`, not in the analyzed source mount.
 
 This service does not publish any host port.
 
@@ -333,7 +383,7 @@ magentic_backend:latest
 That image is built from:
 
 ```text
-services/core/Dockerfile
+services/backend/Dockerfile
 ```
 
 The backend and worker differ only by Compose command:
@@ -342,6 +392,8 @@ The backend and worker differ only by Compose command:
 npm run start:backend
 npm run start:worker
 ```
+
+`magentic_analyzer_php` needs a Dockerfile because it must provide PHP 8.5, Composer, and the PHP analyzer dependencies from `packages/php-analyzer`.
 
 ### Services that do not need Dockerfiles initially
 
@@ -357,7 +409,8 @@ Implemented infrastructure files:
 
 ```text
 docker-compose.yml
-services/core/Dockerfile
+services/backend/Dockerfile
+services/analyzer-php/Dockerfile
 services/frontend/Dockerfile
 services/frontend/nginx.conf
 services/redis/
@@ -365,6 +418,7 @@ services/postgres/
 services/graphdb/
 www/path/to/magento/source-code/
 packages/core/package.json
+packages/php-analyzer/composer.json
 packages/site/package.json
 ```
 
@@ -377,15 +431,17 @@ The first implementation includes:
 - health checks for backend, Redis, PostgreSQL, and Neo4j.
 - `depends_on` relationships for startup order.
 - explicit environment variable names used by backend and worker, such as `REDIS_URL`, `POSTGRES_URL`, `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`.
-- npm workspaces at the root for package orchestration.
+- npm workspaces at the root for Node package orchestration.
+- Composer dependency locking for the PHP analyzer package.
 
 ## Recommended First Implementation
 
-Start with a root `docker-compose.yml` containing six services:
+Start with a root `docker-compose.yml` containing seven services:
 
 - `magentic_frontend`
 - `magentic_backend`
 - `magentic_worker`
+- `magentic_analyzer_php`
 - `magentic_redis`
 - `magentic_postgres`
 - `magentic_graphdb`
@@ -403,7 +459,7 @@ localhost:${NEO4J_HTTP_PORT:-7474} -> magentic_graphdb:7474
 localhost:${NEO4J_BOLT_PORT:-7687} -> magentic_graphdb:7687
 ```
 
-Keep backend, worker, Redis, and PostgreSQL private on the Compose network.
+Keep backend, worker, PHP analyzer, Redis, and PostgreSQL private on the Compose network.
 
 Use same-origin browser API calls:
 
@@ -417,7 +473,7 @@ Proxy those calls through Nginx:
 magentic_frontend -> magentic_backend:3000
 ```
 
-Use Redis for BullMQ communication between backend and worker, PostgreSQL for ordinary application storage, and Neo4j as the graph database used by backend and worker.
+Use Redis for BullMQ communication between backend and worker, PostgreSQL for ordinary application storage, Neo4j as the graph database used by backend and worker, and the PHP analyzer service for PHP source parsing commands.
 
 ## Graph Search API
 

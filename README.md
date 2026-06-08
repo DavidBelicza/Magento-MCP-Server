@@ -41,7 +41,7 @@ Start the Docker environment:
 docker compose up -d
 ```
 
-Start the backend and worker in development mode:
+Start the Docker environment in development mode:
 
 ```bash
 npm run docker:dev
@@ -78,7 +78,15 @@ The default analyzed source mount is:
 ./www/path/to/magento/source-code -> /mnt/analyzed-source
 ```
 
-The mount is read-only inside the containers and host-side file changes are visible inside `magentic_backend` and `magentic_worker`.
+The mount is read-only inside the containers and host-side file changes are visible inside `magentic_backend`, `magentic_worker`, and `magentic_analyzer_php`.
+
+The PHP analyzer application source lives in:
+
+```text
+packages/php-analyzer
+```
+
+In development mode, Composer dependencies are installed automatically into `packages/php-analyzer/vendor` when `magentic_analyzer_php` starts. The local `vendor` directory is ignored by Git and Docker build context.
 
 ### Useful Commands
 
@@ -110,6 +118,12 @@ Run npm inside the frontend container:
 
 ```bash
 docker compose exec magentic_frontend npm --version
+```
+
+Run the PHP analyzer command:
+
+```bash
+docker compose run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse
 ```
 
 Stop the Docker environment:

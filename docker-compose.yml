@@ -19,7 +19,7 @@ services:
     image: magentic_backend:latest
     build:
       context: .
-      dockerfile: services/core/Dockerfile
+      dockerfile: services/backend/Dockerfile
     command: ["npm", "run", "start:backend"]
     environment:
       NODE_ENV: production
@@ -70,6 +70,24 @@ services:
         condition: service_healthy
       magentic_graphdb:
         condition: service_healthy
+
+  magentic_analyzer_php:
+    image: magentic_analyzer_php:latest
+    build:
+      context: .
+      dockerfile: services/analyzer-php/Dockerfile
+    environment:
+      MAGENTIC_ANALYZED_SOURCE_PATH: "${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}"
+    volumes: *magentic_analyzed_source_volumes
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "php -r \"require '/app/vendor/autoload.php'; exit(class_exists('PhpParser\\\\ParserFactory') ? 0 : 1);\""
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   magentic_redis:
     image: redis:7-alpine

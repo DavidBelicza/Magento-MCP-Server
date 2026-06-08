@@ -1,0 +1,15 @@
+{
+  "name": "magentic/php-analyzer",
+  "description": "PHP analysis runtime for Magentic.",
+  "type": "project",
+  "require": {
+    "php": "^8.5",
+    "nikic/php-parser": "^5.0",
+    "symfony/console": "^8.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "Magentic\\PhpAnalyzer\\": "src/"
+    }
+  }
+}

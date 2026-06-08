@@ -20,6 +20,7 @@ Expected result:
 
 - `@magentic/core` TypeScript build passes.
 - `@magentic/site` TypeScript and Vite build passes.
+- `packages/php-analyzer/composer.lock` is present and matches `packages/php-analyzer/composer.json`.
 
 ## Docker Compose Config
 
@@ -32,11 +33,13 @@ docker compose config
 Expected result:
 
 - Compose project name is `magentic`.
-- Services are named `magentic_frontend`, `magentic_backend`, `magentic_worker`, `magentic_redis`, `magentic_postgres`, and `magentic_graphdb`.
+- Services are named `magentic_frontend`, `magentic_backend`, `magentic_worker`, `magentic_analyzer_php`, `magentic_redis`, `magentic_postgres`, and `magentic_graphdb`.
 - No service is named `core`.
 - `magentic_backend` and `magentic_worker` both use `magentic_backend:latest`.
+- `magentic_analyzer_php` uses `magentic_analyzer_php:latest`.
 - `magentic_frontend` uses `magentic_frontend:latest`.
 - `magentic_backend` and `magentic_worker` both mount `${MAGENTIC_ANALYZED_SOURCE_HOST_PATH}` as read-only.
+- `magentic_analyzer_php` mounts `${MAGENTIC_ANALYZED_SOURCE_HOST_PATH}` as read-only.
 
 Validate the development override:
 
@@ -48,11 +51,15 @@ Expected result:
 
 - `magentic_backend` runs `npm run dev:backend`.
 - `magentic_worker` runs `npm run dev:worker`.
-- `magentic_backend` builds the `dev` target from `services/core/Dockerfile`.
+- `magentic_backend` builds the `dev` target from `services/backend/Dockerfile`.
 - `magentic_backend` and `magentic_worker` use `magentic_backend_dev:latest` in dev mode.
 - Both services mount `./packages/core/src:/app/src`.
 - Both services keep image-built `node_modules` available inside `/app`.
 - Both services keep the analyzed source mount read-only.
+- `magentic_analyzer_php` builds from `services/analyzer-php/Dockerfile`.
+- `magentic_analyzer_php` mounts `./packages/php-analyzer:/app`.
+- `magentic_analyzer_php` runs Composer install on startup in dev mode.
+- `magentic_analyzer_php` keeps the analyzed source mount read-only.
 
 ## Docker Build
 
@@ -66,7 +73,9 @@ Expected result:
 
 - `magentic_backend:latest` builds successfully.
 - `magentic_frontend:latest` builds successfully.
+- `magentic_analyzer_php:latest` builds successfully.
 - npm install runs during image builds, not manually inside containers.
+- Composer install runs during the PHP analyzer image build.
 
 ## Start Services
 
@@ -91,6 +100,7 @@ docker compose ps
 Expected result:
 
 - `magentic_backend` is healthy.
+- `magentic_analyzer_php` is healthy.
 - `magentic_redis` is healthy.
 - `magentic_postgres` is healthy.
 - `magentic_graphdb` is healthy.
@@ -98,6 +108,7 @@ Expected result:
 - `magentic_graphdb` publishes `7474->7474` and `7687->7687`.
 - `magentic_backend` does not publish a host port.
 - `magentic_worker` does not publish a host port.
+- `magentic_analyzer_php` does not publish a host port.
 
 ## HTTP Checks
 
@@ -318,6 +329,28 @@ Expected result:
 
 - Each command prints an npm version.
 
+## PHP Analyzer Checks
+
+Check PHP and Composer inside the analyzer container:
+
+```bash
+docker compose exec -T magentic_analyzer_php php -v
+docker compose exec -T magentic_analyzer_php composer --version
+```
+
+Check the analyzer command:
+
+```bash
+docker compose exec -T magentic_analyzer_php php /app/bin/php-analyzer magentic:parse
+```
+
+Expected result:
+
+- PHP reports version 8.5.
+- Composer prints a version.
+- The analyzer command prints `magentic:parse ready`.
+- The analyzer command prints a `PhpParser` parser class.
+
 ## Shared Backend Image Check
 
 Confirm backend and worker use the same image ID:
@@ -344,6 +377,12 @@ Check the worker mount:
 docker compose exec -T magentic_worker sh -lc 'test -d "$MAGENTIC_ANALYZED_SOURCE_PATH" && echo mounted'
 ```
 
+Check the PHP analyzer mount:
+
+```bash
+docker compose exec -T magentic_analyzer_php sh -lc 'test -d "$MAGENTIC_ANALYZED_SOURCE_PATH" && echo mounted'
+```
+
 Expected result:
 
 ```text
@@ -365,6 +404,12 @@ Check that host-side changes are visible inside the worker:
 ```bash
 touch ./www/path/to/magento/source-code/.magentic-host-sync-test
 docker compose exec -T magentic_worker sh -lc 'test -f "$MAGENTIC_ANALYZED_SOURCE_PATH/.magentic-host-sync-test" && echo synced'
+```
+
+Check that host-side changes are visible inside the PHP analyzer:
+
+```bash
+docker compose exec -T magentic_analyzer_php sh -lc 'test -f "$MAGENTIC_ANALYZED_SOURCE_PATH/.magentic-host-sync-test" && echo synced'
 ```
 
 Expected result:
