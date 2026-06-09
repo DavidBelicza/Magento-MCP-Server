@@ -8,7 +8,7 @@ Magentic is a Docker-based, self-hosted MCP server for agentic AI workflows. It 
 - `packages/site`: React, Vite, Tailwind frontend with routed views and React Force Graph 2D visualization.
 - `packages/php-analyzer`: PHP CLI analyzer package using Symfony Console and `nikic/php-parser`.
 
-The main architecture notes are in `docs/plan_local_docker_architecture.md`. Runtime sanity checks are in `docs/test_system_sanity.md`.
+The holistic architecture notes are in `docs/architecture_project.md`. Source indexing and graph/world-mapping notes are in `docs/architecture_world_mapping.md`. Runtime sanity checks are in `docs/test_system_sanity.md`.
 
 ## Docker Services
 
@@ -44,7 +44,7 @@ Useful checks:
 curl -s http://localhost:8080/api/health
 curl -s -X POST http://localhost:8080/api/index/packages
 curl -s "http://localhost:8080/api/index/get-status?jobId=<job-id>"
-docker compose run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse
+docker compose run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse vendor/magento/module-catalog
 ```
 
 ## Core Layout

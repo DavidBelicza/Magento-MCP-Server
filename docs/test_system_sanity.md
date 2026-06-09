@@ -338,18 +338,54 @@ docker compose exec -T magentic_analyzer_php php -v
 docker compose exec -T magentic_analyzer_php composer --version
 ```
 
-Check the analyzer command:
+Check PHP CLI limits inside the analyzer container:
 
 ```bash
-docker compose exec -T magentic_analyzer_php php /app/bin/php-analyzer magentic:parse
+docker compose exec -T magentic_analyzer_php php -r 'echo ini_get("memory_limit"), PHP_EOL, ini_get("max_execution_time"), PHP_EOL;'
 ```
 
 Expected result:
 
 - PHP reports version 8.5.
 - Composer prints a version.
-- The analyzer command prints `magentic:parse ready`.
-- The analyzer command prints a `PhpParser` parser class.
+- The memory limit is `1G`.
+- The max execution time is `0`.
+
+Check the analyzer command against a single class file:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse vendor/magento/composer/src/ConsoleArrayInputFactory.php
+```
+
+Expected JSONL output:
+
+```jsonl
+{"fact":"symbol","symbolId":"php-class:Magento\\Composer\\ConsoleArrayInputFactory","fqcn":"Magento\\Composer\\ConsoleArrayInputFactory","kind":"class"}
+```
+
+Check an inherited class:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse vendor/magento/module-inventory-configuration/Model/StockItemConfiguration.php
+```
+
+Expected result:
+
+- The output is JSONL only.
+- One line describes `Magento\InventoryConfiguration\Model\StockItemConfiguration`.
+- One line describes `Magento\Framework\Model\AbstractExtensibleModel`.
+- One line describes an `extends` reference from the child class to the parent class.
+
+Check a larger directory stream:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps magentic_analyzer_php sh -lc 'php /app/bin/php-analyzer magentic:parse vendor/magento/module-catalog | php -r '"'"'$count = 0; while (($line = fgets(STDIN)) !== false) { json_decode($line, true, 512, JSON_THROW_ON_ERROR); $count++; } echo "json lines: ", $count, PHP_EOL;'"'"''
+```
+
+Expected result:
+
+- Every analyzer output line is valid JSON.
+- The command prints a positive JSON line count.
 
 ## Shared Backend Image Check
 

@@ -1,10 +1,15 @@
-# Local Docker Architecture Plan
+# Project Architecture
 
 ## Goal
 
-Create a Docker-based local development architecture for Magentic. The system exposes one public HTTP entrypoint through `magentic_frontend` while keeping the backend, worker, PHP analyzer, Redis, PostgreSQL, and Neo4j services private except for explicit Neo4j browser/debug ports.
+Magentic is a Docker-based, self-hosted MCP server for agentic AI workflows. It exposes one public HTTP entrypoint through `magentic_frontend` while keeping the backend, worker, PHP analyzer, Redis, PostgreSQL, and Neo4j services private except for explicit Neo4j browser/debug ports.
 
 The first version uses plain HTTP on localhost. HTTPS, local domains, and a shared reverse proxy can be added later.
+
+The project has two architecture documents:
+
+- `docs/architecture_project.md`: holistic project, service, package, and runtime architecture.
+- `docs/architecture_world_mapping.md`: source-code indexing and graph/world-mapping architecture.
 
 ## Repository Layout
 
@@ -12,7 +17,9 @@ The first version uses plain HTTP on localhost. HTTPS, local domains, and a shar
 .
 ├── docker-compose.yml
 ├── docs/
-│   └── plan_local_docker_architecture.md
+│   ├── architecture_project.md
+│   ├── architecture_world_mapping.md
+│   └── test_system_sanity.md
 ├── services/
 │   ├── analyzer-php/
 │   ├── backend/
@@ -27,7 +34,7 @@ The first version uses plain HTTP on localhost. HTTPS, local domains, and a shar
     └── site/
 ```
 
-`docs/` contains Markdown documentation and planning notes.
+`docs/` contains architecture and sanity-check documentation.
 
 `services/` contains Docker service definitions, runtime configuration, Dockerfiles, entrypoint scripts, and service-specific infrastructure files.
 
@@ -101,9 +108,12 @@ Responsibilities:
 - provide PHP CLI commands through Symfony Console
 - parse PHP source code with `nikic/php-parser`
 - expose the `magentic:parse` command through `bin/php-analyzer`
+- emit newline-delimited JSON facts for source symbols and references
 - read the analyzed source at `/mnt/analyzed-source`
 
 The package name is `magentic/php-analyzer`. PHP source uses the PSR-4 namespace `Magentic\PhpAnalyzer\`.
+
+The PHP analyzer does not write directly to PostgreSQL or Neo4j. It is a CLI extraction tool used by the Node.js worker. See `docs/architecture_world_mapping.md` for the indexing flow.
 
 ## Docker Compose Services
 
@@ -200,6 +210,7 @@ Responsibilities:
 - read and write indexing-related data
 - communicate with PostgreSQL
 - communicate with Neo4j
+- call analyzer CLIs and consume their JSONL output
 - share code from `packages/core`
 - read the analyzed Magento source at `/mnt/analyzed-source`
 
@@ -229,8 +240,9 @@ Responsibilities:
 
 - provide PHP command-line analysis tooling
 - run commands from `packages/php-analyzer/bin/php-analyzer`
-- expose `magentic:parse` as the initial analyzer command
+- expose `magentic:parse` as a JSONL-producing analyzer command
 - read the analyzed source at `/mnt/analyzed-source`
+- use larger CLI-oriented PHP runtime limits through `services/analyzer-php/php.ini`
 
 The analyzed source mount is read-only inside the container. The analyzer application source itself lives in `packages/php-analyzer`, not in the analyzed source mount.
 
@@ -403,14 +415,15 @@ npm run start:worker
 
 `magentic_graphdb` uses the official Neo4j image directly from Compose.
 
-## Planned Files
+## Implemented Infrastructure Files
 
-Implemented infrastructure files:
+Important infrastructure files:
 
 ```text
 docker-compose.yml
 services/backend/Dockerfile
 services/analyzer-php/Dockerfile
+services/analyzer-php/php.ini
 services/frontend/Dockerfile
 services/frontend/nginx.conf
 services/redis/
@@ -422,9 +435,9 @@ packages/php-analyzer/composer.json
 packages/site/package.json
 ```
 
-## Additional Architecture Items
+## Supporting Architecture Items
 
-The first implementation includes:
+The runtime includes:
 
 - `.env.example` with documented local defaults for ports, Redis connection values, PostgreSQL connection values, Neo4j connection values, and Node environment.
 - named Docker volumes for Redis, PostgreSQL, and Neo4j.
@@ -434,9 +447,9 @@ The first implementation includes:
 - npm workspaces at the root for Node package orchestration.
 - Composer dependency locking for the PHP analyzer package.
 
-## Recommended First Implementation
+## Runtime Topology
 
-Start with a root `docker-compose.yml` containing seven services:
+The root `docker-compose.yml` defines seven services:
 
 - `magentic_frontend`
 - `magentic_backend`

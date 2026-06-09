@@ -2,6 +2,12 @@
 
 ## MCP Server for Agentic AI
 
+## Documentation
+
+- `docs/architecture_project.md`: holistic project and service architecture.
+- `docs/architecture_world_mapping.md`: source-code indexing and graph/world-mapping architecture.
+- `docs/test_system_sanity.md`: runtime and integration sanity checks.
+
 ## Installation
 
 ### Prerequisites
@@ -120,11 +126,13 @@ Run npm inside the frontend container:
 docker compose exec magentic_frontend npm --version
 ```
 
-Run the PHP analyzer command:
+Run the PHP analyzer command against a path inside the analyzed source mount:
 
 ```bash
-docker compose run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse vendor/magento/module-catalog
 ```
+
+The path argument is relative to `MAGENTIC_ANALYZED_SOURCE_PATH`, which defaults to `/mnt/analyzed-source` inside the container. The command writes JSONL facts to stdout.
 
 Stop the Docker environment:
 

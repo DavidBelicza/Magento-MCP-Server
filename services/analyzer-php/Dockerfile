@@ -5,6 +5,7 @@ FROM php:8.5-cli-alpine
 WORKDIR /app
 
 COPY --from=composer /usr/bin/composer /usr/bin/composer
+COPY services/analyzer-php/php.ini /usr/local/etc/php/conf.d/magentic-cli.ini
 COPY packages/php-analyzer/composer.json packages/php-analyzer/composer.lock ./
 
 RUN composer install --no-interaction --no-progress --prefer-dist --no-dev --optimize-autoloader
