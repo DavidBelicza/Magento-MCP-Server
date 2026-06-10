@@ -6,7 +6,7 @@ Magentic is a Docker-based, self-hosted MCP server for agentic AI workflows. It 
 
 - `packages/core`: Fastify backend, BullMQ worker, Redis queues, PostgreSQL storage, Neo4j graph writes, startup schema installation.
 - `packages/site`: React, Vite, Tailwind frontend with routed views and React Force Graph 2D visualization.
-- `packages/php-analyzer`: PHP CLI analyzer package using Symfony Console and `nikic/php-parser`.
+- `packages/php-analyzer`: PHP analyzer microservice using `nikic/php-parser`.
 
 The holistic architecture notes are in `docs/architecture_project.md`. Source indexing and graph/world-mapping notes are in `docs/architecture_world_mapping.md`. Runtime sanity checks are in `docs/test_system_sanity.md`.
 
@@ -17,7 +17,7 @@ The Compose project is named `magentic`. Main services:
 - `magentic_frontend`: public entrypoint on `localhost:8080`; Nginx in production, Vite in dev override.
 - `magentic_backend`: private Fastify API service; routes live in `packages/core/src/server.ts`.
 - `magentic_worker`: private BullMQ worker; entrypoint is `packages/core/src/worker.ts`.
-- `magentic_analyzer_php`: private PHP CLI analyzer runtime; command entrypoint is `packages/php-analyzer/bin/php-analyzer`.
+- `magentic_analyzer_php`: private PHP analyzer runtime.
 - `magentic_redis`: queue backend for BullMQ.
 - `magentic_postgres`: persistent application storage and schema history.
 - `magentic_graphdb`: Neo4j graph database, exposed for local browser/debug access.
@@ -44,7 +44,7 @@ Useful checks:
 curl -s http://localhost:8080/api/health
 curl -s -X POST http://localhost:8080/api/index/packages
 curl -s "http://localhost:8080/api/index/get-status?jobId=<job-id>"
-docker compose run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse vendor/magento/module-catalog
+docker run --rm --network magentic_default curlimages/curl -X POST http://magentic_analyzer_php/analyze -H "Content-Type: application/json" -d '{"path": "vendor/magento/module-catalog"}'
 ```
 
 ## Core Layout
@@ -79,8 +79,6 @@ The frontend uses same-origin `/api/*` calls. In dev, Vite proxies `/api` to `ma
 Important PHP analyzer paths:
 
 - `packages/php-analyzer/composer.json`: PHP package manifest.
-- `packages/php-analyzer/bin/php-analyzer`: Symfony Console entrypoint.
-- `packages/php-analyzer/src/Command/Parse.php`: `magentic:parse` command.
 - `services/analyzer-php/Dockerfile`: PHP analyzer runtime image.
 
 The analyzer package uses PSR-4 namespace `Magentic\PhpAnalyzer\`. The analyzed source mount is read-only at `/mnt/analyzed-source`; do not confuse it with the analyzer application source in `packages/php-analyzer`.

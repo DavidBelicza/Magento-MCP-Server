@@ -48,7 +48,7 @@ services:
       [
         "sh",
         "-c",
-        "composer install --no-interaction --no-progress --prefer-dist && trap 'exit 0' TERM INT; while sleep 3600; do :; done"
+        "composer install --no-interaction --no-progress --prefer-dist && frankenphp run --config /etc/caddy/Caddyfile"
       ]
     volumes:
       - ./packages/php-analyzer:/app

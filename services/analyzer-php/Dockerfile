@@ -1,6 +1,6 @@
 FROM composer:2 AS composer
 
-FROM php:8.5-cli-alpine
+FROM dunglas/frankenphp:php8.4-alpine
 
 WORKDIR /app
 
@@ -11,7 +11,9 @@ COPY packages/php-analyzer/composer.json packages/php-analyzer/composer.lock ./
 RUN composer install --no-interaction --no-progress --prefer-dist --no-dev --optimize-autoloader
 
 COPY packages/php-analyzer/ ./
+COPY services/analyzer-php/Caddyfile /etc/caddy/Caddyfile
 
 ENV MAGENTIC_ANALYZED_SOURCE_PATH=/mnt/analyzed-source
+ENV SERVER_NAME=":80"
 
-CMD ["sh", "-c", "trap 'exit 0' TERM INT; while sleep 3600; do :; done"]
+CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]

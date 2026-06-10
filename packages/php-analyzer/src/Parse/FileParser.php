@@ -10,16 +10,16 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\NameResolver;
 use PhpParser\Parser;
 
-final class FileParser
+readonly class FileParser
 {
     public function __construct(private Parser $parser)
     {
     }
 
     /**
-     * @return \Generator<Fact>
+     * @return array<int, Fact>
      */
-    public function parse(string $absolutePath, string $relativePath): \Generator
+    public function parse(string $absolutePath, string $relativePath): array
     {
         try {
             $source = $this->readSource($absolutePath);
@@ -28,14 +28,12 @@ final class FileParser
             $traverser->addVisitor(new NameResolver());
             $nodes = $traverser->traverse($nodes);
         } catch (Error $error) {
-            yield Fact::error($relativePath, $error->getMessage());
-
-            return;
+            return [Fact::error($relativePath, $error->getMessage())];
         } catch (\RuntimeException $exception) {
-            yield Fact::error($relativePath, $exception->getMessage());
-
-            return;
+            return [Fact::error($relativePath, $exception->getMessage())];
         }
+
+        $facts = [];
 
         foreach ($this->extractTopLevelClasses($nodes) as [$class, $namespace]) {
             if (!$class->name instanceof Node\Identifier) {
@@ -44,7 +42,7 @@ final class FileParser
 
             $fqcn = $this->createClassFqcn($class->name->toString(), $namespace);
 
-            yield $this->createSymbolFact($fqcn);
+            $facts[] = $this->createSymbolFact($fqcn);
 
             if (!$class->extends instanceof Node\Name) {
                 continue;
@@ -52,13 +50,15 @@ final class FileParser
 
             $parentFqcn = $class->extends->toString();
 
-            yield $this->createSymbolFact($parentFqcn);
-            yield Fact::reference(
+            $facts[] = $this->createSymbolFact($parentFqcn);
+            $facts[] = Fact::reference(
                 ReferenceKind::Extends,
                 $this->createClassSymbolId($fqcn),
                 $this->createClassSymbolId($parentFqcn)
             );
         }
+
+        return $facts;
     }
 
     /**

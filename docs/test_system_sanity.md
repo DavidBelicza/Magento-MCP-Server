@@ -338,7 +338,7 @@ docker compose exec -T magentic_analyzer_php php -v
 docker compose exec -T magentic_analyzer_php composer --version
 ```
 
-Check PHP CLI limits inside the analyzer container:
+Check PHP limits inside the analyzer container:
 
 ```bash
 docker compose exec -T magentic_analyzer_php php -r 'echo ini_get("memory_limit"), PHP_EOL, ini_get("max_execution_time"), PHP_EOL;'
@@ -351,41 +351,41 @@ Expected result:
 - The memory limit is `1G`.
 - The max execution time is `0`.
 
-Check the analyzer command against a single class file:
+Check the analyzer endpoint against a single class file:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse vendor/magento/composer/src/ConsoleArrayInputFactory.php
+docker run --rm --network magentic_default curlimages/curl -s -X POST http://magentic_analyzer_php/analyze -H "Content-Type: application/json" -d '{"path": "vendor/magento/composer/src/ConsoleArrayInputFactory.php"}'
 ```
 
 Expected JSONL output:
 
 ```jsonl
-{"fact":"symbol","symbolId":"php-class:Magento\\Composer\\ConsoleArrayInputFactory","fqcn":"Magento\\Composer\\ConsoleArrayInputFactory","kind":"class"}
+{"file":"vendor/magento/composer/src/ConsoleArrayInputFactory.php","facts":[{"fact":"symbol","symbolId":"php-class:Magento\\Composer\\ConsoleArrayInputFactory","fqcn":"Magento\\Composer\\ConsoleArrayInputFactory","kind":"class"}]}
 ```
 
 Check an inherited class:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse vendor/magento/module-inventory-configuration/Model/StockItemConfiguration.php
+docker run --rm --network magentic_default curlimages/curl -s -X POST http://magentic_analyzer_php/analyze -H "Content-Type: application/json" -d '{"path": "vendor/magento/module-inventory-configuration/Model/StockItemConfiguration.php"}'
 ```
 
 Expected result:
 
 - The output is JSONL only.
-- One line describes `Magento\InventoryConfiguration\Model\StockItemConfiguration`.
-- One line describes `Magento\Framework\Model\AbstractExtensibleModel`.
-- One line describes an `extends` reference from the child class to the parent class.
+- Facts array includes `Magento\InventoryConfiguration\Model\StockItemConfiguration`.
+- Facts array includes `Magento\Framework\Model\AbstractExtensibleModel`.
+- Facts array includes an `extends` reference from the child class to the parent class.
 
 Check a larger directory stream:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps magentic_analyzer_php sh -lc 'php /app/bin/php-analyzer magentic:parse vendor/magento/module-catalog | php -r '"'"'$count = 0; while (($line = fgets(STDIN)) !== false) { json_decode($line, true, 512, JSON_THROW_ON_ERROR); $count++; } echo "json lines: ", $count, PHP_EOL;'"'"''
+docker run --rm --network magentic_default curlimages/curl -s -X POST http://magentic_analyzer_php/analyze -H "Content-Type: application/json" -d '{"path": "vendor/magento/module-catalog"}' | wc -l
 ```
 
 Expected result:
 
 - Every analyzer output line is valid JSON.
-- The command prints a positive JSON line count.
+- The command prints a positive number of lines.
 
 ## Shared Backend Image Check
 

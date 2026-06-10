@@ -126,13 +126,23 @@ Run npm inside the frontend container:
 docker compose exec magentic_frontend npm --version
 ```
 
-Run the PHP analyzer command against a path inside the analyzed source mount:
+
+To manually test the end-to-end Node indexing API (which enqueues the job for the worker):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse vendor/magento/module-catalog
+curl -X POST http://localhost:8080/api/index/source \
+  -H "Content-Type: application/json" \
+  -d '{"directories": ["vendor/magento/module-catalog"]}'
 ```
 
-The path argument is relative to `MAGENTIC_ANALYZED_SOURCE_PATH`, which defaults to `/mnt/analyzed-source` inside the container. The command writes JSONL facts to stdout.
+To manually test the internal PHP Analyzer HTTP endpoint (`/analyze`) directly via the Docker network:
+
+```bash
+docker run --rm --network magentic_default curlimages/curl \
+  -X POST http://magentic_analyzer_php/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"path": "vendor/magento/module-catalog"}'
+```
 
 Stop the Docker environment:
 

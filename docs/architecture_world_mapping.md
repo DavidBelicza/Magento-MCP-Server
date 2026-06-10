@@ -10,7 +10,7 @@ flowchart TD
     B --> C[Queue / Redis]
     C --> D[Node.js Worker]
 
-    D --> E[Spawn PHP Analyzer CLI]
+    D --> E[Call PHP Analyzer API]
     E --> F[PHP AST Parser<br/>nikic/php-parser]
 
     F --> G[JSONL Output<br/>symbols + references]
@@ -36,7 +36,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    subgraph PHP_Analyzer_CLI[PHP Analyzer CLI]
+    subgraph PHP_Analyzer_Service[PHP Analyzer Service]
         A1[Resolve requested paths]
         A2[Stream PHP files]
         A3[Parse AST]
@@ -62,7 +62,7 @@ flowchart LR
         C4[BELONGS_TO_PACKAGE relationships]
     end
 
-    PHP_Analyzer_CLI --> Node_Worker
+    PHP_Analyzer_Service --> Node_Worker
     Node_Worker --> Neo4j
 ```
 
@@ -74,14 +74,14 @@ sequenceDiagram
     participant API as Backend API
     participant Queue as Redis Queue
     participant Worker as Node.js Worker
-    participant PHP as PHP Analyzer CLI
+    participant PHP as PHP Analyzer Service
     participant DB as Neo4j
 
     UI->>API: Start indexing project
     API->>Queue: Add indexing job
     Queue->>Worker: Worker receives job
 
-    Worker->>PHP: Run parse command for requested source path
+    Worker->>PHP: Call /analyze for requested source path
     PHP-->>Worker: Emit JSONL facts
 
     loop For each JSONL line
@@ -117,15 +117,15 @@ flowchart TD
     G --> H
 ```
 
-## PHP Analyzer Command
+## PHP Analyzer Service
 
 The analyzer reads paths relative to `MAGENTIC_ANALYZED_SOURCE_PATH`. In Docker, the default container path is `/mnt/analyzed-source`.
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps magentic_analyzer_php php /app/bin/php-analyzer magentic:parse vendor/magento/module-catalog
+docker run --rm --network magentic_default curlimages/curl -s -X POST http://magentic_analyzer_php/analyze -H "Content-Type: application/json" -d '{"path": "vendor/magento/module-catalog"}'
 ```
 
-The command writes JSONL to stdout. It does not write graph data directly and does not emit human-readable status lines on stdout.
+The endpoint returns JSONL. It does not write graph data directly and does not emit human-readable status lines on stdout.
 
 ## Example JSONL Output
 
@@ -148,12 +148,12 @@ Duplicate symbol facts are allowed. The graph ingestion layer should upsert node
 
 ```mermaid
 flowchart LR
-    A[PHP CLI<br/>extracts facts] --> B[JSONL stream]
+    A[PHP Analyzer<br/>extracts facts] --> B[JSONL stream]
     B --> C[Node Worker<br/>orchestrates ingestion]
     C --> D[Neo4j<br/>stores graph]
 ```
 
-The PHP CLI should stay simple: it reads source code and emits facts.
+The PHP Analyzer should stay simple: it reads source code and emits facts.
 
 The Node.js worker owns the workflow: job execution, status, JSONL parsing, TypeScript mapping, and Neo4j writes.
 

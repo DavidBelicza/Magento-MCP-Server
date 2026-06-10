@@ -4,42 +4,62 @@ declare(strict_types=1);
 
 namespace Magentic\PhpAnalyzer\Parse;
 
-final class SourceFileFinder
+readonly class PathScanner
 {
-    public function __construct(private string $analyzedSourcePath)
-    {
+    public function __construct(
+        private string $analyzedSourcePath,
+        private FileParser $fileParser
+    ) {
     }
 
     /**
      * @param array<int, mixed> $paths
-     * @return \Generator<SourceFile>
+     * @return \Generator<array{file: string, facts: array<int, Fact>}>
      */
-    public function findPhpFiles(array $paths): \Generator
+    public function scan(array $paths): \Generator
     {
         foreach ($paths as $path) {
-            yield from $this->findPhpFilesForPath($path);
+            yield from $this->scanPath($path);
         }
     }
 
     /**
-     * @return \Generator<SourceFile>
+     * @return \Generator<array{file: string, facts: array<int, Fact>}>
      */
-    private function findPhpFilesForPath(mixed $path): \Generator
+    private function scanPath(mixed $path): \Generator
     {
         $relativePath = $this->validateInputPath($path);
         $realPath = $this->validateResolvedPath($relativePath, (string) $path);
 
-        if (is_file($realPath)) {
-            yield $this->validatePhpFile($realPath, $relativePath, (string) $path);
+        $fs = new \Symfony\Component\Filesystem\Filesystem();
+
+        if ((new \SplFileInfo($realPath))->isFile()) {
+            $sourceFile = $this->validatePhpFile($realPath, $relativePath, (string) $path);
+            yield from $this->parseAndYield($sourceFile);
 
             return;
         }
 
-        if (!is_dir($realPath)) {
+        if (!$fs->exists($realPath) || !(new \SplFileInfo($realPath))->isDir()) {
             throw new \RuntimeException(sprintf('Path is not a file or directory: %s', (string) $path));
         }
 
-        yield from $this->findPhpFilesInDirectory($realPath);
+        yield from $this->scanDirectory($realPath);
+    }
+
+    /**
+     * @return \Generator<array{file: string, facts: array<int, Fact>}>
+     */
+    private function parseAndYield(SourceFile $sourceFile): \Generator
+    {
+        $facts = $this->fileParser->parse($sourceFile->absolutePath, $sourceFile->relativePath);
+
+        if (count($facts) > 0) {
+            yield [
+                'file' => $sourceFile->relativePath,
+                'facts' => $facts,
+            ];
+        }
     }
 
     private function validateInputPath(mixed $path): string
@@ -54,8 +74,9 @@ final class SourceFileFinder
     private function validateResolvedPath(string $relativePath, string $originalPath): string
     {
         $resolvedPath = $this->resolveAnalyzedSourcePath($relativePath);
+        $fs = new \Symfony\Component\Filesystem\Filesystem();
 
-        if (!file_exists($resolvedPath)) {
+        if (!$fs->exists($resolvedPath)) {
             throw new \RuntimeException(sprintf('Path does not exist: %s', $originalPath));
         }
 
@@ -78,21 +99,19 @@ final class SourceFileFinder
     }
 
     /**
-     * @return \Generator<SourceFile>
+     * @return \Generator<array{file: string, facts: array<int, Fact>}>
      */
-    private function findPhpFilesInDirectory(string $directory): \Generator
+    private function scanDirectory(string $directory): \Generator
     {
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS)
-        );
+        $finder = new \Symfony\Component\Finder\Finder();
+        $finder->files()->in($directory)->name('*.php');
 
-        foreach ($iterator as $file) {
-            if ($file->isFile() && $this->isPhpFile($file->getPathname())) {
-                yield new SourceFile(
-                    $file->getPathname(),
-                    $this->relativeAnalyzedSourcePath($file->getPathname())
-                );
-            }
+        foreach ($finder as $file) {
+            $sourceFile = new SourceFile(
+                $file->getPathname(),
+                $this->relativeAnalyzedSourcePath($file->getPathname())
+            );
+            yield from $this->parseAndYield($sourceFile);
         }
     }
 

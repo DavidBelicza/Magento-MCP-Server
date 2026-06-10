@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Magentic\PhpAnalyzer\Parse;
 
-final class Fact implements \JsonSerializable
+readonly class Fact implements \JsonSerializable
 {
     /**
      * @param array<string, string> $values

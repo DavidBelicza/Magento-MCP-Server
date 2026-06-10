@@ -38,7 +38,7 @@ The project has two architecture documents:
 
 `services/` contains Docker service definitions, runtime configuration, Dockerfiles, entrypoint scripts, and service-specific infrastructure files.
 
-`packages/` contains application source packages. `packages/core` and `packages/site` are Node.js projects. `packages/php-analyzer` is a Composer-based PHP CLI project.
+`packages/` contains application source packages. `packages/core` and `packages/site` are Node.js projects. `packages/php-analyzer` is a Composer-based PHP project.
 
 The root directory contains the primary `docker-compose.yml`, root `package.json`, and root `package-lock.json`. The root Node files are intentional because the project uses npm workspaces. They allow root-level commands such as `npm run build --workspaces` while keeping `packages/core` and `packages/site` as separate packages.
 
@@ -54,10 +54,10 @@ node:24-alpine
 
 This requirement is for Node.js 24 LTS. npm is bundled with the official Node image. The `magentic_backend` image and `magentic_frontend` runtime image are both based on `node:24-alpine`, so npm commands can be run inside those containers through Docker Compose.
 
-The PHP analyzer runtime uses the official PHP 8.5 CLI image line:
+The PHP analyzer runtime uses FrankenPHP for a high performance HTTP server:
 
 ```text
-php:8.5-cli-alpine
+dunglas/frankenphp:php8.4-alpine
 ```
 
 Composer is copied into the analyzer image from the official Composer image. Production image builds run `composer install` from `packages/php-analyzer/composer.lock`. In development mode, the analyzer package is bind-mounted into `/app`, and Composer install runs on container startup so local `packages/php-analyzer/vendor` is available for editor support while remaining ignored by Git.
@@ -105,15 +105,15 @@ PHP Composer package used by:
 
 Responsibilities:
 
-- provide PHP CLI commands through Symfony Console
+- provide an HTTP endpoint to analyze PHP code
 - parse PHP source code with `nikic/php-parser`
-- expose the `magentic:parse` command through `bin/php-analyzer`
+- expose the `/analyze` endpoint
 - emit newline-delimited JSON facts for source symbols and references
 - read the analyzed source at `/mnt/analyzed-source`
 
 The package name is `magentic/php-analyzer`. PHP source uses the PSR-4 namespace `Magentic\PhpAnalyzer\`.
 
-The PHP analyzer does not write directly to PostgreSQL or Neo4j. It is a CLI extraction tool used by the Node.js worker. See `docs/architecture_world_mapping.md` for the indexing flow.
+The PHP analyzer does not write directly to PostgreSQL or Neo4j. It is an extraction microservice used by the Node.js worker. See `docs/architecture_world_mapping.md` for the indexing flow.
 
 ## Docker Compose Services
 
@@ -210,7 +210,7 @@ Responsibilities:
 - read and write indexing-related data
 - communicate with PostgreSQL
 - communicate with Neo4j
-- call analyzer CLIs and consume their JSONL output
+- call analyzer HTTP endpoints and consume their JSONL output
 - share code from `packages/core`
 - read the analyzed Magento source at `/mnt/analyzed-source`
 
@@ -231,18 +231,16 @@ Private PHP analyzer service.
 Technology:
 
 - `magentic_analyzer_php:latest`
-- PHP 8.5 CLI
+- FrankenPHP 8.4
 - Composer
-- Symfony Console
 - `nikic/php-parser`
 
 Responsibilities:
 
-- provide PHP command-line analysis tooling
-- run commands from `packages/php-analyzer/bin/php-analyzer`
-- expose `magentic:parse` as a JSONL-producing analyzer command
+- provide PHP analysis tooling via an HTTP API
+- expose `/analyze` as a JSONL-producing analyzer endpoint
 - read the analyzed source at `/mnt/analyzed-source`
-- use larger CLI-oriented PHP runtime limits through `services/analyzer-php/php.ini`
+- use larger PHP runtime limits through `services/analyzer-php/php.ini`
 
 The analyzed source mount is read-only inside the container. The analyzer application source itself lives in `packages/php-analyzer`, not in the analyzed source mount.
 

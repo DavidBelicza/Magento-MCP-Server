@@ -3,9 +3,11 @@
   "description": "PHP analysis runtime for Magentic.",
   "type": "project",
   "require": {
-    "php": "^8.5",
+    "php": "^8.4",
     "nikic/php-parser": "^5.0",
-    "symfony/console": "^8.1"
+    "symfony/http-foundation": "^7.2",
+    "symfony/filesystem": "^7.2",
+    "symfony/finder": "^7.2"
   },
   "autoload": {
     "psr-4": {

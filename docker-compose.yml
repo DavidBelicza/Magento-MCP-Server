@@ -79,11 +79,13 @@ services:
     environment:
       MAGENTIC_ANALYZED_SOURCE_PATH: "${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}"
     volumes: *magentic_analyzed_source_volumes
+    expose:
+      - "80"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "php -r \"require '/app/vendor/autoload.php'; exit(class_exists('PhpParser\\\\ParserFactory') ? 0 : 1);\""
+          "curl -f http://localhost:80/health || exit 1"
         ]
       interval: 10s
       timeout: 5s
