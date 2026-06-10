@@ -5,6 +5,8 @@ export type AppConfig = {
   neo4jUri: string;
   neo4jUsername: string;
   neo4jPassword: string;
+  graphBatchSize: number;
+  analyzerPhpUrl: string;
 };
 
 function readNumber(value: string | undefined, fallback: number): number {
@@ -23,6 +25,8 @@ export function readConfig(): AppConfig {
     postgresUrl: process.env.POSTGRES_URL ?? "postgres://magentic:dev-password@magentic_postgres:5432/magentic",
     neo4jUri: process.env.NEO4J_URI ?? "bolt://magentic_graphdb:7687",
     neo4jUsername: process.env.NEO4J_USERNAME ?? "neo4j",
-    neo4jPassword: process.env.NEO4J_PASSWORD ?? "dev-password"
+    neo4jPassword: process.env.NEO4J_PASSWORD ?? "dev-password",
+    graphBatchSize: readNumber(process.env.GRAPH_BATCH_SIZE, 200),
+    analyzerPhpUrl: process.env.ANALYZER_PHP_URL ?? "http://magentic_analyzer_php"
   };
 }

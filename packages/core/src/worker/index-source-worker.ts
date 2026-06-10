@@ -1,4 +1,5 @@
 import { Worker, type Job } from "bullmq";
+import type { Driver } from "neo4j-driver";
 import { createRedisConnectionOptions } from "../connections.js";
 import { processFact } from "../modules/processing/php-analysis/process-fact.js";
 import {
@@ -13,10 +14,10 @@ type IndexSourceResult = {
   status: "accepted";
 };
 
-export function createIndexSourceWorker() {
+export function createIndexSourceWorker(driver: Driver, batchSize: number, analyzerPhpUrl: string) {
   const worker = new Worker<IndexSourceJob, IndexSourceResult, typeof indexSourceJobName>(
     indexSourceQueueName,
-    handleJob,
+    (job) => handleJob(job, driver, batchSize, analyzerPhpUrl),
     {
       connection: createRedisConnectionOptions()
     }
@@ -33,13 +34,13 @@ export function createIndexSourceWorker() {
   return worker;
 }
 
-async function handleJob(job: Job<IndexSourceJob>): Promise<IndexSourceResult> {
+async function handleJob(job: Job<IndexSourceJob>, driver: Driver, batchSize: number, analyzerPhpUrl: string): Promise<IndexSourceResult> {
   await job.updateProgress({ phase: "accepted", percent: 0 });
 
   const directory = extractDirectory(job.data.directory);
-  const reader = await fetchAnalyzerStream(directory);
+  const reader = await fetchAnalyzerStream(directory, analyzerPhpUrl);
 
-  await processStream(reader, job);
+  await processStream(reader, job, driver, batchSize);
 
   await job.updateProgress({ phase: "completed", percent: 100 });
 
@@ -56,8 +57,8 @@ function extractDirectory(directory: unknown): string {
     : ".";
 }
 
-async function fetchAnalyzerStream(directory: string): Promise<ReadableStreamDefaultReader<Uint8Array>> {
-  const response = await fetch("http://magentic_analyzer_php/analyze", {
+async function fetchAnalyzerStream(directory: string, analyzerPhpUrl: string): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+  const response = await fetch(`${analyzerPhpUrl}/analyze`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -76,7 +77,7 @@ async function fetchAnalyzerStream(directory: string): Promise<ReadableStreamDef
   return response.body.getReader();
 }
 
-async function processStream(reader: ReadableStreamDefaultReader<Uint8Array>, job: Job<IndexSourceJob>): Promise<void> {
+async function processStream(reader: ReadableStreamDefaultReader<Uint8Array>, job: Job<IndexSourceJob>, driver: Driver, batchSize: number): Promise<void> {
   const decoder = new TextDecoder();
   let buffer = "";
 
@@ -88,24 +89,24 @@ async function processStream(reader: ReadableStreamDefaultReader<Uint8Array>, jo
       }
 
       buffer += decoder.decode(value, { stream: true });
-      buffer = await processBufferLines(buffer, job);
+      buffer = await processBufferLines(buffer, job, driver, batchSize);
     }
 
     if (buffer.trim()) {
-      await processFact(buffer.trim());
+      await processFact(driver, buffer.trim(), batchSize);
     }
   } finally {
     reader.releaseLock();
   }
 }
 
-async function processBufferLines(buffer: string, job: Job<IndexSourceJob>): Promise<string> {
+async function processBufferLines(buffer: string, job: Job<IndexSourceJob>, driver: Driver, batchSize: number): Promise<string> {
   const lines = buffer.split("\n");
   const remainingBuffer = lines.pop() ?? "";
 
   for (const line of lines) {
     if (line.trim()) {
-      await processFact(line.trim());
+      await processFact(driver, line.trim(), batchSize);
       await job.updateProgress({ phase: "processing" });
     }
   }

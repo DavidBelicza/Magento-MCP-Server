@@ -86,8 +86,6 @@ readonly class FileParser
         }
     }
 
-    /**
-     */
     private function createSymbolFact(string $fqcn): Fact
     {
         return Fact::symbol($this->createClassSymbolId($fqcn), $fqcn, 'class');
