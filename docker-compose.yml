@@ -30,6 +30,7 @@ services:
       NEO4J_USERNAME: "${NEO4J_USERNAME:-neo4j}"
       NEO4J_PASSWORD: "${NEO4J_PASSWORD:-dev-password}"
       MAGENTIC_ANALYZED_SOURCE_PATH: "${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}"
+      ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-true}"
     volumes: *magentic_analyzed_source_volumes
     expose:
       - "3000"
@@ -62,6 +63,7 @@ services:
       NEO4J_USERNAME: "${NEO4J_USERNAME:-neo4j}"
       NEO4J_PASSWORD: "${NEO4J_PASSWORD:-dev-password}"
       MAGENTIC_ANALYZED_SOURCE_PATH: "${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}"
+      ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-true}"
     volumes: *magentic_analyzed_source_volumes
     depends_on:
       magentic_redis:
@@ -78,6 +80,7 @@ services:
       dockerfile: services/analyzer-php/Dockerfile
     environment:
       MAGENTIC_ANALYZED_SOURCE_PATH: "${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}"
+      ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-true}"
     volumes: *magentic_analyzed_source_volumes
     expose:
       - "80"
@@ -138,6 +141,41 @@ services:
       timeout: 10s
       retries: 20
       start_period: 30s
+
+  magentic_loki:
+    image: grafana/loki:3.0.0
+    profiles: ["telemetry"]
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  magentic_promtail:
+    image: grafana/promtail:3.0.0
+    profiles: ["telemetry"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./packages/core/schema/promtail-config.yaml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      magentic_loki:
+        condition: service_healthy
+
+  magentic_grafana:
+    image: grafana/grafana:latest
+    profiles: ["telemetry"]
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      magentic_loki:
+        condition: service_healthy
 
 volumes:
   magentic_redis_data:

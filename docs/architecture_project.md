@@ -128,6 +128,9 @@ Services use the `magentic_` prefix:
 - `magentic_redis`
 - `magentic_postgres`
 - `magentic_graphdb`
+- `magentic_loki` (optional, via telemetry profile)
+- `magentic_promtail` (optional, via telemetry profile)
+- `magentic_grafana` (optional, via telemetry profile)
 
 Custom images also use the `magentic_` prefix:
 
@@ -292,6 +295,19 @@ Default local URLs:
 http://localhost:7474
 bolt://localhost:7687
 ```
+
+### Telemetry Services (`magentic_loki`, `magentic_promtail`, `magentic_grafana`)
+
+The PLG stack provides centralized, zero-overhead logging.
+
+Responsibilities:
+- **Loki**: Stores structured JSON logs received from Promtail. Available on port `3100`.
+- **Promtail**: Binds to the Docker Daemon to securely read container `stdout`/`stderr` logs without application coupling, and pushes them to Loki.
+- **Grafana**: A UI for querying Loki using LogQL. Exposed on port `3001`.
+
+The telemetry services are placed under the `telemetry` Compose profile and will only boot if explicitly requested (e.g., `docker compose --profile telemetry up -d`).
+
+Logging behavior in the application code can be completely muted by setting `ENABLE_TELEMETRY=false` in the `.env` file, bypassing all JSON string formatting.
 
 ## Networking Model
 

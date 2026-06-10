@@ -78,6 +78,35 @@ username: neo4j
 password: dev-password
 ```
 
+### Telemetry / Logging (Optional)
+
+Magentic includes a pre-configured PLG (Promtail, Loki, Grafana) stack for centralized logging and telemetry. By default, these services are completely disabled to save local resources.
+
+To boot the environment with the logger stack enabled:
+```bash
+docker compose --profile telemetry up -d
+```
+
+Once running, access the Grafana UI:
+```text
+http://localhost:3001
+username: admin
+password: admin
+```
+
+#### How to view logs manually in Grafana
+
+Grafana 11 includes a new "Logs" app, but to query raw LogQL streams without extra configuration, you should use the standard **Explore** tab:
+
+1. Look at the left sidebar and click the **Explore** icon (it looks like a small **compass** 🧭).
+2. At the top left of the Explore page, ensure **Loki** is selected from the data source dropdown.
+3. Switch to the **Code** view (if it is currently in Builder mode).
+4. Enter a LogQL query to fetch logs. For example, to see worker logs:
+   `{compose_service="magentic_worker"}`
+5. Click the blue **Run query** button in the top right corner.
+
+You can entirely mute log generation in the PHP and Node.js applications by setting `ENABLE_TELEMETRY=false` in the `.env` file.
+
 The default analyzed source mount is:
 
 ```text

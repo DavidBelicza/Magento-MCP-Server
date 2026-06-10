@@ -5,6 +5,7 @@ declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';
 
 use Magentic\PhpAnalyzer\Http\StreamAnalyzerHandler;
+use Magentic\PhpAnalyzer\Logging\LoggerFactory;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -28,7 +29,10 @@ if ($uri === '/analyze' && $method === 'POST') {
     
     $path = $payload['path'] ?? '';
 
-    $handler = new StreamAnalyzerHandler();
+    $logger = LoggerFactory::create();
+    $logger->info('Incoming PHP analysis request', ['path' => $path]);
+
+    $handler = new StreamAnalyzerHandler($logger);
     $response = $handler->handle($path);
     $response->send();
     exit(0);

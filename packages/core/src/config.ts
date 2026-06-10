@@ -7,6 +7,7 @@ export type AppConfig = {
   neo4jPassword: string;
   graphBatchSize: number;
   analyzerPhpUrl: string;
+  enableTelemetry: boolean;
 };
 
 function readNumber(value: string | undefined, fallback: number): number {
@@ -27,6 +28,7 @@ export function readConfig(): AppConfig {
     neo4jUsername: process.env.NEO4J_USERNAME ?? "neo4j",
     neo4jPassword: process.env.NEO4J_PASSWORD ?? "dev-password",
     graphBatchSize: readNumber(process.env.GRAPH_BATCH_SIZE, 200),
-    analyzerPhpUrl: process.env.ANALYZER_PHP_URL ?? "http://magentic_analyzer_php"
+    analyzerPhpUrl: process.env.ANALYZER_PHP_URL ?? "http://magentic_analyzer_php",
+    enableTelemetry: process.env.ENABLE_TELEMETRY === "true"
   };
 }

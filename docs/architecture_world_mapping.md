@@ -56,9 +56,9 @@ flowchart LR
     end
 
     subgraph Neo4j[Neo4j]
-        C1[PhpClass nodes]
+        C1[Symbol:PHP:Class nodes]
         C2[Package nodes]
-        C3[EXTENDS relationships]
+        C3[EXTENDS relationships (with identity hash)]
         C4[BELONGS_TO_PACKAGE relationships]
     end
 
@@ -109,7 +109,7 @@ flowchart TD
     C --> E[Reference Fact]
     C --> I[Error Fact]
 
-    D --> F[PhpClass Node]
+    D --> F[Symbol Node (e.g. :Symbol:PHP:Class)]
     E --> G[Graph Relationship]
     I --> J[Indexing diagnostics]
 
@@ -138,11 +138,11 @@ The endpoint returns JSONL. It does not write graph data directly and does not e
 
 Current facts:
 
-- `symbol`: declares or references a PHP class symbol by stable `symbolId`.
-- `reference`: records a relationship between symbols, currently only `kind: "extends"`.
+- `symbol`: declares or references a PHP class symbol by stable `symbolId`. Mapped into Neo4j using multi-label taxonomy (e.g., `:Symbol:PHP:Class`, `:Symbol:PHP:Interface`).
+- `reference`: records a relationship between symbols, currently only `kind: "extends"`. Translated into an `EXTENDS` relation in Neo4j. Relationships contain an `identity` hash (e.g., `md5(fromSymbolId + "EXTENDS" + toSymbolId)`) to prevent duplicate edges.
 - `error`: records parser or read failures for one file while allowing the stream to continue.
 
-Duplicate symbol facts are allowed. The graph ingestion layer should upsert nodes by `symbolId`.
+Duplicate symbol facts are allowed. The graph ingestion layer should `MERGE` nodes by `symbolId`.
 
 ## Main Principle
 

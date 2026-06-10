@@ -7,6 +7,8 @@ namespace Magentic\PhpAnalyzer\Http;
 use Magentic\PhpAnalyzer\Parse\FileParser;
 use Magentic\PhpAnalyzer\Parse\PathScanner;
 use PhpParser\ParserFactory;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -14,6 +16,13 @@ use Symfony\Component\Filesystem\Filesystem;
 
 readonly class StreamAnalyzerHandler
 {
+    private LoggerInterface $logger;
+
+    public function __construct(?LoggerInterface $logger = null)
+    {
+        $this->logger = $logger ?? new NullLogger();
+    }
+
     public function handle(string $path): Response
     {
         try {

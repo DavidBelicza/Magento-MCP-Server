@@ -3,6 +3,7 @@ import { installSchemas } from "./schema/install-schemas.js";
 import { createIndexPackagesWorker } from "./worker/index-packages-worker.js";
 import { createIndexSourceWorker } from "./worker/index-source-worker.js";
 import { readConfig } from "./config.js";
+import { logger } from "./logger.js";
 
 const config = readConfig();
 
@@ -13,6 +14,8 @@ await installSchemas(postgres, neo4jDriver);
 
 const indexPackagesWorker = createIndexPackagesWorker(neo4jDriver);
 const indexSourceWorker = createIndexSourceWorker(neo4jDriver, config.graphBatchSize, config.analyzerPhpUrl);
+
+logger.info({ event: 'worker_started' }, 'Magentic Worker is running');
 
 process.on("SIGTERM", async () => {
   await indexPackagesWorker.close();
