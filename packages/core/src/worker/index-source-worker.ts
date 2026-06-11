@@ -1,7 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import type { Driver } from "neo4j-driver";
 import { createRedisConnectionOptions } from "../connections.js";
-import { processFact } from "../modules/processing/php-analysis/process-fact.js";
+import { consumeFactStream } from "../modules/processing/php-analysis/consume-fact-stream.js";
 import {
   indexSourceJobName,
   indexSourceQueueName,
@@ -40,7 +40,7 @@ async function handleJob(job: Job<IndexSourceJob>, driver: Driver, batchSize: nu
   const directory = extractDirectory(job.data.directory);
   const reader = await fetchAnalyzerStream(directory, analyzerPhpUrl);
 
-  await processStream(reader, job, driver, batchSize);
+  await consumeFactStream(reader, driver, batchSize, () => job.updateProgress({ phase: "processing" }));
 
   await job.updateProgress({ phase: "completed", percent: 100 });
 
@@ -75,41 +75,4 @@ async function fetchAnalyzerStream(directory: string, analyzerPhpUrl: string): P
   }
 
   return response.body.getReader();
-}
-
-async function processStream(reader: ReadableStreamDefaultReader<Uint8Array>, job: Job<IndexSourceJob>, driver: Driver, batchSize: number): Promise<void> {
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      buffer = await processBufferLines(buffer, job, driver, batchSize);
-    }
-
-    if (buffer.trim()) {
-      await processFact(driver, buffer.trim(), batchSize);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
-
-async function processBufferLines(buffer: string, job: Job<IndexSourceJob>, driver: Driver, batchSize: number): Promise<string> {
-  const lines = buffer.split("\n");
-  const remainingBuffer = lines.pop() ?? "";
-
-  for (const line of lines) {
-    if (line.trim()) {
-      await processFact(driver, line.trim(), batchSize);
-      await job.updateProgress({ phase: "processing" });
-    }
-  }
-
-  return remainingBuffer;
 }

@@ -1,4 +1,4 @@
-import type { Driver, ManagedTransaction } from "neo4j-driver";
+import type { ManagedTransaction, Session } from "neo4j-driver";
 import { mapGraphFieldsToStoredProperties } from "./properties.js";
 import type { GraphNodeRecord, GraphRelationshipRecord, GraphWriteProgress, GraphWriteSummary } from "./types.js";
 
@@ -6,6 +6,7 @@ export type WriteGraphUpsertOptions = {
   labels: string[];
   relationshipTypes: string[];
   clearOutboundFromNodeIds?: string[];
+  clearNodeLabel?: string;
   batchSize?: number;
   onProgress?: (progress: GraphWriteProgress) => Promise<void>;
   getClearingPhase?: () => string;
@@ -23,7 +24,7 @@ type ProgressState = {
 const defaultBatchSize = 200;
 
 export async function writeGraphUpsert(
-  driver: Driver,
+  session: Session,
   nodes: GraphNodeRecord[],
   relationships: GraphRelationshipRecord[],
   options: WriteGraphUpsertOptions
@@ -31,50 +32,47 @@ export async function writeGraphUpsert(
   const labels = unique(options.labels);
   const relationshipTypes = unique(options.relationshipTypes);
   const batchSize = options.batchSize ?? defaultBatchSize;
-  const session = driver.session();
   const progress: ProgressState = {
     processed: 0,
     total: nodes.length + relationships.length,
     onProgress: options.onProgress
   };
 
-  validateGraphTokens([...labels, ...relationshipTypes]);
+  validateGraphTokens([...labels, ...relationshipTypes, ...(options.clearNodeLabel ? [options.clearNodeLabel] : [])]);
 
-  try {
-    if (options.clearOutboundFromNodeIds && options.clearOutboundFromNodeIds.length > 0) {
-      await reportProgress(progress, options.getClearingPhase?.() ?? "clearing-graph");
-      await session.executeWrite(async (tx) => {
-        await clearOutboundRelationships(tx, options.clearOutboundFromNodeIds!);
-      });
-    }
-
-    for (const label of labels) {
-      const labelNodes = nodes.filter((node) => node.label === label);
-      await writeNodes(session, label, labelNodes, batchSize, progress, options);
-    }
-
-    for (const relationshipType of relationshipTypes) {
-      const typeRelationships = relationships.filter((relationship) => relationship.type === relationshipType);
-      await writeRelationships(session, relationshipType, typeRelationships, batchSize, progress, options);
-    }
-
-    await reportProgress(progress, options.getCompletedPhase?.() ?? "completed");
-
-    return {
-      nodeCount: nodes.length,
-      relationshipCount: relationships.length,
-      totalCount: progress.total
-    };
-  } finally {
-    await session.close();
+  if (options.clearOutboundFromNodeIds && options.clearOutboundFromNodeIds.length > 0) {
+    await reportProgress(progress, options.getClearingPhase?.() ?? "clearing-graph");
+    await session.executeWrite(async (tx) => {
+      await clearOutboundRelationships(tx, options.clearOutboundFromNodeIds!, options.clearNodeLabel);
+    });
   }
+
+  for (const label of labels) {
+    const labelNodes = nodes.filter((node) => node.label === label);
+    await writeNodes(session, label, labelNodes, batchSize, progress, options);
+  }
+
+  for (const relationshipType of relationshipTypes) {
+    const typeRelationships = relationships.filter((relationship) => relationship.type === relationshipType);
+    await writeRelationships(session, relationshipType, typeRelationships, batchSize, progress, options);
+  }
+
+  await reportProgress(progress, options.getCompletedPhase?.() ?? "completed");
+
+  return {
+    nodeCount: nodes.length,
+    relationshipCount: relationships.length,
+    totalCount: progress.total
+  };
 }
 
-async function clearOutboundRelationships(tx: ManagedTransaction, nodeIds: string[]): Promise<void> {
+async function clearOutboundRelationships(tx: ManagedTransaction, nodeIds: string[], nodeLabel?: string): Promise<void> {
+  const nodePattern = nodeLabel ? `(node:${nodeLabel} {id: id})` : "(node {id: id})";
+
   for (const batch of chunk(nodeIds, 200)) {
     await tx.run(
       `UNWIND $nodeIds AS id
-       MATCH (node {id: id})-[relationship]->()
+       MATCH ${nodePattern}-[relationship]->()
        DELETE relationship`,
       { nodeIds: batch }
     );
@@ -82,7 +80,7 @@ async function clearOutboundRelationships(tx: ManagedTransaction, nodeIds: strin
 }
 
 async function writeNodes(
-  session: ReturnType<Driver["session"]>,
+  session: Session,
   label: string,
   nodes: GraphNodeRecord[],
   batchSize: number,
@@ -110,7 +108,7 @@ async function writeNodes(
 }
 
 async function writeRelationships(
-  session: ReturnType<Driver["session"]>,
+  session: Session,
   relationshipType: string,
   relationships: GraphRelationshipRecord[],
   batchSize: number,
