@@ -12,9 +12,21 @@ class SymbolVisitor extends NodeVisitorAbstract
     /** @var array<int, Fact> */
     private array $facts = [];
 
+    private string $namespace = '';
+
+    /** @var array<string, string> */
+    private array $uses = [];
+
+    public function __construct(private DocBlockTypeResolver $docBlockResolver)
+    {
+    }
+
     public function enterNode(Node $node): null
     {
         match (true) {
+            $node instanceof Node\Stmt\Namespace_ => $this->enterNamespace($node),
+            $node instanceof Node\Stmt\Use_ => $this->collectUses($node->uses, ''),
+            $node instanceof Node\Stmt\GroupUse => $this->collectUses($node->uses, $node->prefix->toString()),
             $node instanceof Node\Stmt\Class_ => $this->handleClass($node),
             $node instanceof Node\Stmt\Interface_ => $this->handleInterface($node),
             $node instanceof Node\Stmt\Trait_ => $this->handleTrait($node),
@@ -23,6 +35,23 @@ class SymbolVisitor extends NodeVisitorAbstract
         };
 
         return null;
+    }
+
+    private function enterNamespace(Node\Stmt\Namespace_ $namespace): void
+    {
+        $this->namespace = $namespace->name?->toString() ?? '';
+        $this->uses = [];
+    }
+
+    /**
+     * @param array<int, Node\UseItem> $uses
+     */
+    private function collectUses(array $uses, string $prefix): void
+    {
+        foreach ($uses as $use) {
+            $name = $prefix === '' ? $use->name->toString() : $prefix . '\\' . $use->name->toString();
+            $this->uses[strtolower($use->getAlias()->toString())] = $name;
+        }
     }
 
     /**
@@ -142,11 +171,12 @@ class SymbolVisitor extends NodeVisitorAbstract
         ?string $parentFqcn
     ): void {
         $typeRenderer = new TypeRenderer($ownerFqcn, $parentFqcn);
+        $scope = new DocBlockScope($this->namespace, $this->uses, $ownerFqcn, $parentFqcn);
 
         foreach ($classLike->getMethods() as $method) {
             $methodFqcn = $ownerFqcn . '::' . $method->name->toString();
             $methodId = SymbolKind::Method->idFor($methodFqcn);
-            $properties = $this->methodProperties($method, $typeRenderer);
+            $properties = $this->methodProperties($method, $typeRenderer, $scope);
 
             $this->facts[] = Fact::symbol($methodId, $methodFqcn, SymbolKind::Method->value, true, $properties);
             $this->facts[] = Fact::reference(ReferenceKind::HasMethod, $ownerSymbolId, $methodId);
@@ -156,10 +186,19 @@ class SymbolVisitor extends NodeVisitorAbstract
     /**
      * @return array<string, mixed>
      */
-    private function methodProperties(Node\Stmt\ClassMethod $method, TypeRenderer $typeRenderer): array
-    {
+    private function methodProperties(
+        Node\Stmt\ClassMethod $method,
+        TypeRenderer $typeRenderer,
+        DocBlockScope $scope
+    ): array {
+        $docComment = $method->getDocComment()?->getText() ?? '';
+        $docTypes = $docComment === '' ? new MethodDocTypes('', []) : $this->docBlockResolver->resolve($docComment, $scope);
+
+        $returnType = $typeRenderer->render($method->returnType);
+
         $paramNames = [];
         $paramTypes = [];
+        $paramTypesDoc = [];
         $parameters = [];
 
         foreach ($method->params as $param) {
@@ -169,12 +208,12 @@ class SymbolVisitor extends NodeVisitorAbstract
 
             $name = $param->var->name;
             $type = $typeRenderer->render($param->type);
+            $docType = $docTypes->paramTypes[$name] ?? '';
 
             $paramNames[] = $name;
             $paramTypes[] = $type;
+            $paramTypesDoc[] = $docType === $type ? '' : $docType;
             $parameters[] = [
-                'name' => $name,
-                'type' => $type,
                 'optional' => $param->default !== null,
                 'variadic' => $param->variadic,
                 'byRef' => $param->byRef,
@@ -189,9 +228,11 @@ class SymbolVisitor extends NodeVisitorAbstract
             'abstract' => $method->isAbstract(),
             'final' => $method->isFinal(),
             'hasBody' => $method->stmts !== null,
-            'returnType' => $typeRenderer->render($method->returnType),
+            'returnType' => $returnType,
+            'returnTypeDoc' => $docTypes->returnType === $returnType ? '' : $docTypes->returnType,
             'paramNames' => $paramNames,
             'paramTypes' => $paramTypes,
+            'paramTypesDoc' => $paramTypesDoc,
             'parameters' => $parameters,
         ];
     }

@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace Magentic\PhpAnalyzer\Http;
 
+use Magentic\PhpAnalyzer\Parse\DocBlockTypeResolver;
 use Magentic\PhpAnalyzer\Parse\FileParser;
 use Magentic\PhpAnalyzer\Parse\PathScanner;
 use PhpParser\ParserFactory;
+use PHPStan\PhpDocParser\Lexer\Lexer;
+use PHPStan\PhpDocParser\Parser\ConstExprParser;
+use PHPStan\PhpDocParser\Parser\PhpDocParser;
+use PHPStan\PhpDocParser\Parser\TypeParser;
+use PHPStan\PhpDocParser\ParserConfig;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -66,6 +72,11 @@ readonly class StreamAnalyzerHandler
 
     private function createFileParser(): FileParser
     {
-        return new FileParser((new ParserFactory())->createForNewestSupportedVersion());
+        $parserConfig = new ParserConfig([]);
+        $constExprParser = new ConstExprParser($parserConfig);
+        $phpDocParser = new PhpDocParser($parserConfig, new TypeParser($parserConfig, $constExprParser), $constExprParser);
+        $docBlockResolver = new DocBlockTypeResolver(new Lexer($parserConfig), $phpDocParser);
+
+        return new FileParser((new ParserFactory())->createForNewestSupportedVersion(), $docBlockResolver);
     }
 }

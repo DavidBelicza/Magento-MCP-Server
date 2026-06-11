@@ -12,8 +12,10 @@ use PhpParser\Parser;
 
 readonly class FileParser
 {
-    public function __construct(private Parser $parser)
-    {
+    public function __construct(
+        private Parser $parser,
+        private DocBlockTypeResolver $docBlockResolver
+    ) {
     }
 
     /**
@@ -31,7 +33,7 @@ readonly class FileParser
             return [Fact::error($relativePath, $exception->getMessage())];
         }
 
-        $visitor = new SymbolVisitor();
+        $visitor = new SymbolVisitor($this->docBlockResolver);
         $traverser = new NodeTraverser();
         $traverser->addVisitor($visitor);
         $traverser->traverse($nodes);
