@@ -8,7 +8,14 @@ Magentic is a Docker-based, self-hosted MCP server for agentic AI workflows. It 
 - `packages/site`: React, Vite, Tailwind frontend with routed views and React Force Graph 2D visualization.
 - `packages/php-analyzer`: PHP analyzer microservice using `nikic/php-parser`.
 
-The holistic architecture notes are in `docs/architecture_project.md`. Source indexing and graph/world-mapping notes are in `docs/architecture_world_mapping.md`. Runtime sanity checks are in `docs/test_system_sanity.md`.
+## Documentation
+
+`README.md` in the repository root covers setup, running the stack, and operational commands. Architecture and reference notes live in the `docs/` directory:
+
+- `docs/architecture_project.md`: holistic project and service architecture.
+- `docs/architecture_world_mapping.md`: source indexing and graph/world-mapping workflow, including the worker ingestion flow.
+- `docs/test_system_sanity.md`: runtime and integration sanity checks.
+- `docs/README-performance.md`: PHP analyzer file-scanning performance notes.
 
 ## Docker Services
 
@@ -52,13 +59,16 @@ docker run --rm --network magentic_default curlimages/curl -X POST http://magent
 Important core paths:
 
 - `src/server.ts`: Fastify server and API routes.
-- `src/worker.ts`: indexing worker process.
+- `src/worker.ts`: worker process entrypoint and config wiring.
+- `src/worker/index-source-worker.ts`: source indexing worker that consumes the PHP analyzer JSONL stream.
 - `src/queue/index-packages.ts`: BullMQ queue contract.
-- `src/processing/composer-lock/`: Composer lock parsing and graph record building.
-- `src/graph/`: generic graph write helpers.
+- `src/modules/processing/php-analysis/`: JSONL stream consumption, fact accumulation, mapping, and Neo4j writes for source indexing. See `docs/architecture_world_mapping.md`.
+- `src/modules/processing/composer-lock/`: Composer lock parsing and graph record building.
+- `src/modules/graph/`: generic graph write helpers (`upsert.ts` for the source path, `full-replace.ts` for the composer path).
+- `src/config.ts`: environment-backed config, including `GRAPH_BATCH_SIZE` (source ingestion batch and transaction size, default 5000).
 - `src/schema/install-schemas.ts`: startup schema installer.
 - `schema/postgresql/`: PostgreSQL `.sql` schema scripts.
-- `schema/neo4j/`: Neo4j `.cypher` schema scripts.
+- `schema/neo4j/`: Neo4j `.cypher` schema scripts (Symbol id uniqueness, EXTENDS and IMPLEMENTS edge constraints).
 
 Schema scripts are installed on backend/worker startup, not during Docker build and not from frontend requests. PostgreSQL stores executed schema scripts in `application_schema_history`.
 

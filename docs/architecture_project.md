@@ -457,7 +457,7 @@ The runtime includes:
 - named Docker volumes for Redis, PostgreSQL, and Neo4j.
 - health checks for backend, Redis, PostgreSQL, and Neo4j.
 - `depends_on` relationships for startup order.
-- explicit environment variable names used by backend and worker, such as `REDIS_URL`, `POSTGRES_URL`, `NEO4J_URI`, `NEO4J_USERNAME`, and `NEO4J_PASSWORD`.
+- explicit environment variable names used by backend and worker, such as `REDIS_URL`, `POSTGRES_URL`, `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, and `GRAPH_BATCH_SIZE` (source ingestion batch and transaction size, default 5000).
 - npm workspaces at the root for Node package orchestration.
 - Composer dependency locking for the PHP analyzer package.
 

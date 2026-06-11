@@ -360,8 +360,10 @@ docker run --rm --network magentic_default curlimages/curl -s -X POST http://mag
 Expected JSONL output:
 
 ```jsonl
-{"file":"vendor/magento/composer/src/ConsoleArrayInputFactory.php","facts":[{"fact":"symbol","symbolId":"php-class:Magento\\Composer\\ConsoleArrayInputFactory","fqcn":"Magento\\Composer\\ConsoleArrayInputFactory","kind":"class"}]}
+{"file":"vendor/magento/composer/src/ConsoleArrayInputFactory.php","facts":[{"fact":"symbol","symbolId":"php-class:Magento\\Composer\\ConsoleArrayInputFactory","fqcn":"Magento\\Composer\\ConsoleArrayInputFactory","kind":"class","defined":true}]}
 ```
+
+Each symbol fact carries a `defined` flag: `true` for the symbol the file declares, `false` for symbols it only references (parent classes and implemented interfaces).
 
 Check an inherited class:
 
@@ -372,9 +374,10 @@ docker run --rm --network magentic_default curlimages/curl -s -X POST http://mag
 Expected result:
 
 - The output is JSONL only.
-- Facts array includes `Magento\InventoryConfiguration\Model\StockItemConfiguration`.
-- Facts array includes `Magento\Framework\Model\AbstractExtensibleModel`.
+- Facts array includes `Magento\InventoryConfiguration\Model\StockItemConfiguration` with `defined: true`.
+- Facts array includes `Magento\Framework\Model\AbstractExtensibleModel` with `defined: false`.
 - Facts array includes an `extends` reference from the child class to the parent class.
+- A class that implements interfaces also emits each interface as an `interface` symbol with `defined: false` and an `implements` reference from the class to the interface.
 
 Check a larger directory stream:
 

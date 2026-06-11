@@ -3,8 +3,6 @@ import { createFactAccumulator, type FactAccumulator } from "./fact-accumulator.
 import { savePhpAnalysisBatch } from "./save-facts.js";
 import type { FileFacts } from "./types.js";
 
-const recordsPerFlush = 5000;
-
 export async function consumeFactStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   driver: Driver,
@@ -13,7 +11,7 @@ export async function consumeFactStream(
 ): Promise<void> {
   const session = driver.session();
   const decoder = new TextDecoder();
-  const accumulator = createFactAccumulator(recordsPerFlush, async (batch) => {
+  const accumulator = createFactAccumulator(batchSize, async (batch) => {
     await savePhpAnalysisBatch(session, batch, batchSize);
     await onBatchSaved();
   });
