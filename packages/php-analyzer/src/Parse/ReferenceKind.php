@@ -9,4 +9,5 @@ enum ReferenceKind: string
     case Extends = 'extends';
     case Implements = 'implements';
     case Uses = 'uses';
+    case HasMethod = 'has_method';
 }

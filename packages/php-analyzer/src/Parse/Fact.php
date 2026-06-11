@@ -7,21 +7,30 @@ namespace Magentic\PhpAnalyzer\Parse;
 readonly class Fact implements \JsonSerializable
 {
     /**
-     * @param array<string, string|bool> $values
+     * @param array<string, mixed> $values
      */
     private function __construct(private array $values)
     {
     }
 
-    public static function symbol(string $symbolId, string $fqcn, string $kind, bool $defined): self
+    /**
+     * @param array<string, mixed> $properties
+     */
+    public static function symbol(string $symbolId, string $fqcn, string $kind, bool $defined, array $properties = []): self
     {
-        return new self([
+        $values = [
             'fact' => FactType::Symbol->value,
             'symbolId' => $symbolId,
             'fqcn' => $fqcn,
             'kind' => $kind,
             'defined' => $defined,
-        ]);
+        ];
+
+        if ($properties !== []) {
+            $values['properties'] = $properties;
+        }
+
+        return new self($values);
     }
 
     public static function reference(ReferenceKind $kind, string $fromSymbolId, string $toSymbolId): self
@@ -44,7 +53,7 @@ readonly class Fact implements \JsonSerializable
     }
 
     /**
-     * @return array<string, string|bool>
+     * @return array<string, mixed>
      */
     public function jsonSerialize(): array
     {

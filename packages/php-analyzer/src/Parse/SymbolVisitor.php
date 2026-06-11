@@ -1,0 +1,219 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Magentic\PhpAnalyzer\Parse;
+
+use PhpParser\Node;
+use PhpParser\NodeVisitorAbstract;
+
+final class SymbolVisitor extends NodeVisitorAbstract
+{
+    /** @var array<int, Fact> */
+    private array $facts = [];
+
+    public function enterNode(Node $node): null
+    {
+        if ($node instanceof Node\Stmt\Class_) {
+            $this->handleClass($node);
+        } elseif ($node instanceof Node\Stmt\Interface_) {
+            $this->handleInterface($node);
+        } elseif ($node instanceof Node\Stmt\Trait_) {
+            $this->handleTrait($node);
+        } elseif ($node instanceof Node\Stmt\Enum_) {
+            $this->handleEnum($node);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, Fact>
+     */
+    public function facts(): array
+    {
+        return $this->facts;
+    }
+
+    private function handleClass(Node\Stmt\Class_ $class): void
+    {
+        $fqcn = $this->fqcn($class);
+        if ($fqcn === null) {
+            return;
+        }
+
+        $symbolId = SymbolId::forSymbol('class', $fqcn);
+        $parentFqcn = $class->extends instanceof Node\Name ? $class->extends->toString() : null;
+
+        $this->facts[] = Fact::symbol($symbolId, $fqcn, 'class', true, [
+            'abstract' => $class->isAbstract(),
+            'final' => $class->isFinal(),
+            'readonly' => $class->isReadonly(),
+        ]);
+
+        if ($parentFqcn !== null) {
+            $parentId = SymbolId::forSymbol('class', $parentFqcn);
+            $this->facts[] = Fact::symbol($parentId, $parentFqcn, 'class', false);
+            $this->facts[] = Fact::reference(ReferenceKind::Extends, $symbolId, $parentId);
+        }
+
+        foreach ($class->implements as $interface) {
+            $this->addImplements($symbolId, $interface);
+        }
+
+        $this->addTraitUses($symbolId, $class);
+        $this->addMethods($fqcn, $symbolId, $class, $parentFqcn);
+    }
+
+    private function handleInterface(Node\Stmt\Interface_ $interface): void
+    {
+        $fqcn = $this->fqcn($interface);
+        if ($fqcn === null) {
+            return;
+        }
+
+        $symbolId = SymbolId::forSymbol('interface', $fqcn);
+        $this->facts[] = Fact::symbol($symbolId, $fqcn, 'interface', true);
+
+        foreach ($interface->extends as $parent) {
+            $parentFqcn = $parent->toString();
+            $parentId = SymbolId::forSymbol('interface', $parentFqcn);
+            $this->facts[] = Fact::symbol($parentId, $parentFqcn, 'interface', false);
+            $this->facts[] = Fact::reference(ReferenceKind::Extends, $symbolId, $parentId);
+        }
+
+        $this->addMethods($fqcn, $symbolId, $interface, null);
+    }
+
+    private function handleTrait(Node\Stmt\Trait_ $trait): void
+    {
+        $fqcn = $this->fqcn($trait);
+        if ($fqcn === null) {
+            return;
+        }
+
+        $symbolId = SymbolId::forSymbol('trait', $fqcn);
+        $this->facts[] = Fact::symbol($symbolId, $fqcn, 'trait', true);
+
+        $this->addTraitUses($symbolId, $trait);
+        $this->addMethods($fqcn, $symbolId, $trait, null);
+    }
+
+    private function handleEnum(Node\Stmt\Enum_ $enum): void
+    {
+        $fqcn = $this->fqcn($enum);
+        if ($fqcn === null) {
+            return;
+        }
+
+        $symbolId = SymbolId::forSymbol('enum', $fqcn);
+        $this->facts[] = Fact::symbol($symbolId, $fqcn, 'enum', true);
+
+        foreach ($enum->implements as $interface) {
+            $this->addImplements($symbolId, $interface);
+        }
+
+        $this->addTraitUses($symbolId, $enum);
+        $this->addMethods($fqcn, $symbolId, $enum, null);
+    }
+
+    private function addImplements(string $fromSymbolId, Node\Name $interface): void
+    {
+        $interfaceFqcn = $interface->toString();
+        $interfaceId = SymbolId::forSymbol('interface', $interfaceFqcn);
+        $this->facts[] = Fact::symbol($interfaceId, $interfaceFqcn, 'interface', false);
+        $this->facts[] = Fact::reference(ReferenceKind::Implements, $fromSymbolId, $interfaceId);
+    }
+
+    private function addTraitUses(string $fromSymbolId, Node\Stmt\ClassLike $classLike): void
+    {
+        foreach ($classLike->getTraitUses() as $traitUse) {
+            foreach ($traitUse->traits as $trait) {
+                $traitFqcn = $trait->toString();
+                $traitId = SymbolId::forSymbol('trait', $traitFqcn);
+                $this->facts[] = Fact::symbol($traitId, $traitFqcn, 'trait', false);
+                $this->facts[] = Fact::reference(ReferenceKind::Uses, $fromSymbolId, $traitId);
+            }
+        }
+    }
+
+    private function addMethods(string $ownerFqcn, string $ownerSymbolId, Node\Stmt\ClassLike $classLike, ?string $parentFqcn): void
+    {
+        $typeRenderer = new TypeRenderer($ownerFqcn, $parentFqcn);
+
+        foreach ($classLike->getMethods() as $method) {
+            $methodName = $method->name->toString();
+            $methodId = SymbolId::forMethod($ownerFqcn, $methodName);
+
+            $this->facts[] = Fact::symbol(
+                $methodId,
+                $ownerFqcn . '::' . $methodName,
+                'method',
+                true,
+                $this->methodProperties($method, $typeRenderer)
+            );
+            $this->facts[] = Fact::reference(ReferenceKind::HasMethod, $ownerSymbolId, $methodId);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function methodProperties(Node\Stmt\ClassMethod $method, TypeRenderer $typeRenderer): array
+    {
+        $paramNames = [];
+        $paramTypes = [];
+        $parameters = [];
+
+        foreach ($method->params as $param) {
+            if (!$param->var instanceof Node\Expr\Variable || !is_string($param->var->name)) {
+                continue;
+            }
+
+            $name = $param->var->name;
+            $type = $typeRenderer->render($param->type);
+
+            $paramNames[] = $name;
+            $paramTypes[] = $type;
+            $parameters[] = [
+                'name' => $name,
+                'type' => $type,
+                'optional' => $param->default !== null,
+                'variadic' => $param->variadic,
+                'byRef' => $param->byRef,
+                'promoted' => $param->flags !== 0,
+            ];
+        }
+
+        return [
+            'name' => $method->name->toString(),
+            'visibility' => $this->visibility($method),
+            'static' => $method->isStatic(),
+            'abstract' => $method->isAbstract(),
+            'final' => $method->isFinal(),
+            'hasBody' => $method->stmts !== null,
+            'returnType' => $typeRenderer->render($method->returnType),
+            'paramNames' => $paramNames,
+            'paramTypes' => $paramTypes,
+            'parameters' => $parameters,
+        ];
+    }
+
+    private function visibility(Node\Stmt\ClassMethod $method): string
+    {
+        if ($method->isPrivate()) {
+            return 'private';
+        }
+
+        if ($method->isProtected()) {
+            return 'protected';
+        }
+
+        return 'public';
+    }
+
+    private function fqcn(Node\Stmt\ClassLike $classLike): ?string
+    {
+        return $classLike->namespacedName?->toString();
+    }
+}

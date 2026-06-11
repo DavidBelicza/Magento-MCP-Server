@@ -1,9 +1,12 @@
+import type { GraphFieldValue } from "../../graph/types.js";
+
 export type SymbolFact = {
   fact: "symbol";
   symbolId: string;
   fqcn: string;
   kind: string;
   defined: boolean;
+  properties?: Record<string, GraphFieldValue>;
 };
 
 export type ReferenceFact = {

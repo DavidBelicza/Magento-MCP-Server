@@ -71,7 +71,8 @@ function mapSymbolNode(fact: SymbolFact, file: string): GraphNodeRecord {
     fields: {
       fqcn: fact.fqcn,
       kind: fact.kind,
-      file
+      file,
+      ...fact.properties
     }
   };
 }
