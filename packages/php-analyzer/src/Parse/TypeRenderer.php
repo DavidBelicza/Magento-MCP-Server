@@ -6,7 +6,7 @@ namespace Magentic\PhpAnalyzer\Parse;
 
 use PhpParser\Node;
 
-final readonly class TypeRenderer
+readonly class TypeRenderer
 {
     public function __construct(
         private string $selfFqcn,
@@ -16,36 +16,22 @@ final readonly class TypeRenderer
 
     public function render(?Node $type): string
     {
-        if ($type === null) {
-            return '';
-        }
-
-        if ($type instanceof Node\NullableType) {
-            return $this->render($type->type) . '|null';
-        }
-
-        if ($type instanceof Node\UnionType) {
-            return implode('|', array_map($this->renderPart(...), $type->types));
-        }
-
-        if ($type instanceof Node\IntersectionType) {
-            return implode('&', array_map($this->renderPart(...), $type->types));
-        }
-
-        return $this->renderPart($type);
+        return match (true) {
+            $type === null => '',
+            $type instanceof Node\NullableType => $this->render($type->type) . '|null',
+            $type instanceof Node\UnionType => implode('|', array_map($this->renderPart(...), $type->types)),
+            $type instanceof Node\IntersectionType => implode('&', array_map($this->renderPart(...), $type->types)),
+            default => $this->renderPart($type),
+        };
     }
 
     private function renderPart(Node $type): string
     {
-        if ($type instanceof Node\IntersectionType) {
-            return implode('&', array_map($this->renderPart(...), $type->types));
-        }
-
-        if ($type instanceof Node\Identifier || $type instanceof Node\Name) {
-            return $this->renderName($type->toString());
-        }
-
-        return '';
+        return match (true) {
+            $type instanceof Node\IntersectionType => implode('&', array_map($this->renderPart(...), $type->types)),
+            $type instanceof Node\Identifier, $type instanceof Node\Name => $this->renderName($type->toString()),
+            default => '',
+        };
     }
 
     private function renderName(string $name): string

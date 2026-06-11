@@ -102,3 +102,16 @@ The analyzer package uses PSR-4 namespace `Magentic\PhpAnalyzer\`. The analyzed 
 - Do not import from archive/reference folders.
 - Do not add test files unless explicitly requested.
 - Treat Redis as short-term process state; PostgreSQL is durable application state; Neo4j is graph storage.
+
+### PHP Conventions
+
+These apply to PHP code (`packages/php-analyzer`). Clean code comes first; treat the rest as defaults, not hard gates. It is fine to write a rough version first and refine it after.
+
+- Do not mark a class `final` unless the design clearly calls for sealing it; `final` blocks extension and mocking.
+- Prefer a `readonly` class. If it must hold mutable state, mark the unchanging properties `readonly`.
+- Keep functions flat; favor early returns and small private helpers over nested blocks.
+- When a function declares more than two parameters, put each parameter on its own line.
+- Let the code describe itself instead of commenting. Add a docblock only for type information a native type cannot express (generics, array shapes); when a docblock is present, document every such parameter and the return so it is not partial.
+- Replace an if/else chain of more than two branches with `match` (or `switch`).
+- Model a fixed set of values as an enum rather than an array of constants or magic strings.
+- Inject collaborators so they can be mocked in tests; instantiating a pure value object from local data is fine.

@@ -16,8 +16,13 @@ readonly class Fact implements \JsonSerializable
     /**
      * @param array<string, mixed> $properties
      */
-    public static function symbol(string $symbolId, string $fqcn, string $kind, bool $defined, array $properties = []): self
-    {
+    public static function symbol(
+        string $symbolId,
+        string $fqcn,
+        string $kind,
+        bool $defined,
+        array $properties = []
+    ): self {
         $values = [
             'fact' => FactType::Symbol->value,
             'symbolId' => $symbolId,
@@ -33,8 +38,11 @@ readonly class Fact implements \JsonSerializable
         return new self($values);
     }
 
-    public static function reference(ReferenceKind $kind, string $fromSymbolId, string $toSymbolId): self
-    {
+    public static function reference(
+        ReferenceKind $kind,
+        string $fromSymbolId,
+        string $toSymbolId
+    ): self {
         return new self([
             'fact' => FactType::Reference->value,
             'kind' => $kind->value,

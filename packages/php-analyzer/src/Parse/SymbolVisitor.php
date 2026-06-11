@@ -7,22 +7,20 @@ namespace Magentic\PhpAnalyzer\Parse;
 use PhpParser\Node;
 use PhpParser\NodeVisitorAbstract;
 
-final class SymbolVisitor extends NodeVisitorAbstract
+class SymbolVisitor extends NodeVisitorAbstract
 {
     /** @var array<int, Fact> */
     private array $facts = [];
 
     public function enterNode(Node $node): null
     {
-        if ($node instanceof Node\Stmt\Class_) {
-            $this->handleClass($node);
-        } elseif ($node instanceof Node\Stmt\Interface_) {
-            $this->handleInterface($node);
-        } elseif ($node instanceof Node\Stmt\Trait_) {
-            $this->handleTrait($node);
-        } elseif ($node instanceof Node\Stmt\Enum_) {
-            $this->handleEnum($node);
-        }
+        match (true) {
+            $node instanceof Node\Stmt\Class_ => $this->handleClass($node),
+            $node instanceof Node\Stmt\Interface_ => $this->handleInterface($node),
+            $node instanceof Node\Stmt\Trait_ => $this->handleTrait($node),
+            $node instanceof Node\Stmt\Enum_ => $this->handleEnum($node),
+            default => null,
+        };
 
         return null;
     }
@@ -42,18 +40,18 @@ final class SymbolVisitor extends NodeVisitorAbstract
             return;
         }
 
-        $symbolId = SymbolId::forSymbol('class', $fqcn);
+        $symbolId = SymbolKind::Class_->idFor($fqcn);
         $parentFqcn = $class->extends instanceof Node\Name ? $class->extends->toString() : null;
 
-        $this->facts[] = Fact::symbol($symbolId, $fqcn, 'class', true, [
+        $this->facts[] = Fact::symbol($symbolId, $fqcn, SymbolKind::Class_->value, true, [
             'abstract' => $class->isAbstract(),
             'final' => $class->isFinal(),
             'readonly' => $class->isReadonly(),
         ]);
 
         if ($parentFqcn !== null) {
-            $parentId = SymbolId::forSymbol('class', $parentFqcn);
-            $this->facts[] = Fact::symbol($parentId, $parentFqcn, 'class', false);
+            $parentId = SymbolKind::Class_->idFor($parentFqcn);
+            $this->facts[] = Fact::symbol($parentId, $parentFqcn, SymbolKind::Class_->value, false);
             $this->facts[] = Fact::reference(ReferenceKind::Extends, $symbolId, $parentId);
         }
 
@@ -72,13 +70,13 @@ final class SymbolVisitor extends NodeVisitorAbstract
             return;
         }
 
-        $symbolId = SymbolId::forSymbol('interface', $fqcn);
-        $this->facts[] = Fact::symbol($symbolId, $fqcn, 'interface', true);
+        $symbolId = SymbolKind::Interface_->idFor($fqcn);
+        $this->facts[] = Fact::symbol($symbolId, $fqcn, SymbolKind::Interface_->value, true);
 
         foreach ($interface->extends as $parent) {
             $parentFqcn = $parent->toString();
-            $parentId = SymbolId::forSymbol('interface', $parentFqcn);
-            $this->facts[] = Fact::symbol($parentId, $parentFqcn, 'interface', false);
+            $parentId = SymbolKind::Interface_->idFor($parentFqcn);
+            $this->facts[] = Fact::symbol($parentId, $parentFqcn, SymbolKind::Interface_->value, false);
             $this->facts[] = Fact::reference(ReferenceKind::Extends, $symbolId, $parentId);
         }
 
@@ -92,8 +90,8 @@ final class SymbolVisitor extends NodeVisitorAbstract
             return;
         }
 
-        $symbolId = SymbolId::forSymbol('trait', $fqcn);
-        $this->facts[] = Fact::symbol($symbolId, $fqcn, 'trait', true);
+        $symbolId = SymbolKind::Trait_->idFor($fqcn);
+        $this->facts[] = Fact::symbol($symbolId, $fqcn, SymbolKind::Trait_->value, true);
 
         $this->addTraitUses($symbolId, $trait);
         $this->addMethods($fqcn, $symbolId, $trait, null);
@@ -106,8 +104,8 @@ final class SymbolVisitor extends NodeVisitorAbstract
             return;
         }
 
-        $symbolId = SymbolId::forSymbol('enum', $fqcn);
-        $this->facts[] = Fact::symbol($symbolId, $fqcn, 'enum', true);
+        $symbolId = SymbolKind::Enum_->idFor($fqcn);
+        $this->facts[] = Fact::symbol($symbolId, $fqcn, SymbolKind::Enum_->value, true);
 
         foreach ($enum->implements as $interface) {
             $this->addImplements($symbolId, $interface);
@@ -120,8 +118,8 @@ final class SymbolVisitor extends NodeVisitorAbstract
     private function addImplements(string $fromSymbolId, Node\Name $interface): void
     {
         $interfaceFqcn = $interface->toString();
-        $interfaceId = SymbolId::forSymbol('interface', $interfaceFqcn);
-        $this->facts[] = Fact::symbol($interfaceId, $interfaceFqcn, 'interface', false);
+        $interfaceId = SymbolKind::Interface_->idFor($interfaceFqcn);
+        $this->facts[] = Fact::symbol($interfaceId, $interfaceFqcn, SymbolKind::Interface_->value, false);
         $this->facts[] = Fact::reference(ReferenceKind::Implements, $fromSymbolId, $interfaceId);
     }
 
@@ -130,28 +128,27 @@ final class SymbolVisitor extends NodeVisitorAbstract
         foreach ($classLike->getTraitUses() as $traitUse) {
             foreach ($traitUse->traits as $trait) {
                 $traitFqcn = $trait->toString();
-                $traitId = SymbolId::forSymbol('trait', $traitFqcn);
-                $this->facts[] = Fact::symbol($traitId, $traitFqcn, 'trait', false);
+                $traitId = SymbolKind::Trait_->idFor($traitFqcn);
+                $this->facts[] = Fact::symbol($traitId, $traitFqcn, SymbolKind::Trait_->value, false);
                 $this->facts[] = Fact::reference(ReferenceKind::Uses, $fromSymbolId, $traitId);
             }
         }
     }
 
-    private function addMethods(string $ownerFqcn, string $ownerSymbolId, Node\Stmt\ClassLike $classLike, ?string $parentFqcn): void
-    {
+    private function addMethods(
+        string $ownerFqcn,
+        string $ownerSymbolId,
+        Node\Stmt\ClassLike $classLike,
+        ?string $parentFqcn
+    ): void {
         $typeRenderer = new TypeRenderer($ownerFqcn, $parentFqcn);
 
         foreach ($classLike->getMethods() as $method) {
-            $methodName = $method->name->toString();
-            $methodId = SymbolId::forMethod($ownerFqcn, $methodName);
+            $methodFqcn = $ownerFqcn . '::' . $method->name->toString();
+            $methodId = SymbolKind::Method->idFor($methodFqcn);
+            $properties = $this->methodProperties($method, $typeRenderer);
 
-            $this->facts[] = Fact::symbol(
-                $methodId,
-                $ownerFqcn . '::' . $methodName,
-                'method',
-                true,
-                $this->methodProperties($method, $typeRenderer)
-            );
+            $this->facts[] = Fact::symbol($methodId, $methodFqcn, SymbolKind::Method->value, true, $properties);
             $this->facts[] = Fact::reference(ReferenceKind::HasMethod, $ownerSymbolId, $methodId);
         }
     }
@@ -201,15 +198,11 @@ final class SymbolVisitor extends NodeVisitorAbstract
 
     private function visibility(Node\Stmt\ClassMethod $method): string
     {
-        if ($method->isPrivate()) {
-            return 'private';
-        }
-
-        if ($method->isProtected()) {
-            return 'protected';
-        }
-
-        return 'public';
+        return match (true) {
+            $method->isPrivate() => 'private',
+            $method->isProtected() => 'protected',
+            default => 'public',
+        };
     }
 
     private function fqcn(Node\Stmt\ClassLike $classLike): ?string
