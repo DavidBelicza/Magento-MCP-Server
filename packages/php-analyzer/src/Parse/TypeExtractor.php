@@ -27,8 +27,11 @@ readonly class TypeExtractor
      * @param array<int, string> $classTypes
      * @param array<int, string> $scalarParts
      */
-    private function collect(?Node $type, array &$classTypes, array &$scalarParts): void
-    {
+    private function collect(
+        ?Node $type,
+        array &$classTypes,
+        array &$scalarParts
+    ): void {
         match (true) {
             $type instanceof Node\NullableType => $this->collectNullable($type, $classTypes, $scalarParts),
             $type instanceof Node\UnionType,
@@ -43,8 +46,11 @@ readonly class TypeExtractor
      * @param array<int, string> $classTypes
      * @param array<int, string> $scalarParts
      */
-    private function collectNullable(Node\NullableType $type, array &$classTypes, array &$scalarParts): void
-    {
+    private function collectNullable(
+        Node\NullableType $type,
+        array &$classTypes,
+        array &$scalarParts
+    ): void {
         $this->collect($type->type, $classTypes, $scalarParts);
         $scalarParts[] = 'null';
     }
@@ -67,8 +73,11 @@ readonly class TypeExtractor
      * @param array<int, string> $classTypes
      * @param array<int, string> $scalarParts
      */
-    private function addScalar(string $name, array &$classTypes, array &$scalarParts): void
-    {
+    private function addScalar(
+        string $name,
+        array &$classTypes,
+        array &$scalarParts
+    ): void {
         $lower = strtolower($name);
 
         if ($lower === 'self' || $lower === 'static' || $lower === 'parent') {

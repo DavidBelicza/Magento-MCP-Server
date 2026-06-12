@@ -225,8 +225,11 @@ readonly class DocBlockTypeResolver
     /**
      * @param array<int, DocClassRef> $classes
      */
-    private function addClass(string $fqcn, bool $isArray, array &$classes): void
-    {
+    private function addClass(
+        string $fqcn,
+        bool $isArray,
+        array &$classes
+    ): void {
         $classes[] = new DocClassRef($fqcn, $isArray);
     }
 

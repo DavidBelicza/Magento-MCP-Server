@@ -357,13 +357,13 @@ Check the analyzer endpoint against a single class file:
 docker run --rm --network magentic_default curlimages/curl -s -X POST http://magentic_analyzer_php/analyze -H "Content-Type: application/json" -d '{"path": "vendor/magento/composer/src/ConsoleArrayInputFactory.php"}'
 ```
 
-Expected JSONL output:
+Expected JSONL output (the class symbol fact; `symbolId` is the FQN verbatim, no kind prefix):
 
 ```jsonl
-{"file":"vendor/magento/composer/src/ConsoleArrayInputFactory.php","facts":[{"fact":"symbol","symbolId":"php-class:Magento\\Composer\\ConsoleArrayInputFactory","fqcn":"Magento\\Composer\\ConsoleArrayInputFactory","kind":"class","defined":true}]}
+{"file":"vendor/magento/composer/src/ConsoleArrayInputFactory.php","facts":[{"fact":"symbol","symbolId":"Magento\\Composer\\ConsoleArrayInputFactory","fqcn":"Magento\\Composer\\ConsoleArrayInputFactory","kind":"class","defined":true,"properties":{"abstract":false,"final":false,"readonly":false}}, ...]}
 ```
 
-Each symbol fact carries a `defined` flag: `true` for the symbol the file declares, `false` for symbols it only references (parent classes and implemented interfaces).
+The same `facts` array also contains the class's method symbols, `has_method` references, and any `param_type` / `returns_type` references for class-typed parameters and return values. Each symbol fact carries a `defined` flag: `true` for the symbol the file declares, `false` for symbols it only references (parent classes, implemented interfaces, used traits, and parameter/return types). See `docs/php_graph_mapping.json` for the full fact-to-graph mapping.
 
 Check an inherited class:
 

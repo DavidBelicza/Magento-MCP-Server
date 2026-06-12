@@ -14,6 +14,7 @@ Magentic is a Docker-based, self-hosted MCP server for agentic AI workflows. It 
 
 - `docs/architecture_project.md`: holistic project and service architecture.
 - `docs/architecture_world_mapping.md`: source indexing and graph/world-mapping workflow, including the worker ingestion flow.
+- `docs/php_graph_mapping.json`: adjacency reference for the PHP source graph model — node kinds, relationship types, edge properties, and a worked example graph.
 - `docs/test_system_sanity.md`: runtime and integration sanity checks.
 - `docs/README-performance.md`: PHP analyzer file-scanning performance notes.
 
@@ -68,7 +69,7 @@ Important core paths:
 - `src/config.ts`: environment-backed config, including `GRAPH_BATCH_SIZE` (source ingestion batch and transaction size, default 5000).
 - `src/schema/install-schemas.ts`: startup schema installer.
 - `schema/postgresql/`: PostgreSQL `.sql` schema scripts.
-- `schema/neo4j/`: Neo4j `.cypher` schema scripts (Symbol id uniqueness, EXTENDS and IMPLEMENTS edge constraints).
+- `schema/neo4j/`: Neo4j `.cypher` schema scripts (Symbol id uniqueness; edge identity constraints for EXTENDS, IMPLEMENTS, USES, HAS_METHOD, PARAM_TYPE, and RETURNS_TYPE).
 
 Schema scripts are installed on backend/worker startup, not during Docker build and not from frontend requests. PostgreSQL stores executed schema scripts in `application_schema_history`.
 

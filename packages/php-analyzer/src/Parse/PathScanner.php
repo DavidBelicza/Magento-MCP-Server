@@ -89,8 +89,11 @@ readonly class PathScanner
         return $realPath;
     }
 
-    private function validatePhpFile(string $absolutePath, string $relativePath, string $originalPath): SourceFile
-    {
+    private function validatePhpFile(
+        string $absolutePath,
+        string $relativePath,
+        string $originalPath
+    ): SourceFile {
         if (!$this->isPhpFile($absolutePath)) {
             throw new \RuntimeException(sprintf('File is not a PHP file: %s', $originalPath));
         }

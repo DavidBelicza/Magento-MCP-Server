@@ -6,6 +6,7 @@
 
 - `docs/architecture_project.md`: holistic project and service architecture.
 - `docs/architecture_world_mapping.md`: source-code indexing and graph/world-mapping architecture.
+- `docs/php_graph_mapping.json`: adjacency reference for the PHP source graph model (node kinds, relationships, edge properties, worked example).
 - `docs/test_system_sanity.md`: runtime and integration sanity checks.
 
 ## Installation
