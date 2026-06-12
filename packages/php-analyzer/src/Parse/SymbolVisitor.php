@@ -170,13 +170,13 @@ class SymbolVisitor extends NodeVisitorAbstract
         Node\Stmt\ClassLike $classLike,
         ?string $parentFqcn
     ): void {
-        $typeRenderer = new TypeRenderer($ownerFqcn, $parentFqcn);
+        $typeExtractor = new TypeExtractor($ownerFqcn, $parentFqcn);
         $scope = new DocBlockScope($this->namespace, $this->uses, $ownerFqcn, $parentFqcn);
 
         foreach ($classLike->getMethods() as $method) {
             $methodFqcn = $ownerFqcn . '::' . $method->name->toString();
             $methodId = SymbolKind::Method->idFor($methodFqcn);
-            $properties = $this->methodProperties($method, $typeRenderer, $scope);
+            $properties = $this->methodProperties($method, $methodId, $typeExtractor, $scope);
 
             $this->facts[] = Fact::symbol($methodId, $methodFqcn, SymbolKind::Method->value, true, $properties);
             $this->facts[] = Fact::reference(ReferenceKind::HasMethod, $ownerSymbolId, $methodId);
@@ -188,18 +188,28 @@ class SymbolVisitor extends NodeVisitorAbstract
      */
     private function methodProperties(
         Node\Stmt\ClassMethod $method,
-        TypeRenderer $typeRenderer,
+        string $methodId,
+        TypeExtractor $typeExtractor,
         DocBlockScope $scope
     ): array {
         $docComment = $method->getDocComment()?->getText() ?? '';
-        $docTypes = $docComment === '' ? new MethodDocTypes('', []) : $this->docBlockResolver->resolve($docComment, $scope);
+        $docTypes = $docComment === '' ? MethodDocTypes::empty() : $this->docBlockResolver->resolve($docComment, $scope);
 
-        $returnType = $typeRenderer->render($method->returnType);
+        $returnType = $typeExtractor->extract($method->returnType);
+        foreach ($returnType->classTypes as $classType) {
+            $this->addTypeReference(ReferenceKind::ReturnsType, $methodId, $classType, ['source' => 'native']);
+        }
+        $this->addDocTypeReferences(
+            ReferenceKind::ReturnsType,
+            $methodId,
+            $docTypes->returnType,
+            $returnType->classTypes
+        );
 
         $paramNames = [];
         $paramTypes = [];
-        $paramTypesDoc = [];
         $parameters = [];
+        $position = 0;
 
         foreach ($method->params as $param) {
             if (!$param->var instanceof Node\Expr\Variable || !is_string($param->var->name)) {
@@ -207,18 +217,37 @@ class SymbolVisitor extends NodeVisitorAbstract
             }
 
             $name = $param->var->name;
-            $type = $typeRenderer->render($param->type);
-            $docType = $docTypes->paramTypes[$name] ?? '';
+            $type = $typeExtractor->extract($param->type);
+            $docType = $docTypes->paramTypes[$name] ?? DocType::empty();
+            $paramFields = ['name' => $name, 'position' => $position];
+
+            foreach ($type->classTypes as $classType) {
+                $this->addTypeReference(
+                    ReferenceKind::ParamType,
+                    $methodId,
+                    $classType,
+                    [...$paramFields, 'source' => 'native'],
+                    (string) $position
+                );
+            }
+            $this->addDocTypeReferences(
+                ReferenceKind::ParamType,
+                $methodId,
+                $docType,
+                $type->classTypes,
+                $paramFields,
+                (string) $position
+            );
 
             $paramNames[] = $name;
-            $paramTypes[] = $type;
-            $paramTypesDoc[] = $docType === $type ? '' : $docType;
+            $paramTypes[] = $type->scalar !== '' ? $type->scalar : $docType->scalar;
             $parameters[] = [
                 'optional' => $param->default !== null,
                 'variadic' => $param->variadic,
                 'byRef' => $param->byRef,
                 'promoted' => $param->flags !== 0,
             ];
+            $position++;
         }
 
         return [
@@ -228,13 +257,52 @@ class SymbolVisitor extends NodeVisitorAbstract
             'abstract' => $method->isAbstract(),
             'final' => $method->isFinal(),
             'hasBody' => $method->stmts !== null,
-            'returnType' => $returnType,
-            'returnTypeDoc' => $docTypes->returnType === $returnType ? '' : $docTypes->returnType,
+            'returnType' => $returnType->scalar !== '' ? $returnType->scalar : $docTypes->returnType->scalar,
             'paramNames' => $paramNames,
             'paramTypes' => $paramTypes,
-            'paramTypesDoc' => $paramTypesDoc,
             'parameters' => $parameters,
         ];
+    }
+
+    /**
+     * @param array<int, string> $nativeClassTypes
+     * @param array<string, mixed> $baseFields
+     */
+    private function addDocTypeReferences(
+        ReferenceKind $kind,
+        string $fromSymbolId,
+        DocType $docType,
+        array $nativeClassTypes,
+        array $baseFields = [],
+        ?string $identityKey = null
+    ): void {
+        foreach ($docType->classes as $class) {
+            if (in_array($class->fqcn, $nativeClassTypes, true)) {
+                continue;
+            }
+
+            $this->addTypeReference(
+                $kind,
+                $fromSymbolId,
+                $class->fqcn,
+                [...$baseFields, 'source' => 'docblock', 'is_array' => $class->isArray],
+                $identityKey
+            );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $fields
+     */
+    private function addTypeReference(
+        ReferenceKind $kind,
+        string $fromSymbolId,
+        string $typeFqcn,
+        array $fields = [],
+        ?string $identityKey = null
+    ): void {
+        $this->facts[] = Fact::symbol($typeFqcn, $typeFqcn, '', false);
+        $this->facts[] = Fact::reference($kind, $fromSymbolId, $typeFqcn, $fields, $identityKey);
     }
 
     private function visibility(Node\Stmt\ClassMethod $method): string

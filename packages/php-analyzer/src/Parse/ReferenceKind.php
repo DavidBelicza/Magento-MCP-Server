@@ -10,4 +10,6 @@ enum ReferenceKind: string
     case Implements = 'implements';
     case Uses = 'uses';
     case HasMethod = 'has_method';
+    case ParamType = 'param_type';
+    case ReturnsType = 'returns_type';
 }

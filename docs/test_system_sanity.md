@@ -346,7 +346,7 @@ docker compose exec -T magentic_analyzer_php php -r 'echo ini_get("memory_limit"
 
 Expected result:
 
-- PHP reports version 8.5.
+- PHP reports version 8.4.
 - Composer prints a version.
 - The memory limit is `1G`.
 - The max execution time is `0`.

@@ -38,17 +38,32 @@ readonly class Fact implements \JsonSerializable
         return new self($values);
     }
 
+    /**
+     * @param array<string, mixed> $fields
+     */
     public static function reference(
         ReferenceKind $kind,
         string $fromSymbolId,
-        string $toSymbolId
+        string $toSymbolId,
+        array $fields = [],
+        ?string $identityKey = null
     ): self {
-        return new self([
+        $values = [
             'fact' => FactType::Reference->value,
             'kind' => $kind->value,
             'fromSymbolId' => $fromSymbolId,
             'toSymbolId' => $toSymbolId,
-        ]);
+        ];
+
+        if ($fields !== []) {
+            $values['fields'] = $fields;
+        }
+
+        if ($identityKey !== null) {
+            $values['identityKey'] = $identityKey;
+        }
+
+        return new self($values);
     }
 
     public static function error(string $path, string $message): self

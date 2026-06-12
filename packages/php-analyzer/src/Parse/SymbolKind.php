@@ -14,12 +14,6 @@ enum SymbolKind: string
 
     public function idFor(string $identifier): string
     {
-        return match ($this) {
-            self::Class_ => 'php-class:' . $identifier,
-            self::Interface_ => 'php-interface:' . $identifier,
-            self::Trait_ => 'php-trait:' . $identifier,
-            self::Enum_ => 'php-enum:' . $identifier,
-            self::Method => 'php-method:' . $identifier,
-        };
+        return $identifier;
     }
 }

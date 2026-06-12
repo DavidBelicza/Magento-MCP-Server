@@ -66,12 +66,12 @@ function capitalize(value: string): string {
 
 function mapSymbolNode(fact: SymbolFact, file: string): GraphNodeRecord {
   return {
-    label: `Symbol:PHP:${capitalize(fact.kind)}`,
+    label: fact.kind ? `Symbol:PHP:${capitalize(fact.kind)}` : "Symbol:PHP",
     id: fact.symbolId,
     fields: {
       fqcn: fact.fqcn,
-      kind: fact.kind,
-      file,
+      ...(fact.defined ? { file } : {}),
+      ...(fact.kind ? { kind: fact.kind } : {}),
       ...fact.properties
     }
   };
@@ -79,8 +79,9 @@ function mapSymbolNode(fact: SymbolFact, file: string): GraphNodeRecord {
 
 function mapReferenceEdge(fact: ReferenceFact): GraphRelationshipRecord {
   const type = fact.kind.toUpperCase();
+  const discriminator = fact.identityKey === undefined ? "" : `:${fact.identityKey}`;
   const identity = createHash("sha256")
-    .update(`${fact.fromSymbolId}:${type}:${fact.toSymbolId}`)
+    .update(`${fact.fromSymbolId}:${type}:${fact.toSymbolId}${discriminator}`)
     .digest("hex");
 
   return {
@@ -90,6 +91,6 @@ function mapReferenceEdge(fact: ReferenceFact): GraphRelationshipRecord {
     fromId: fact.fromSymbolId,
     toLabel: "Symbol",
     toId: fact.toSymbolId,
-    fields: {}
+    fields: fact.fields ?? {}
   };
 }

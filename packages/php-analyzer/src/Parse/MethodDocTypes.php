@@ -7,11 +7,16 @@ namespace Magentic\PhpAnalyzer\Parse;
 readonly class MethodDocTypes
 {
     /**
-     * @param array<string, string> $paramTypes
+     * @param array<string, DocType> $paramTypes
      */
     public function __construct(
-        public string $returnType,
+        public DocType $returnType,
         public array $paramTypes
     ) {
+    }
+
+    public static function empty(): self
+    {
+        return new self(DocType::empty(), []);
     }
 }

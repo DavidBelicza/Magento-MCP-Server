@@ -14,6 +14,8 @@ export type ReferenceFact = {
   kind: string;
   fromSymbolId: string;
   toSymbolId: string;
+  fields?: Record<string, GraphFieldValue>;
+  identityKey?: string;
 };
 
 export type ErrorFact = {

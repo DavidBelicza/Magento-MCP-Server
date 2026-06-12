@@ -12,16 +12,16 @@ use PHPStan\PhpDocParser\Parser\TokenIterator;
 
 readonly class DocBlockTypeResolver
 {
-    private const KEYWORDS = [
+    private const FUNDAMENTALS = [
         'int' => true, 'integer' => true, 'float' => true, 'double' => true, 'string' => true,
-        'bool' => true, 'boolean' => true, 'void' => true, 'never' => true, 'mixed' => true,
-        'null' => true, 'false' => true, 'true' => true, 'array' => true, 'iterable' => true,
-        'object' => true, 'callable' => true, 'resource' => true, 'scalar' => true, 'number' => true,
-        'list' => true, 'array-key' => true, 'non-empty-array' => true, 'non-empty-list' => true,
-        'non-empty-string' => true, 'class-string' => true, 'interface-string' => true,
-        'trait-string' => true, 'enum-string' => true, 'callable-string' => true,
-        'numeric' => true, 'numeric-string' => true, 'literal-string' => true,
-        'positive-int' => true, 'negative-int' => true, 'key-of' => true, 'value-of' => true,
+        'bool' => true, 'boolean' => true, 'array' => true, 'iterable' => true, 'object' => true,
+        'callable' => true, 'void' => true, 'never' => true, 'null' => true, 'false' => true,
+        'true' => true, 'mixed' => true,
+    ];
+
+    private const ARRAY_GENERICS = [
+        'array' => true, 'list' => true, 'iterable' => true, 'non-empty-array' => true,
+        'non-empty-list' => true,
     ];
 
     public function __construct(
@@ -34,15 +34,15 @@ readonly class DocBlockTypeResolver
     {
         $node = $this->parse($docComment);
         if ($node === null) {
-            return new MethodDocTypes('', []);
+            return MethodDocTypes::empty();
         }
 
         $returns = $node->getReturnTagValues();
-        $returnType = $returns === [] ? '' : $this->render($returns[0]->type, $scope);
+        $returnType = $returns === [] ? DocType::empty() : $this->collect($returns[0]->type, $scope);
 
         $paramTypes = [];
         foreach ($node->getParamTagValues() as $param) {
-            $paramTypes[ltrim($param->parameterName, '$')] = $this->render($param->type, $scope);
+            $paramTypes[ltrim($param->parameterName, '$')] = $this->collect($param->type, $scope);
         }
 
         return new MethodDocTypes($returnType, $paramTypes);
@@ -57,50 +57,153 @@ readonly class DocBlockTypeResolver
         }
     }
 
-    private function render(Type\TypeNode $type, DocBlockScope $scope): string
+    private function collect(Type\TypeNode $type, DocBlockScope $scope): DocType
     {
-        return match (true) {
-            $type instanceof Type\IdentifierTypeNode => $this->renderIdentifier($type->name, $scope),
-            $type instanceof Type\ThisTypeNode => $scope->selfFqcn,
-            $type instanceof Type\NullableTypeNode => $this->render($type->type, $scope) . '|null',
-            $type instanceof Type\ArrayTypeNode => $this->render($type->type, $scope) . '[]',
-            $type instanceof Type\UnionTypeNode => $this->join('|', $type->types, $scope),
-            $type instanceof Type\IntersectionTypeNode => $this->join('&', $type->types, $scope),
-            $type instanceof Type\GenericTypeNode => $this->renderGeneric($type, $scope),
-            default => '',
+        $classes = [];
+        $scalars = [];
+        $this->walk($type, $scope, false, $classes, $scalars);
+
+        return new DocType($this->uniqueClasses($classes), implode('|', array_values(array_unique($scalars))));
+    }
+
+    /**
+     * @param array<int, DocClassRef> $classes
+     * @param array<int, string> $scalars
+     */
+    private function walk(
+        Type\TypeNode $type,
+        DocBlockScope $scope,
+        bool $inArray,
+        array &$classes,
+        array &$scalars
+    ): void {
+        match (true) {
+            $type instanceof Type\IdentifierTypeNode => $this->walkIdentifier($type->name, $scope, $inArray, $classes, $scalars),
+            $type instanceof Type\ThisTypeNode => $this->addClass($scope->selfFqcn, $inArray, $classes),
+            $type instanceof Type\NullableTypeNode => $this->walkNullable($type, $scope, $inArray, $classes, $scalars),
+            $type instanceof Type\ArrayTypeNode => $this->walkArray($type, $scope, $classes, $scalars),
+            $type instanceof Type\UnionTypeNode,
+            $type instanceof Type\IntersectionTypeNode => $this->walkComposite($type, $scope, $inArray, $classes, $scalars),
+            $type instanceof Type\GenericTypeNode => $this->walkGeneric($type, $scope, $classes, $scalars),
+            default => null,
         };
     }
 
     /**
-     * @param array<int, Type\TypeNode> $types
+     * @param array<int, DocClassRef> $classes
+     * @param array<int, string> $scalars
      */
-    private function join(
-        string $separator,
-        array $types,
-        DocBlockScope $scope
-    ): string {
-        return implode($separator, array_map(fn (Type\TypeNode $type): string => $this->render($type, $scope), $types));
+    private function walkNullable(
+        Type\NullableTypeNode $type,
+        DocBlockScope $scope,
+        bool $inArray,
+        array &$classes,
+        array &$scalars
+    ): void {
+        $this->walk($type->type, $scope, $inArray, $classes, $scalars);
+        $scalars[] = 'null';
     }
 
-    private function renderGeneric(Type\GenericTypeNode $type, DocBlockScope $scope): string
-    {
-        return $this->render($type->type, $scope) . '<' . $this->join(',', $type->genericTypes, $scope) . '>';
+    /**
+     * @param array<int, DocClassRef> $classes
+     * @param array<int, string> $scalars
+     */
+    private function walkArray(
+        Type\ArrayTypeNode $type,
+        DocBlockScope $scope,
+        array &$classes,
+        array &$scalars
+    ): void {
+        $scalars[] = 'array';
+        $this->walk($type->type, $scope, true, $classes, $scalars);
     }
 
-    private function renderIdentifier(string $name, DocBlockScope $scope): string
-    {
+    /**
+     * @param array<int, DocClassRef> $classes
+     * @param array<int, string> $scalars
+     */
+    private function walkComposite(
+        Type\UnionTypeNode|Type\IntersectionTypeNode $type,
+        DocBlockScope $scope,
+        bool $inArray,
+        array &$classes,
+        array &$scalars
+    ): void {
+        foreach ($type->types as $member) {
+            $this->walk($member, $scope, $inArray, $classes, $scalars);
+        }
+    }
+
+    /**
+     * @param array<int, DocClassRef> $classes
+     * @param array<int, string> $scalars
+     */
+    private function walkGeneric(
+        Type\GenericTypeNode $type,
+        DocBlockScope $scope,
+        array &$classes,
+        array &$scalars
+    ): void {
+        $base = strtolower(ltrim($type->type->name, '\\'));
+
+        if (isset(self::ARRAY_GENERICS[$base])) {
+            $scalars[] = 'array';
+            foreach ($type->genericTypes as $member) {
+                $this->walk($member, $scope, true, $classes, $scalars);
+            }
+
+            return;
+        }
+
+        $this->walk($type->type, $scope, false, $classes, $scalars);
+        foreach ($type->genericTypes as $member) {
+            $this->walk($member, $scope, false, $classes, $scalars);
+        }
+    }
+
+    /**
+     * @param array<int, DocClassRef> $classes
+     * @param array<int, string> $scalars
+     */
+    private function walkIdentifier(
+        string $name,
+        DocBlockScope $scope,
+        bool $inArray,
+        array &$classes,
+        array &$scalars
+    ): void {
         $lower = strtolower(ltrim($name, '\\'));
 
         if ($lower === 'self' || $lower === 'static' || $lower === 'this') {
-            return $scope->selfFqcn;
+            $this->addClass($scope->selfFqcn, $inArray, $classes);
+
+            return;
         }
 
         if ($lower === 'parent') {
-            return $scope->parentFqcn ?? $name;
+            if ($scope->parentFqcn !== null) {
+                $this->addClass($scope->parentFqcn, $inArray, $classes);
+            }
+
+            return;
         }
 
-        if (isset(self::KEYWORDS[$lower])) {
-            return $name;
+        if (isset(self::FUNDAMENTALS[$lower])) {
+            $scalars[] = $lower;
+
+            return;
+        }
+
+        $resolved = $this->resolveName($name, $scope);
+        if ($resolved !== null) {
+            $this->addClass($resolved, $inArray, $classes);
+        }
+    }
+
+    private function resolveName(string $name, DocBlockScope $scope): ?string
+    {
+        if (str_contains($name, '-') || $name === '') {
+            return null;
         }
 
         if (str_starts_with($name, '\\')) {
@@ -117,5 +220,35 @@ readonly class DocBlockTypeResolver
         }
 
         return $scope->namespace === '' ? $name : $scope->namespace . '\\' . $name;
+    }
+
+    /**
+     * @param array<int, DocClassRef> $classes
+     */
+    private function addClass(string $fqcn, bool $isArray, array &$classes): void
+    {
+        $classes[] = new DocClassRef($fqcn, $isArray);
+    }
+
+    /**
+     * @param array<int, DocClassRef> $classes
+     * @return array<int, DocClassRef>
+     */
+    private function uniqueClasses(array $classes): array
+    {
+        $seen = [];
+        $unique = [];
+
+        foreach ($classes as $class) {
+            $key = $class->fqcn . ($class->isArray ? '[]' : '');
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $unique[] = $class;
+        }
+
+        return $unique;
     }
 }

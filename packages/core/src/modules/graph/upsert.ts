@@ -96,7 +96,7 @@ async function writeNodes(
     await session.executeWrite(async (tx) => {
       await tx.run(
         `UNWIND $rows AS row
-         MERGE (node:${label} {id: row.id})
+         ${mergeNodeClause(label)}
          SET node += row.properties`,
         { rows }
       );
@@ -139,6 +139,13 @@ async function writeRelationships(
     progress.processed += batch.length;
     await reportProgress(progress, options.getRelationshipWritingPhase?.(relationshipType) ?? "writing-relationships");
   }
+}
+
+function mergeNodeClause(label: string): string {
+  const [baseLabel, ...extraLabels] = label.split(":");
+  const merge = `MERGE (node:${baseLabel} {id: row.id})`;
+
+  return extraLabels.length > 0 ? `${merge}\n         SET node:${extraLabels.join(":")}` : merge;
 }
 
 function createRelationshipQuery(relationshipType: string, fromLabel: string, toLabel: string): string {

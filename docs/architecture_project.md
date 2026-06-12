@@ -419,7 +419,7 @@ npm run start:backend
 npm run start:worker
 ```
 
-`magentic_analyzer_php` needs a Dockerfile because it must provide PHP 8.5, Composer, and the PHP analyzer dependencies from `packages/php-analyzer`.
+`magentic_analyzer_php` needs a Dockerfile because it must provide PHP 8.4, Composer, and the PHP analyzer dependencies from `packages/php-analyzer`.
 
 ### Services that do not need Dockerfiles initially
 
