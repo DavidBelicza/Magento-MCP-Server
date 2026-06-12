@@ -2,14 +2,14 @@ import type { Driver, ManagedTransaction } from "neo4j-driver";
 import { mapGraphFieldsToStoredProperties } from "./properties.js";
 import type { GraphNodeRecord, GraphRelationshipRecord, GraphWriteProgress, GraphWriteSummary } from "./types.js";
 
-type WriteGraphFullReplaceOptions = {
+export type WriteGraphMergeSyncOptions = {
   labels: string[];
   relationshipTypes: string[];
   batchSize?: number;
   onProgress?: (progress: GraphWriteProgress) => Promise<void>;
-  getClearingPhase?: () => string;
   getNodeWritingPhase?: (label: string) => string;
   getRelationshipWritingPhase?: (type: string) => string;
+  getPruningPhase?: () => string;
   getCompletedPhase?: () => string;
 };
 
@@ -21,11 +21,11 @@ type ProgressState = {
 
 const defaultBatchSize = 200;
 
-export async function writeGraphFullReplace(
+export async function writeGraphMergeSync(
   driver: Driver,
   nodes: GraphNodeRecord[],
   relationships: GraphRelationshipRecord[],
-  options: WriteGraphFullReplaceOptions
+  options: WriteGraphMergeSyncOptions
 ): Promise<GraphWriteSummary> {
   const labels = unique(options.labels);
   const relationshipTypes = unique(options.relationshipTypes);
@@ -40,11 +40,6 @@ export async function writeGraphFullReplace(
   validateGraphTokens([...labels, ...relationshipTypes]);
 
   try {
-    await reportProgress(progress, options.getClearingPhase?.() ?? "clearing-graph");
-    await session.executeWrite(async (tx) => {
-      await clearGraph(tx, labels, relationshipTypes);
-    });
-
     for (const label of labels) {
       const labelNodes = nodes.filter((node) => node.label === label);
 
@@ -55,6 +50,22 @@ export async function writeGraphFullReplace(
       const typeRelationships = relationships.filter((relationship) => relationship.type === relationshipType);
 
       await writeRelationships(session, relationshipType, typeRelationships, batchSize, progress, options);
+    }
+
+    await reportProgress(progress, options.getPruningPhase?.() ?? "pruning-graph");
+
+    for (const relationshipType of relationshipTypes) {
+      const keepIdentities = relationships
+        .filter((relationship) => relationship.type === relationshipType)
+        .map((relationship) => relationship.identity);
+
+      await pruneRelationships(session, relationshipType, keepIdentities);
+    }
+
+    for (const label of labels) {
+      const keepIds = nodes.filter((node) => node.label === label).map((node) => node.id);
+
+      await pruneNodes(session, label, keepIds);
     }
 
     await reportProgress(progress, options.getCompletedPhase?.() ?? "completed");
@@ -69,23 +80,13 @@ export async function writeGraphFullReplace(
   }
 }
 
-async function clearGraph(tx: ManagedTransaction, labels: string[], relationshipTypes: string[]): Promise<void> {
-  for (const relationshipType of relationshipTypes) {
-    await tx.run(`MATCH ()-[relationship:${relationshipType}]->() DELETE relationship`);
-  }
-
-  for (const label of labels) {
-    await tx.run(`MATCH (node:${label}) DELETE node`);
-  }
-}
-
 async function writeNodes(
   session: ReturnType<Driver["session"]>,
   label: string,
   nodes: GraphNodeRecord[],
   batchSize: number,
   progress: ProgressState,
-  options: WriteGraphFullReplaceOptions
+  options: WriteGraphMergeSyncOptions
 ): Promise<void> {
   for (const batch of chunk(nodes, batchSize)) {
     const rows = batch.map((node) => ({
@@ -113,7 +114,7 @@ async function writeRelationships(
   relationships: GraphRelationshipRecord[],
   batchSize: number,
   progress: ProgressState,
-  options: WriteGraphFullReplaceOptions
+  options: WriteGraphMergeSyncOptions
 ): Promise<void> {
   for (const batch of chunk(relationships, batchSize)) {
     const rows = batch.map((relationship) => ({
@@ -139,6 +140,36 @@ async function writeRelationships(
     progress.processed += batch.length;
     await reportProgress(progress, options.getRelationshipWritingPhase?.(relationshipType) ?? "writing-relationships");
   }
+}
+
+async function pruneRelationships(
+  session: ReturnType<Driver["session"]>,
+  relationshipType: string,
+  keepIdentities: string[]
+): Promise<void> {
+  await session.executeWrite(async (tx) => {
+    await tx.run(
+      `MATCH ()-[relationship:${relationshipType}]->()
+       WHERE NOT relationship.identity IN $keepIdentities
+       DELETE relationship`,
+      { keepIdentities }
+    );
+  });
+}
+
+async function pruneNodes(
+  session: ReturnType<Driver["session"]>,
+  label: string,
+  keepIds: string[]
+): Promise<void> {
+  await session.executeWrite(async (tx) => {
+    await tx.run(
+      `MATCH (node:${label})
+       WHERE NOT node.id IN $keepIds
+       DETACH DELETE node`,
+      { keepIds }
+    );
+  });
 }
 
 function createRelationshipQuery(relationshipType: string, fromLabel: string, toLabel: string): string {

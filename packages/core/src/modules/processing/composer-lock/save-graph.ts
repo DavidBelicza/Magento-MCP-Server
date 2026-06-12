@@ -1,5 +1,5 @@
 import type { Driver } from "neo4j-driver";
-import { writeGraphFullReplace } from "../../graph/full-replace.js";
+import { writeGraphMergeSync } from "../../graph/merge-sync.js";
 import type { GraphNodeRecord, GraphRelationshipRecord } from "../../graph/types.js";
 import type {
   ComposerEdgeRecord,
@@ -36,7 +36,7 @@ export async function saveComposerLockGraph(
     ...[...records.authorNodes.values()].map(mapComposerNodeRecord)
   ];
   const relationships = [...records.edges.values()].map(mapComposerEdgeRecord);
-  const summary = await writeGraphFullReplace(driver, nodes, relationships, {
+  const summary = await writeGraphMergeSync(driver, nodes, relationships, {
     labels: composerNodeLabels,
     relationshipTypes: composerRelationshipTypes,
     onProgress: options.onProgress
@@ -46,9 +46,9 @@ export async function saveComposerLockGraph(
           phase: progress.phase as ComposerProcessingProgress["phase"]
         }) ?? Promise.resolve()
       : undefined,
-    getClearingPhase: () => "clearing-graph",
     getNodeWritingPhase: (label) => (label === "Package" ? "writing-packages" : "writing-authors"),
     getRelationshipWritingPhase: () => "writing-relationships",
+    getPruningPhase: () => "clearing-graph",
     getCompletedPhase: () => "completed"
   });
 

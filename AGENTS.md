@@ -65,7 +65,7 @@ Important core paths:
 - `src/queue/index-packages.ts`: BullMQ queue contract.
 - `src/modules/processing/php-analysis/`: JSONL stream consumption, fact accumulation, mapping, and Neo4j writes for source indexing. See `docs/architecture_world_mapping.md`.
 - `src/modules/processing/composer-lock/`: Composer lock parsing and graph record building.
-- `src/modules/graph/`: generic graph write helpers (`upsert.ts` for the source path, `full-replace.ts` for the composer path).
+- `src/modules/graph/`: generic graph write helpers (`upsert.ts` for the source path, `merge-sync.ts` for the composer path — merge nodes/edges then prune what is no longer present).
 - `src/config.ts`: environment-backed config, including `GRAPH_BATCH_SIZE` (source ingestion batch and transaction size, default 5000).
 - `src/schema/install-schemas.ts`: startup schema installer.
 - `schema/postgresql/`: PostgreSQL `.sql` schema scripts.
