@@ -51,6 +51,7 @@ Useful checks:
 ```bash
 curl -s http://localhost:8080/api/health
 curl -s -X POST http://localhost:8080/api/index/packages
+curl -s -X POST http://localhost:8080/api/index/links
 curl -s "http://localhost:8080/api/index/get-status?jobId=<job-id>"
 docker run --rm --network magentic_default curlimages/curl -X POST http://magentic_analyzer_php/analyze -H "Content-Type: application/json" -d '{"path": "vendor/magento/module-catalog"}'
 ```
@@ -64,12 +65,13 @@ Important core paths:
 - `src/worker/index-source-worker.ts`: source indexing worker that consumes the PHP analyzer JSONL stream.
 - `src/queue/index-packages.ts`: BullMQ queue contract.
 - `src/modules/processing/php-analysis/`: JSONL stream consumption, fact accumulation, mapping, and Neo4j writes for source indexing. See `docs/architecture_world_mapping.md`.
-- `src/modules/processing/composer-lock/`: Composer lock parsing and graph record building.
+- `src/modules/processing/composer-lock/`: Composer lock parsing and graph record building (writes a queryable `psr4Namespaces` list on each Package node).
+- `src/modules/processing/package-linking/`: `index-links` pipeline that connects declared `:Symbol` nodes to `:Package` nodes with `DECLARED_IN_PACKAGE` edges via PSR-4 longest-prefix matching, entirely in Cypher. Entry point `src/worker/index-links-worker.ts`; triggered by `POST /api/index/links` (optional `{ "symbolId": "<FQN>" }` for a scoped relink).
 - `src/modules/graph/`: generic graph write helpers (`upsert.ts` for the source path, `merge-sync.ts` for the composer path — merge nodes/edges then prune what is no longer present).
 - `src/config.ts`: environment-backed config, including `GRAPH_BATCH_SIZE` (source ingestion batch and transaction size, default 5000).
 - `src/schema/install-schemas.ts`: startup schema installer.
 - `schema/postgresql/`: PostgreSQL `.sql` schema scripts.
-- `schema/neo4j/`: Neo4j `.cypher` schema scripts (Symbol id uniqueness; edge identity constraints for EXTENDS, IMPLEMENTS, USES, HAS_METHOD, PARAM_TYPE, and RETURNS_TYPE).
+- `schema/neo4j/`: Neo4j `.cypher` schema scripts (Symbol id uniqueness; edge identity constraints for EXTENDS, IMPLEMENTS, USES, HAS_METHOD, PARAM_TYPE, RETURNS_TYPE, and DECLARED_IN_PACKAGE).
 
 Schema scripts are installed on backend/worker startup, not during Docker build and not from frontend requests. PostgreSQL stores executed schema scripts in `application_schema_history`.
 

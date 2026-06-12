@@ -167,7 +167,7 @@ Only the outbound edges of the symbols a file **defines** are cleared. Reference
 The constraints this workflow relies on are defined in `packages/core/schema/neo4j/*.cypher` and installed at startup; they are not created by this ingestion path. See `AGENTS.md` (Core Layout) for the schema installation flow.
 
 - `Symbol.id` uniqueness — used by the clear step and every node/relationship `MERGE` lookup.
-- Edge `identity` uniqueness for `EXTENDS` and `IMPLEMENTS` (`002`/`003`), `HAS_METHOD` and `USES` (`004`), and `PARAM_TYPE` and `RETURNS_TYPE` (`005`).
+- Edge `identity` uniqueness for `EXTENDS` and `IMPLEMENTS` (`002`/`003`), `HAS_METHOD` and `USES` (`004`), `PARAM_TYPE` and `RETURNS_TYPE` (`005`), and `DECLARED_IN_PACKAGE` (`006`).
 
 ## PHP Source Graph Mapping
 
@@ -179,6 +179,17 @@ Highlights of the model (the JSON has the full detail):
 - **Type edges.** Class/interface/enum/trait parameter and return types become `PARAM_TYPE` / `RETURNS_TYPE` edges to the type node. Fundamental scalars (`int`, `string`, `array`, `void`, ...) stay as the `returnType` / `paramTypes` string fields and never become nodes, which avoids scalar supernodes.
 - **Native vs docblock provenance.** Native signature types are edges with `source: "native"`. Docblock `@param`/`@return` class types are added with `source: "docblock"`, but only when the class is not already in the native set at that position — so identical native/doc types are not stored twice. Array/list/iterable element types from docblocks carry `is_array: true`. Untyped parameters and returns backfill a fundamental scalar from the docblock. Unresolvable, pseudo, or malformed docblock types are dropped entirely.
 - **Parameter edges** carry `name` and `position`; the `position` is folded into the edge identity so two parameters of the same type remain distinct edges, and a union type fans out into one edge per class constituent.
+
+## Package Linking
+
+The PHP source graph and the composer-lock graph (`Package`/`Author` nodes) are produced by two independent pipelines. A third pipeline connects them with `DECLARED_IN_PACKAGE` edges (declared `:Symbol` → `:Package`).
+
+- **Bridge:** PSR-4. Composer indexing writes a queryable `psr4Namespaces` string list on each `Package` node; a declared symbol's package is the one whose namespace is the **longest matching prefix** of the symbol's FQN.
+- **Cypher-driven:** the match runs entirely in Neo4j (`UNWIND` namespaces, index-backed `STARTS WITH` against `:Symbol` nodes filtered to declared types — `kind IN [class, interface, trait, enum]` with a `file`), so no symbol data is loaded into the worker. Edges are written with `MERGE` inside `CALL { } IN TRANSACTIONS` to keep transactions bounded. See `src/modules/processing/package-linking/link-symbols-to-packages.ts`.
+- **Pipeline:** the `index-links` queue/worker, triggered by `POST /api/index/links`. The body is optional: `{ "symbolId": "<FQN>" }` re-links a single symbol (for incremental/file-watcher updates); an empty body clears and rebuilds all links.
+- **Scope:** only declared classes, interfaces, traits, and enums are linked (methods inherit their owner's package via `HAS_METHOD`). Symbols autoloaded by `classmap`/`psr-0` rather than PSR-4 (e.g. `Magento\Setup\*`, legacy `Zend_*`, test classes) are intentionally not linked. A namespace declared by two packages yields one edge to each.
+
+This is the change that lets the two world-models be queried together, e.g. "which package owns this class" or "this class extends a class owned by another package — does its composer manifest require that package?".
 
 ## Scope and Non-Goals
 

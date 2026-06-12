@@ -165,6 +165,14 @@ curl -X POST http://localhost:8080/api/index/source \
   -d '{"directories": ["vendor/magento/module-catalog"]}'
 ```
 
+To connect indexed PHP symbols to their composer packages (run after both the source and package indexing have completed):
+
+```bash
+curl -X POST http://localhost:8080/api/index/links \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
 To manually test the internal PHP Analyzer HTTP endpoint (`/analyze`) directly via the Docker network:
 
 ```bash

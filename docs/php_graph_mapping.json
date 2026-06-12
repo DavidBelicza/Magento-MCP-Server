@@ -46,6 +46,12 @@
           "source (\"native\" | \"docblock\")",
           "is_array (true only on docblock array/list/iterable element edges)"
         ]
+      },
+      "DECLARED_IN_PACKAGE": {
+        "from": "class | interface | trait | enum (declared symbols only; methods inherit their owner's package)",
+        "to": "Package (a node from the composer-lock graph)",
+        "edgeProperties": ["identity (\"<symbolFqn>|DECLARED_IN_PACKAGE|<packageId>\")"],
+        "note": "Built by the separate index-links pipeline, not by source ingestion. Resolved in Cypher by the longest-matching PSR-4 namespace prefix of the symbol's FQN against Package.psr4Namespaces. Symbols loaded via classmap/psr-0 (e.g. Magento\\Setup, legacy Zend, test classes) are not linked. Symbols under a namespace declared by two packages get one edge to each."
       }
     },
     "typeMappingRules": {
@@ -68,8 +74,15 @@
         { "type": "USES", "to": "Magento\\Framework\\Cache\\CacheAwareTrait" },
         { "type": "HAS_METHOD", "to": "Magento\\Catalog\\Model\\ProductRepository::__construct" },
         { "type": "HAS_METHOD", "to": "Magento\\Catalog\\Model\\ProductRepository::save" },
-        { "type": "HAS_METHOD", "to": "Magento\\Catalog\\Model\\ProductRepository::getById" }
+        { "type": "HAS_METHOD", "to": "Magento\\Catalog\\Model\\ProductRepository::getById" },
+        { "type": "DECLARED_IN_PACKAGE", "to": "package:magento/module-catalog" }
       ]
+    },
+    "package:magento/module-catalog": {
+      "labels": ["Package"],
+      "comment": "A composer-lock graph node, linked in by the index-links pipeline via PSR-4 (Magento\\Catalog\\ prefixes the class FQN). Properties abbreviated here; see the composer-lock graph for the full Package shape.",
+      "properties": { "id": "package:magento/module-catalog", "name": "magento/module-catalog", "type": "magento2-module", "psr4Namespaces": ["Magento\\Catalog\\"] },
+      "out": []
     },
     "Magento\\Catalog\\Model\\ProductRepository::__construct": {
       "labels": ["Symbol", "PHP", "Method"],

@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { createNeo4jDriver, createPostgresPool, createRedisConnection } from "./connections.js";
 import { readConfig } from "./config.js";
+import { createIndexLinksQueue } from "./queue/index-links.js";
 import { createIndexPackagesQueue } from "./queue/index-packages.js";
 import { createIndexSourceQueue } from "./queue/index-source.js";
 import { installSchemas } from "./schema/install-schemas.js";
@@ -18,6 +19,7 @@ const postgres = createPostgresPool();
 const neo4jDriver = createNeo4jDriver();
 const indexPackagesQueue = createIndexPackagesQueue();
 const indexSourceQueue = createIndexSourceQueue();
+const indexLinksQueue = createIndexLinksQueue();
 
 function getAnalyzedSourcePath(): string {
   return process.env.MAGENTIC_ANALYZED_SOURCE_PATH ?? "/mnt/analyzed-source";
@@ -32,6 +34,7 @@ registerHealthApi(app, {
 registerIndexApi(app, {
   indexPackagesQueue,
   indexSourceQueue,
+  indexLinksQueue,
   getAnalyzedSourcePath
 });
 
@@ -57,6 +60,7 @@ process.on("SIGTERM", async () => {
   await app.close();
   await indexPackagesQueue.close();
   await indexSourceQueue.close();
+  await indexLinksQueue.close();
   await redis.quit();
   await postgres.end();
   await neo4jDriver.close();

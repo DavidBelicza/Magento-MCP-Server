@@ -48,6 +48,7 @@ function createInstalledPackageNode(composerPackage: ComposerPackage): ComposerN
   const packageParts = splitPackageName(composerPackage.name);
   const license = composerPackage.license ?? [];
   const autoload = normalizeAutoload(composerPackage.autoload);
+  const psr4Namespaces = getPsr4Namespaces(composerPackage.autoload);
   const phpRequirements = getPhpRequirements(composerPackage.require ?? {});
   const phpExtensions = getPhpExtensions(composerPackage.require ?? {});
   const hashFields = {
@@ -66,6 +67,7 @@ function createInstalledPackageNode(composerPackage: ComposerPackage): ComposerN
     isMagentoPackage: composerPackage.name.startsWith("magento/"),
     magentoModuleName: getMagentoModuleName(composerPackage),
     autoload,
+    psr4Namespaces,
     phpRequirements,
     phpExtensions
   };
@@ -266,6 +268,10 @@ function normalizeAutoload(autoload?: ComposerPackage["autoload"]): GraphFieldVa
     classmap: autoload?.classmap ?? [],
     files: autoload?.files ?? []
   };
+}
+
+function getPsr4Namespaces(autoload?: ComposerPackage["autoload"]): string[] {
+  return Object.keys(autoload?.["psr-4"] ?? {});
 }
 
 function normalizeNamespaceMap(namespaceMap: Record<string, string | string[]>): GraphFieldValue[] {

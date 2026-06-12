@@ -1,15 +1,17 @@
 import type { FastifyInstance } from "fastify";
+import type { createIndexLinksQueue } from "../queue/index-links.js";
 import type { createIndexPackagesQueue } from "../queue/index-packages.js";
 import type { createIndexSourceQueue } from "../queue/index-source.js";
 
 type IndexApiDependencies = {
   indexPackagesQueue: ReturnType<typeof createIndexPackagesQueue>;
   indexSourceQueue: ReturnType<typeof createIndexSourceQueue>;
+  indexLinksQueue: ReturnType<typeof createIndexLinksQueue>;
   getAnalyzedSourcePath: () => string;
 };
 
 export function registerIndexApi(app: FastifyInstance, dependencies: IndexApiDependencies): void {
-  const { indexPackagesQueue, indexSourceQueue, getAnalyzedSourcePath } = dependencies;
+  const { indexPackagesQueue, indexSourceQueue, indexLinksQueue, getAnalyzedSourcePath } = dependencies;
 
   app.post("/api/index/packages", async (_request, reply) => {
     const job = await indexPackagesQueue.add(getAnalyzedSourcePath());
@@ -32,6 +34,17 @@ export function registerIndexApi(app: FastifyInstance, dependencies: IndexApiDep
       ok: true,
       jobs,
       message: "Source indexing request accepted."
+    });
+  });
+
+  app.post<{ Body: { symbolId?: string | null } }>("/api/index/links", async (request, reply) => {
+    const job = await indexLinksQueue.add(request.body?.symbolId ?? null);
+
+    return reply.status(202).send({
+      ok: true,
+      status: job.state,
+      jobId: job.id,
+      message: "Package linking request accepted."
     });
   });
 
