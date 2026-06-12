@@ -5,12 +5,12 @@ import { GraphSearchValidationError, searchGraph } from "../modules/graph/search
 import { getQueryHistory, listQueryHistory, saveQueryHistory } from "../modules/search/query-history.js";
 import { buildGraphSearchResult } from "../modules/search/result-builder.js";
 
-type GraphApiDependencies = {
+type GraphSearchApiDependencies = {
   postgres: Pool;
   neo4jDriver: Driver;
 };
 
-export function registerGraphApi(app: FastifyInstance, dependencies: GraphApiDependencies): void {
+export function registerGraphSearchApi(app: FastifyInstance, dependencies: GraphSearchApiDependencies): void {
   const { postgres, neo4jDriver } = dependencies;
 
   app.post<{ Body: { description?: unknown; cypherQuery?: unknown } }>("/api/graph/search", async (request, reply) => {

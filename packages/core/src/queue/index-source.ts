@@ -1,9 +1,12 @@
 import { Queue } from "bullmq";
 import { createRedisConnectionOptions } from "../connections.js";
 
+export type IndexSourceOperation = "index" | "delete";
+
 export type IndexSourceJob = {
   analyzedSourcePath: string;
   directory: unknown | null;
+  operation: IndexSourceOperation;
   requestedAt: string;
 };
 
@@ -19,13 +22,18 @@ export function createIndexSourceQueue() {
   );
 
   return {
-    add: async (analyzedSourcePath: string, directories: unknown[] | null) => {
+    add: async (
+      analyzedSourcePath: string,
+      directories: unknown[] | null,
+      operation: IndexSourceOperation = "index"
+    ) => {
       const requestedAt = new Date().toISOString();
       const jobDirectories = directories ?? [null];
       const jobs = await Promise.all(jobDirectories.map(async (directory) => {
         const job = await queue.add(indexSourceJobName, {
           analyzedSourcePath,
           directory,
+          operation,
           requestedAt
         });
 

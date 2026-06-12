@@ -3,7 +3,7 @@ import { writeGraphUpsert } from "../../graph/upsert.js";
 import { mapFactBatch } from "./map-records.js";
 import type { FileFacts } from "./types.js";
 
-export async function savePhpAnalysisBatch(session: Session, batch: FileFacts[], batchSize: number): Promise<void> {
+export async function saveSourceBatch(session: Session, batch: FileFacts[], batchSize: number): Promise<void> {
   const { nodes, relationships, clearOutboundFromNodeIds } = mapFactBatch(batch);
 
   if (nodes.length === 0 && relationships.length === 0) {

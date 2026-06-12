@@ -1,6 +1,6 @@
 import type { Driver } from "neo4j-driver";
 import { createFactAccumulator, type FactAccumulator } from "./fact-accumulator.js";
-import { savePhpAnalysisBatch } from "./save-facts.js";
+import { saveSourceBatch } from "./save-source.js";
 import type { FileFacts } from "./types.js";
 
 export async function consumeFactStream(
@@ -12,7 +12,7 @@ export async function consumeFactStream(
   const session = driver.session();
   const decoder = new TextDecoder();
   const accumulator = createFactAccumulator(batchSize, async (batch) => {
-    await savePhpAnalysisBatch(session, batch, batchSize);
+    await saveSourceBatch(session, batch, batchSize);
     await onBatchSaved();
   });
   let buffer = "";

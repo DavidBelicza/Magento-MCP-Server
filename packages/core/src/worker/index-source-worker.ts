@@ -2,6 +2,7 @@ import { Worker, type Job } from "bullmq";
 import type { Driver } from "neo4j-driver";
 import { createRedisConnectionOptions } from "../connections.js";
 import { consumeFactStream } from "../modules/processing/php-analysis/consume-fact-stream.js";
+import { deleteSourceByPaths } from "../modules/processing/php-analysis/delete-source.js";
 import {
   indexSourceJobName,
   indexSourceQueueName,
@@ -35,12 +36,31 @@ export function createIndexSourceWorker(driver: Driver, batchSize: number, analy
 }
 
 async function handleJob(job: Job<IndexSourceJob>, driver: Driver, batchSize: number, analyzerPhpUrl: string): Promise<IndexSourceResult> {
+  if (job.data.operation === "delete") {
+    return handleDeleteJob(job, driver);
+  }
+
   await job.updateProgress({ phase: "accepted", percent: 0 });
 
   const directory = extractDirectory(job.data.directory);
   const reader = await fetchAnalyzerStream(directory, analyzerPhpUrl);
 
   await consumeFactStream(reader, driver, batchSize, () => job.updateProgress({ phase: "processing" }));
+
+  await job.updateProgress({ phase: "completed", percent: 100 });
+
+  return {
+    analyzedSourcePath: job.data.analyzedSourcePath,
+    directory: job.data.directory,
+    status: "accepted"
+  };
+}
+
+async function handleDeleteJob(job: Job<IndexSourceJob>, driver: Driver): Promise<IndexSourceResult> {
+  await job.updateProgress({ phase: "deleting", percent: 0 });
+
+  const path = extractDirectory(job.data.directory);
+  await deleteSourceByPaths(driver, [path]);
 
   await job.updateProgress({ phase: "completed", percent: 100 });
 

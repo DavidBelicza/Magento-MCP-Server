@@ -5,9 +5,9 @@ import { createIndexLinksQueue } from "./queue/index-links.js";
 import { createIndexPackagesQueue } from "./queue/index-packages.js";
 import { createIndexSourceQueue } from "./queue/index-source.js";
 import { installSchemas } from "./schema/install-schemas.js";
-import { registerGraphApi } from "./api/graph.js";
+import { registerGraphSearchApi } from "./api/graph-search.js";
 import { registerHealthApi } from "./api/health.js";
-import { registerIndexApi } from "./api/index.js";
+import { registerGraphUpdateApi } from "./api/graph-update.js";
 
 const config = readConfig();
 const app = Fastify({
@@ -31,14 +31,14 @@ registerHealthApi(app, {
   neo4jDriver
 });
 
-registerIndexApi(app, {
+registerGraphUpdateApi(app, {
   indexPackagesQueue,
   indexSourceQueue,
   indexLinksQueue,
   getAnalyzedSourcePath
 });
 
-registerGraphApi(app, {
+registerGraphSearchApi(app, {
   postgres,
   neo4jDriver
 });

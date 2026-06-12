@@ -3,14 +3,14 @@ import type { createIndexLinksQueue } from "../queue/index-links.js";
 import type { createIndexPackagesQueue } from "../queue/index-packages.js";
 import type { createIndexSourceQueue } from "../queue/index-source.js";
 
-type IndexApiDependencies = {
+type GraphUpdateApiDependencies = {
   indexPackagesQueue: ReturnType<typeof createIndexPackagesQueue>;
   indexSourceQueue: ReturnType<typeof createIndexSourceQueue>;
   indexLinksQueue: ReturnType<typeof createIndexLinksQueue>;
   getAnalyzedSourcePath: () => string;
 };
 
-export function registerIndexApi(app: FastifyInstance, dependencies: IndexApiDependencies): void {
+export function registerGraphUpdateApi(app: FastifyInstance, dependencies: GraphUpdateApiDependencies): void {
   const { indexPackagesQueue, indexSourceQueue, indexLinksQueue, getAnalyzedSourcePath } = dependencies;
 
   app.post("/api/index/packages", async (_request, reply) => {
@@ -34,6 +34,25 @@ export function registerIndexApi(app: FastifyInstance, dependencies: IndexApiDep
       ok: true,
       jobs,
       message: "Source indexing request accepted."
+    });
+  });
+
+  app.delete<{ Body: { directories?: unknown[] | null } }>("/api/index/source", async (request, reply) => {
+    const directories = request.body?.directories;
+
+    if (!Array.isArray(directories) || directories.length === 0) {
+      return reply.status(400).send({
+        ok: false,
+        error: "directories is required and must be a non-empty array for deletion"
+      });
+    }
+
+    const jobs = await indexSourceQueue.add(getAnalyzedSourcePath(), directories, "delete");
+
+    return reply.status(202).send({
+      ok: true,
+      jobs,
+      message: "Source deletion request accepted."
     });
   });
 
