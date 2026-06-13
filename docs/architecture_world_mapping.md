@@ -191,6 +191,16 @@ The PHP source graph and the composer-lock graph (`Package`/`Author` nodes) are 
 
 This is the change that lets the two world-models be queried together, e.g. "which package owns this class" or "this class extends a class owned by another package — does its composer manifest require that package?".
 
+## Indexing Pipelines and Orchestration
+
+The graph is produced by three pipelines, each a BullMQ queue and worker:
+
+- **Composer** (`index-packages`): parses `composer.lock` into `Package`/`Author` nodes and composer relationships. It uses **merge-and-prune** writes (`src/modules/graph/merge-sync.ts`): MERGE the current nodes and edges, then delete the packages, authors, and edges no longer present in the lock. Existing nodes — and their inbound `DECLARED_IN_PACKAGE` edges — survive a re-run, while removed dependencies are pruned.
+- **Source** (`index-source`): the ingestion workflow above. It also handles **targeted deletion** — `DELETE` by path removes the declared symbols whose `file` is the path or under it (a batched `DETACH DELETE`).
+- **Linking** (`index-links`): the Package Linking step above.
+
+These are driven by the Graph Indexing API (endpoint reference in `docs/architecture_project.md`). A full **reindex** runs the pipelines in order `packages → source → links`; **reset-and-reindex** prepends a whole-graph delete (`delete-graph → packages → source → links`). Ordering is expressed with a BullMQ `FlowProducer` — `links` is always last because it depends on both source and packages. A full operation runs **exclusively** (a Redis lock returns `409` to a second full request), and the incremental **delta** endpoint — the file-watcher entry point that routes each changed path to the right pipeline — is paused while a full operation is running.
+
 ## Scope and Non-Goals
 
 - **The method-call graph (method calls method) is permanently out of scope.** It would require full method-body traversal and receiver-type resolution, and Magento's DI/factory/magic (`$factory->create()` hiding the produced type) makes it materially incomplete. Signature and docblock types are the deliberate substitute.

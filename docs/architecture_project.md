@@ -301,9 +301,9 @@ bolt://localhost:7687
 The PLG stack provides centralized, zero-overhead logging.
 
 Responsibilities:
-- **Loki**: Stores structured JSON logs received from Promtail. Available on port `3100`.
+- **Loki**: Stores structured JSON logs received from Promtail. Listens on `3100` inside the Compose network only — it is not published to the host, since Grafana and Promtail reach it over the Docker network.
 - **Promtail**: Binds to the Docker Daemon to securely read container `stdout`/`stderr` logs without application coupling, and pushes them to Loki.
-- **Grafana**: A UI for querying Loki using LogQL. Exposed on port `3001`.
+- **Grafana**: A UI for querying Loki using LogQL. Published to the host on `${GRAFANA_HTTP_PORT:-3001}`.
 
 The telemetry services are placed under the `telemetry` Compose profile and will only boot if explicitly requested (e.g., `docker compose --profile telemetry up -d`).
 
@@ -557,3 +557,57 @@ This endpoint returns the saved raw normalized `result` and rebuilds `structured
 ```
 
 The Query History tab links each listed history item to that Graph page URL. When `/graph` is opened without a query-history ID, the frontend loads the latest query history item and replaces the URL with `/graph?queryHistoryId=<latest-query-history-id>`. Missing or invalid query-history IDs show an error state with a link back to Query History instead of rendering an empty graph canvas.
+
+## Graph Indexing API
+
+The graph is built and maintained by three internal pipelines, each a BullMQ queue with its own worker:
+
+- `index-packages`: parse `composer.lock` into `Package`/`Author` nodes and composer relationships (merge-and-prune writes).
+- `index-source`: stream the PHP analyzer's JSONL and write `Symbol` nodes, member nodes, and their edges (incremental upsert; also handles targeted deletion by path).
+- `index-links`: connect declared `Symbol` nodes to their `Package` via `DECLARED_IN_PACKAGE` (PSR-4 longest-prefix, in Cypher).
+
+All indexing routes live under `/api/graph/index/*`. The `graph` segment namespaces this as *graph* indexing so a future vector-database index (for example `/api/vector/...`) stays separate. Every route returns `202 Accepted` immediately and runs asynchronously on the worker; nothing blocks the HTTP request.
+
+### Single-pipeline endpoints
+
+```text
+POST   /api/graph/index/packages          index composer.lock
+POST   /api/graph/index/source            index PHP source ({ "directories": [...] } optional; whole source when omitted)
+DELETE /api/graph/index/source            remove indexed source under the given paths ({ "directories": [...] }, required)
+POST   /api/graph/index/links             (re)build DECLARED_IN_PACKAGE ({ "symbolId": "<FQN>" } optional for a scoped relink)
+```
+
+### Orchestrated endpoints
+
+```text
+POST /api/graph/index/reindex             full rebuild, no delete
+POST /api/graph/index/reset-and-reindex   delete the whole graph, then full rebuild
+```
+
+Both compose the pipelines with a BullMQ `FlowProducer` so they run in a guaranteed order, with `index-links` last because it depends on both source and packages:
+
+```text
+reindex:            packages -> source -> links
+reset-and-reindex:  delete-graph -> packages -> source -> links
+```
+
+`delete-graph` is a batched whole-graph delete (`DETACH DELETE` via `CALL { } IN TRANSACTIONS`). Ordering is expressed declaratively in the flow tree; the workers run unchanged. If any stage fails, `failParentOnFailure` propagates so the flow fails cleanly instead of hanging.
+
+### Incremental updates (file watcher)
+
+```text
+POST /api/graph/index/delta               { "operation": "upsert" | "delete", "paths": [ ... ] }
+```
+
+`delta` is the entry point for a future file watcher. It classifies each path — `composer.lock` routes to package indexing, `*.xml` is skipped for now, everything else routes to source — and proxies to the internal endpoints via Fastify `app.inject`. On `upsert` it also triggers a links relink. It accepts file and directory paths.
+
+### Exclusivity and status
+
+A full operation runs exclusively. `reindex` and `reset-and-reindex` acquire a Redis lock (`SET NX` with a TTL safety net); a second full request while one is running returns `409`, and `/api/graph/index/delta` returns `409` while a full operation is in progress. The lock is released when the flow's terminal job finishes, on success or failure.
+
+```text
+GET /api/graph/index/status               all in-progress jobs across the four queues, plus the lock state
+GET /api/graph/index/status/:jobId        a single job by id, searched across all queues
+```
+
+`status` aggregates active and waiting jobs (including flow parents in `waiting-children`) so the in-progress state of a whole flow is visible in one response.

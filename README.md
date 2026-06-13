@@ -157,21 +157,44 @@ docker compose exec magentic_frontend npm --version
 ```
 
 
-To manually test the end-to-end Node indexing API (which enqueues the job for the worker):
+Build the whole graph from scratch — deletes everything, then runs composer, source, and linking in order (the "reset and reindex" action). It returns immediately and runs in the background:
+
+```bash
+curl -X POST http://localhost:8080/api/graph/index/reset-and-reindex -d '{}'
+```
+
+Rebuild without deleting first:
+
+```bash
+curl -X POST http://localhost:8080/api/graph/index/reindex -d '{}'
+```
+
+Watch what is currently running (and whether a full operation holds the lock):
+
+```bash
+curl -s http://localhost:8080/api/graph/index/status
+```
+
+Run a single pipeline directly. Source indexing accepts an optional list of directories (whole source when omitted); the matching `DELETE` removes indexed source under those paths:
 
 ```bash
 curl -X POST http://localhost:8080/api/graph/index/source \
   -H "Content-Type: application/json" \
   -d '{"directories": ["vendor/magento/module-catalog"]}'
+
+curl -X POST http://localhost:8080/api/graph/index/packages -d '{}'
+curl -X POST http://localhost:8080/api/graph/index/links -d '{}'
 ```
 
-To connect indexed PHP symbols to their composer packages (run after both the source and package indexing have completed):
+Apply an incremental change for a set of paths (the file-watcher entry point), which routes each path to the right pipeline:
 
 ```bash
-curl -X POST http://localhost:8080/api/graph/index/links \
+curl -X POST http://localhost:8080/api/graph/index/delta \
   -H "Content-Type: application/json" \
-  -d '{}'
+  -d '{"operation": "upsert", "paths": ["vendor/magento/module-catalog"]}'
 ```
+
+See `docs/architecture_project.md` (Graph Indexing API) for the full endpoint reference and orchestration rules.
 
 To manually test the internal PHP Analyzer HTTP endpoint (`/analyze`) directly via the Docker network:
 
