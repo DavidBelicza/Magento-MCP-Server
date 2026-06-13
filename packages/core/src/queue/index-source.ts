@@ -8,6 +8,7 @@ export type IndexSourceJob = {
   directory: unknown | null;
   operation: IndexSourceOperation;
   requestedAt: string;
+  fullIndexFlow?: boolean;
 };
 
 export const indexSourceQueueName = "index-source";

@@ -1,5 +1,6 @@
 export type GraphWipeJob = {
   requestedAt: string;
+  fullIndexFlow?: boolean;
 };
 
 export const graphWipeQueueName = "graph-wipe";

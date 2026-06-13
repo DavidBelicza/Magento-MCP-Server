@@ -1,21 +1,33 @@
 import type { FlowJob, FlowProducer } from "bullmq";
 import type { FastifyInstance } from "fastify";
+import type { Redis } from "ioredis";
+import { acquireFullIndexLock, isFullIndexLocked } from "../modules/index-lock.js";
 import { graphWipeJobName, graphWipeQueueName } from "../queue/graph-wipe.js";
 import { indexLinksJobName, indexLinksQueueName, type createIndexLinksQueue } from "../queue/index-links.js";
 import { indexPackagesJobName, indexPackagesQueueName, type createIndexPackagesQueue } from "../queue/index-packages.js";
 import { indexSourceJobName, indexSourceQueueName, type createIndexSourceQueue } from "../queue/index-source.js";
+import type { createIndexStatus } from "../queue/index-status.js";
 
 type GraphUpdateApiDependencies = {
   indexPackagesQueue: ReturnType<typeof createIndexPackagesQueue>;
   indexSourceQueue: ReturnType<typeof createIndexSourceQueue>;
   indexLinksQueue: ReturnType<typeof createIndexLinksQueue>;
   indexFlowProducer: FlowProducer;
+  indexStatus: ReturnType<typeof createIndexStatus>;
+  redis: Redis;
   getAnalyzedSourcePath: () => string;
 };
 
 export function registerGraphUpdateApi(app: FastifyInstance, dependencies: GraphUpdateApiDependencies): void {
-  const { indexPackagesQueue, indexSourceQueue, indexLinksQueue, indexFlowProducer, getAnalyzedSourcePath } =
-    dependencies;
+  const {
+    indexPackagesQueue,
+    indexSourceQueue,
+    indexLinksQueue,
+    indexFlowProducer,
+    indexStatus,
+    redis,
+    getAnalyzedSourcePath
+  } = dependencies;
 
   app.post("/api/index/packages", async (_request, reply) => {
     const job = await indexPackagesQueue.add(getAnalyzedSourcePath());
@@ -72,6 +84,13 @@ export function registerGraphUpdateApi(app: FastifyInstance, dependencies: Graph
   });
 
   app.post<{ Body: { operation?: unknown; paths?: unknown } }>("/api/sync", async (request, reply) => {
+    if (await isFullIndexLocked(redis)) {
+      return reply.status(409).send({
+        ok: false,
+        error: "a reset or full reindex is in progress; sync is paused"
+      });
+    }
+
     const operation = request.body?.operation;
     const paths = request.body?.paths;
 
@@ -124,6 +143,13 @@ export function registerGraphUpdateApi(app: FastifyInstance, dependencies: Graph
   });
 
   app.post("/api/index/reindex", async (_request, reply) => {
+    if (!(await acquireFullIndexLock(redis))) {
+      return reply.status(409).send({
+        ok: false,
+        error: "a reset or full reindex is already in progress"
+      });
+    }
+
     const flow = await indexFlowProducer.add(buildIndexFlow(getAnalyzedSourcePath(), false));
 
     return reply.status(202).send({
@@ -134,12 +160,30 @@ export function registerGraphUpdateApi(app: FastifyInstance, dependencies: Graph
   });
 
   app.post("/api/index/reset", async (_request, reply) => {
+    if (!(await acquireFullIndexLock(redis))) {
+      return reply.status(409).send({
+        ok: false,
+        error: "a reset or full reindex is already in progress"
+      });
+    }
+
     const flow = await indexFlowProducer.add(buildIndexFlow(getAnalyzedSourcePath(), true));
 
     return reply.status(202).send({
       ok: true,
       jobId: flow.job.id,
       message: "Reset and reindex request accepted."
+    });
+  });
+
+  app.get("/api/index/status", async (_request, reply) => {
+    const items = await indexStatus.getInProgress();
+
+    return reply.send({
+      ok: true,
+      inProgress: items.length,
+      locked: await isFullIndexLocked(redis),
+      items
     });
   });
 
@@ -173,24 +217,34 @@ export function registerGraphUpdateApi(app: FastifyInstance, dependencies: Graph
 
 function buildIndexFlow(analyzedSourcePath: string, withWipe: boolean): FlowJob {
   const requestedAt = new Date().toISOString();
+  const failParent = { failParentOnFailure: true };
   const wipeChildren: FlowJob[] = withWipe
-    ? [{ name: graphWipeJobName, queueName: graphWipeQueueName, data: { requestedAt } }]
+    ? [
+        {
+          name: graphWipeJobName,
+          queueName: graphWipeQueueName,
+          data: { requestedAt, fullIndexFlow: true },
+          opts: failParent
+        }
+      ]
     : [];
 
   return {
     name: indexLinksJobName,
     queueName: indexLinksQueueName,
-    data: { symbolId: null, requestedAt },
+    data: { symbolId: null, requestedAt, fullIndexFlow: true },
     children: [
       {
         name: indexSourceJobName,
         queueName: indexSourceQueueName,
-        data: { analyzedSourcePath, directory: null, operation: "index", requestedAt },
+        data: { analyzedSourcePath, directory: null, operation: "index", requestedAt, fullIndexFlow: true },
+        opts: failParent,
         children: [
           {
             name: indexPackagesJobName,
             queueName: indexPackagesQueueName,
-            data: { analyzedSourcePath, requestedAt },
+            data: { analyzedSourcePath, requestedAt, fullIndexFlow: true },
+            opts: failParent,
             children: wipeChildren
           }
         ]

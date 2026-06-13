@@ -1,6 +1,8 @@
 import { Worker, type Job } from "bullmq";
+import type { Redis } from "ioredis";
 import type { Driver } from "neo4j-driver";
 import { createRedisConnectionOptions } from "../connections.js";
+import { releaseFullIndexLock } from "../modules/index-lock.js";
 import { linkSymbolsToPackages } from "../modules/processing/package-linking/link-symbols-to-packages.js";
 import {
   indexLinksJobName,
@@ -12,10 +14,10 @@ type IndexLinksResult = {
   linkedCount: number;
 };
 
-export function createIndexLinksWorker(driver: Driver) {
+export function createIndexLinksWorker(driver: Driver, redis: Redis) {
   const worker = new Worker<IndexLinksJob, IndexLinksResult, typeof indexLinksJobName>(
     indexLinksQueueName,
-    (job) => handleJob(job, driver),
+    (job) => handleJob(job, driver, redis),
     {
       connection: createRedisConnectionOptions()
     }
@@ -32,8 +34,14 @@ export function createIndexLinksWorker(driver: Driver) {
   return worker;
 }
 
-async function handleJob(job: Job<IndexLinksJob>, driver: Driver): Promise<IndexLinksResult> {
+async function handleJob(job: Job<IndexLinksJob>, driver: Driver, redis: Redis): Promise<IndexLinksResult> {
   const scope = job.data.symbolId ? { symbolId: job.data.symbolId } : null;
 
-  return linkSymbolsToPackages(driver, scope);
+  try {
+    return await linkSymbolsToPackages(driver, scope);
+  } finally {
+    if (job.data.fullIndexFlow) {
+      await releaseFullIndexLock(redis);
+    }
+  }
 }

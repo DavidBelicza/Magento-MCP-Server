@@ -5,6 +5,7 @@ import { readConfig } from "./config.js";
 import { createIndexLinksQueue } from "./queue/index-links.js";
 import { createIndexPackagesQueue } from "./queue/index-packages.js";
 import { createIndexSourceQueue } from "./queue/index-source.js";
+import { createIndexStatus } from "./queue/index-status.js";
 import { installSchemas } from "./schema/install-schemas.js";
 import { registerGraphSearchApi } from "./api/graph-search.js";
 import { registerHealthApi } from "./api/health.js";
@@ -22,6 +23,7 @@ const indexPackagesQueue = createIndexPackagesQueue();
 const indexSourceQueue = createIndexSourceQueue();
 const indexLinksQueue = createIndexLinksQueue();
 const indexFlowProducer = new FlowProducer({ connection: createRedisConnectionOptions() });
+const indexStatus = createIndexStatus();
 
 function getAnalyzedSourcePath(): string {
   return process.env.MAGENTIC_ANALYZED_SOURCE_PATH ?? "/mnt/analyzed-source";
@@ -38,6 +40,8 @@ registerGraphUpdateApi(app, {
   indexSourceQueue,
   indexLinksQueue,
   indexFlowProducer,
+  indexStatus,
+  redis,
   getAnalyzedSourcePath
 });
 
@@ -65,6 +69,7 @@ process.on("SIGTERM", async () => {
   await indexSourceQueue.close();
   await indexLinksQueue.close();
   await indexFlowProducer.close();
+  await indexStatus.close();
   await redis.quit();
   await postgres.end();
   await neo4jDriver.close();
