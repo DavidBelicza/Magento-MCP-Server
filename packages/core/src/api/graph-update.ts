@@ -1,17 +1,21 @@
+import type { FlowJob, FlowProducer } from "bullmq";
 import type { FastifyInstance } from "fastify";
-import type { createIndexLinksQueue } from "../queue/index-links.js";
-import type { createIndexPackagesQueue } from "../queue/index-packages.js";
-import type { createIndexSourceQueue } from "../queue/index-source.js";
+import { graphWipeJobName, graphWipeQueueName } from "../queue/graph-wipe.js";
+import { indexLinksJobName, indexLinksQueueName, type createIndexLinksQueue } from "../queue/index-links.js";
+import { indexPackagesJobName, indexPackagesQueueName, type createIndexPackagesQueue } from "../queue/index-packages.js";
+import { indexSourceJobName, indexSourceQueueName, type createIndexSourceQueue } from "../queue/index-source.js";
 
 type GraphUpdateApiDependencies = {
   indexPackagesQueue: ReturnType<typeof createIndexPackagesQueue>;
   indexSourceQueue: ReturnType<typeof createIndexSourceQueue>;
   indexLinksQueue: ReturnType<typeof createIndexLinksQueue>;
+  indexFlowProducer: FlowProducer;
   getAnalyzedSourcePath: () => string;
 };
 
 export function registerGraphUpdateApi(app: FastifyInstance, dependencies: GraphUpdateApiDependencies): void {
-  const { indexPackagesQueue, indexSourceQueue, indexLinksQueue, getAnalyzedSourcePath } = dependencies;
+  const { indexPackagesQueue, indexSourceQueue, indexLinksQueue, indexFlowProducer, getAnalyzedSourcePath } =
+    dependencies;
 
   app.post("/api/index/packages", async (_request, reply) => {
     const job = await indexPackagesQueue.add(getAnalyzedSourcePath());
@@ -119,6 +123,26 @@ export function registerGraphUpdateApi(app: FastifyInstance, dependencies: Graph
     });
   });
 
+  app.post("/api/index/reindex", async (_request, reply) => {
+    const flow = await indexFlowProducer.add(buildIndexFlow(getAnalyzedSourcePath(), false));
+
+    return reply.status(202).send({
+      ok: true,
+      jobId: flow.job.id,
+      message: "Reindex request accepted."
+    });
+  });
+
+  app.post("/api/index/reset", async (_request, reply) => {
+    const flow = await indexFlowProducer.add(buildIndexFlow(getAnalyzedSourcePath(), true));
+
+    return reply.status(202).send({
+      ok: true,
+      jobId: flow.job.id,
+      message: "Reset and reindex request accepted."
+    });
+  });
+
   app.get<{ Querystring: { jobId?: string } }>("/api/index/get-status", async (request, reply) => {
     const jobId = request.query.jobId;
 
@@ -145,6 +169,34 @@ export function registerGraphUpdateApi(app: FastifyInstance, dependencies: Graph
       message: "Index status loaded."
     };
   });
+}
+
+function buildIndexFlow(analyzedSourcePath: string, withWipe: boolean): FlowJob {
+  const requestedAt = new Date().toISOString();
+  const wipeChildren: FlowJob[] = withWipe
+    ? [{ name: graphWipeJobName, queueName: graphWipeQueueName, data: { requestedAt } }]
+    : [];
+
+  return {
+    name: indexLinksJobName,
+    queueName: indexLinksQueueName,
+    data: { symbolId: null, requestedAt },
+    children: [
+      {
+        name: indexSourceJobName,
+        queueName: indexSourceQueueName,
+        data: { analyzedSourcePath, directory: null, operation: "index", requestedAt },
+        children: [
+          {
+            name: indexPackagesJobName,
+            queueName: indexPackagesQueueName,
+            data: { analyzedSourcePath, requestedAt },
+            children: wipeChildren
+          }
+        ]
+      }
+    ]
+  };
 }
 
 type SyncRouting = {

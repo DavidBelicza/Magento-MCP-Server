@@ -1,5 +1,6 @@
+import { FlowProducer } from "bullmq";
 import Fastify from "fastify";
-import { createNeo4jDriver, createPostgresPool, createRedisConnection } from "./connections.js";
+import { createNeo4jDriver, createPostgresPool, createRedisConnection, createRedisConnectionOptions } from "./connections.js";
 import { readConfig } from "./config.js";
 import { createIndexLinksQueue } from "./queue/index-links.js";
 import { createIndexPackagesQueue } from "./queue/index-packages.js";
@@ -20,6 +21,7 @@ const neo4jDriver = createNeo4jDriver();
 const indexPackagesQueue = createIndexPackagesQueue();
 const indexSourceQueue = createIndexSourceQueue();
 const indexLinksQueue = createIndexLinksQueue();
+const indexFlowProducer = new FlowProducer({ connection: createRedisConnectionOptions() });
 
 function getAnalyzedSourcePath(): string {
   return process.env.MAGENTIC_ANALYZED_SOURCE_PATH ?? "/mnt/analyzed-source";
@@ -35,6 +37,7 @@ registerGraphUpdateApi(app, {
   indexPackagesQueue,
   indexSourceQueue,
   indexLinksQueue,
+  indexFlowProducer,
   getAnalyzedSourcePath
 });
 
@@ -61,6 +64,7 @@ process.on("SIGTERM", async () => {
   await indexPackagesQueue.close();
   await indexSourceQueue.close();
   await indexLinksQueue.close();
+  await indexFlowProducer.close();
   await redis.quit();
   await postgres.end();
   await neo4jDriver.close();
