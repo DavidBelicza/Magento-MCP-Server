@@ -1,12 +1,12 @@
 import { Queue, type JobType } from "bullmq";
 import { createRedisConnectionOptions } from "../connections.js";
-import { graphWipeQueueName } from "./graph-wipe.js";
-import { indexLinksQueueName } from "./index-links.js";
-import { indexPackagesQueueName } from "./index-packages.js";
-import { indexSourceQueueName } from "./index-source.js";
+import { deleteGraphQueueName } from "../queue/delete-graph.js";
+import { indexLinksQueueName } from "../queue/index-links.js";
+import { indexPackagesQueueName } from "../queue/index-packages.js";
+import { indexSourceQueueName } from "../queue/index-source.js";
 
 const indexQueueNames = [
-  graphWipeQueueName,
+  deleteGraphQueueName,
   indexPackagesQueueName,
   indexSourceQueueName,
   indexLinksQueueName
@@ -33,6 +33,24 @@ export function createIndexStatus() {
       const grouped = await Promise.all(queues.map((queue) => collectQueueJobs(queue)));
 
       return grouped.flat().sort((left, right) => left.timestamp - right.timestamp);
+    },
+    getJob: async (jobId: string): Promise<InProgressJob | null> => {
+      for (const queue of queues) {
+        const job = await queue.getJob(jobId);
+
+        if (job) {
+          return {
+            queue: queue.name,
+            id: job.id,
+            name: job.name,
+            state: await job.getState(),
+            progress: job.progress,
+            timestamp: job.timestamp
+          };
+        }
+      }
+
+      return null;
     },
     close: async () => {
       await Promise.all(queues.map((queue) => queue.close()));

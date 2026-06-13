@@ -150,7 +150,7 @@ Duplicate symbol facts are expected: a referenced symbol appears in every file t
 
 ## Ingestion Workflow (Node.js Worker)
 
-The worker consumes the analyzer's JSONL stream and writes it into Neo4j in batches. The entry point is `packages/core/src/worker/index-source-worker.ts`, which hands the response stream to `consumeFactStream` in `packages/core/src/modules/processing/php-analysis/consume-fact-stream.ts`.
+The worker consumes the analyzer's JSONL stream and writes it into Neo4j in batches. The entry point is `packages/core/src/worker/index-source-worker.ts`, which hands the response stream to `consumeFactStream` in `packages/core/src/modules/processing/source-php/consume-fact-stream.ts`.
 
 1. **Stream and parse.** Each stream line is one analyzed file. The line is parsed into a `FileFacts` object (`{ file, facts[] }`). Malformed lines are logged and skipped.
 2. **Accumulate.** Parsed files are buffered while the total number of facts is counted. The buffer is not flushed per file.
@@ -186,7 +186,7 @@ The PHP source graph and the composer-lock graph (`Package`/`Author` nodes) are 
 
 - **Bridge:** PSR-4. Composer indexing writes a queryable `psr4Namespaces` string list on each `Package` node; a declared symbol's package is the one whose namespace is the **longest matching prefix** of the symbol's FQN.
 - **Cypher-driven:** the match runs entirely in Neo4j (`UNWIND` namespaces, index-backed `STARTS WITH` against `:Symbol` nodes filtered to declared types — `kind IN [class, interface, trait, enum]` with a `file`), so no symbol data is loaded into the worker. Edges are written with `MERGE` inside `CALL { } IN TRANSACTIONS` to keep transactions bounded. See `src/modules/processing/package-linking/link-symbols-to-packages.ts`.
-- **Pipeline:** the `index-links` queue/worker, triggered by `POST /api/index/links`. The body is optional: `{ "symbolId": "<FQN>" }` re-links a single symbol (for incremental/file-watcher updates); an empty body clears and rebuilds all links.
+- **Pipeline:** the `index-links` queue/worker, triggered by `POST /api/graph/index/links`. The body is optional: `{ "symbolId": "<FQN>" }` re-links a single symbol (for incremental/file-watcher updates); an empty body clears and rebuilds all links.
 - **Scope:** only declared classes, interfaces, traits, and enums are linked (methods inherit their owner's package via `HAS_METHOD`). Symbols autoloaded by `classmap`/`psr-0` rather than PSR-4 (e.g. `Magento\Setup\*`, legacy `Zend_*`, test classes) are intentionally not linked. A namespace declared by two packages yields one edge to each.
 
 This is the change that lets the two world-models be queried together, e.g. "which package owns this class" or "this class extends a class owned by another package — does its composer manifest require that package?".

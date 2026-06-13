@@ -1,17 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import type { Driver } from "neo4j-driver";
 import type { Pool } from "pg";
-import { GraphSearchValidationError, searchGraph } from "../modules/graph/search/index.js";
-import { getQueryHistory, listQueryHistory, saveQueryHistory } from "../modules/search/query-history.js";
-import { buildGraphSearchResult } from "../modules/search/result-builder.js";
+import { GraphSearchValidationError, searchGraph } from "../../modules/graph/search/index.js";
+import { saveQueryHistory } from "../../modules/search/query-history.js";
+import { buildGraphSearchResult } from "../../modules/search/result-builder.js";
 
-type GraphSearchApiDependencies = {
+type Dependencies = {
   postgres: Pool;
   neo4jDriver: Driver;
 };
 
-export function registerGraphSearchApi(app: FastifyInstance, dependencies: GraphSearchApiDependencies): void {
-  const { postgres, neo4jDriver } = dependencies;
+export function registerSearchRoute(app: FastifyInstance, deps: Dependencies): void {
+  const { postgres, neo4jDriver } = deps;
 
   app.post<{ Body: { description?: unknown; cypherQuery?: unknown } }>("/api/graph/search", async (request, reply) => {
     const description = typeof request.body?.description === "string" ? request.body.description : "";
@@ -61,50 +61,6 @@ export function registerGraphSearchApi(app: FastifyInstance, dependencies: Graph
       return reply.status(500).send({
         ok: false,
         error: "Graph search failed"
-      });
-    }
-  });
-
-  app.get("/api/graph/get-query-history", async (_request, reply) => {
-    try {
-      const items = await listQueryHistory(postgres);
-
-      return {
-        ok: true,
-        items
-      };
-    } catch (error) {
-      app.log.error(error);
-
-      return reply.status(500).send({
-        ok: false,
-        error: "Query history could not be loaded"
-      });
-    }
-  });
-
-  app.get<{ Params: { id: string } }>("/api/graph/get-query-history/:id", async (request, reply) => {
-    try {
-      const history = await getQueryHistory(postgres, request.params.id);
-
-      if (!history) {
-        return reply.status(404).send({
-          ok: false,
-          error: "Query history item not found"
-        });
-      }
-
-      return {
-        ok: true,
-        ...history,
-        structuredResult: buildGraphSearchResult(history.result)
-      };
-    } catch (error) {
-      app.log.error(error);
-
-      return reply.status(500).send({
-        ok: false,
-        error: "Query history item could not be loaded"
       });
     }
   });

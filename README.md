@@ -160,7 +160,7 @@ docker compose exec magentic_frontend npm --version
 To manually test the end-to-end Node indexing API (which enqueues the job for the worker):
 
 ```bash
-curl -X POST http://localhost:8080/api/index/source \
+curl -X POST http://localhost:8080/api/graph/index/source \
   -H "Content-Type: application/json" \
   -d '{"directories": ["vendor/magento/module-catalog"]}'
 ```
@@ -168,7 +168,7 @@ curl -X POST http://localhost:8080/api/index/source \
 To connect indexed PHP symbols to their composer packages (run after both the source and package indexing have completed):
 
 ```bash
-curl -X POST http://localhost:8080/api/index/links \
+curl -X POST http://localhost:8080/api/graph/index/links \
   -H "Content-Type: application/json" \
   -d '{}'
 ```

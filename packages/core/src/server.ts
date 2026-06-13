@@ -2,14 +2,21 @@ import { FlowProducer } from "bullmq";
 import Fastify from "fastify";
 import { createNeo4jDriver, createPostgresPool, createRedisConnection, createRedisConnectionOptions } from "./connections.js";
 import { readConfig } from "./config.js";
+import { createIndexStatus } from "./modules/index-status.js";
 import { createIndexLinksQueue } from "./queue/index-links.js";
 import { createIndexPackagesQueue } from "./queue/index-packages.js";
 import { createIndexSourceQueue } from "./queue/index-source.js";
-import { createIndexStatus } from "./queue/index-status.js";
 import { installSchemas } from "./schema/install-schemas.js";
-import { registerGraphSearchApi } from "./api/graph-search.js";
+import { registerGetQueryHistoryRoute } from "./api/graph/get-query-history.js";
+import { registerIndexDeltaRoute } from "./api/graph/index-delta.js";
+import { registerIndexLinksRoute } from "./api/graph/index-links.js";
+import { registerIndexPackagesRoute } from "./api/graph/index-packages.js";
+import { registerIndexReindexRoute } from "./api/graph/index-reindex.js";
+import { registerIndexResetAndReindexRoute } from "./api/graph/index-reset-and-reindex.js";
+import { registerIndexSourceRoute } from "./api/graph/index-source.js";
+import { registerIndexStatusRoute } from "./api/graph/index-status.js";
+import { registerSearchRoute } from "./api/graph/search.js";
 import { registerHealthApi } from "./api/health.js";
-import { registerGraphUpdateApi } from "./api/graph-update.js";
 
 const config = readConfig();
 const app = Fastify({
@@ -35,20 +42,15 @@ registerHealthApi(app, {
   neo4jDriver
 });
 
-registerGraphUpdateApi(app, {
-  indexPackagesQueue,
-  indexSourceQueue,
-  indexLinksQueue,
-  indexFlowProducer,
-  indexStatus,
-  redis,
-  getAnalyzedSourcePath
-});
-
-registerGraphSearchApi(app, {
-  postgres,
-  neo4jDriver
-});
+registerSearchRoute(app, { postgres, neo4jDriver });
+registerGetQueryHistoryRoute(app, { postgres });
+registerIndexPackagesRoute(app, { indexPackagesQueue, getAnalyzedSourcePath });
+registerIndexSourceRoute(app, { indexSourceQueue, getAnalyzedSourcePath });
+registerIndexLinksRoute(app, { indexLinksQueue });
+registerIndexDeltaRoute(app, { redis });
+registerIndexReindexRoute(app, { indexFlowProducer, redis, getAnalyzedSourcePath });
+registerIndexResetAndReindexRoute(app, { indexFlowProducer, redis, getAnalyzedSourcePath });
+registerIndexStatusRoute(app, { indexStatus, redis });
 
 async function start() {
   try {

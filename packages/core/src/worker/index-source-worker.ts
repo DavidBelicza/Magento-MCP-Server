@@ -1,8 +1,8 @@
 import { Worker, type Job } from "bullmq";
 import type { Driver } from "neo4j-driver";
 import { createRedisConnectionOptions } from "../connections.js";
-import { consumeFactStream } from "../modules/processing/php-analysis/consume-fact-stream.js";
-import { deleteSourceByPaths } from "../modules/processing/php-analysis/delete-source.js";
+import { consumeFactStream } from "../modules/processing/source-php/consume-fact-stream.js";
+import { deleteSourceByPaths } from "../modules/processing/source-php/delete-source.js";
 import {
   indexSourceJobName,
   indexSourceQueueName,
