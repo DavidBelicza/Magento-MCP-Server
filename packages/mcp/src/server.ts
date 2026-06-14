@@ -9,7 +9,7 @@ import { registerGraphSearch } from "./tools/graph-search.js";
 
 const config = readConfig();
 const backend = createBackendClient(config.backendUrl);
-const app = Fastify({ logger: true });
+const app = Fastify({ logger: true, ignoreTrailingSlash: true });
 
 function buildMcpServer(): McpServer {
   const server = new McpServer({ name: "magentic", version: "0.1.0" });

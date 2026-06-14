@@ -79,6 +79,72 @@ username: neo4j
 password: dev-password
 ```
 
+## Connecting an MCP Client
+
+The stack exposes an MCP server over Streamable HTTP through the frontend proxy:
+
+```text
+http://localhost:8080/mcp
+```
+
+Replace `8080` with your `FRONTEND_HTTP_PORT` if you changed it. It exposes three tools: `get_status`, `graph_search`, and `get_graph_schema`. All three clients below connect to this URL directly — no `mcp-remote` or stdio bridge is needed.
+
+CLI and desktop agents send no `Origin` header and connect out of the box. Browser-based clients must use an origin in `MCP_ALLOWED_ORIGINS` (defaults to localhost/127.0.0.1 on `FRONTEND_HTTP_PORT`).
+
+### Claude Code
+
+Command line:
+
+```bash
+claude mcp add --transport http magentic http://localhost:8080/mcp
+```
+
+Config file (`.mcp.json` in the project root, or user scope in `~/.claude.json`):
+
+```json
+{
+  "mcpServers": {
+    "magentic": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}
+```
+
+Run `/mcp` inside Claude Code to check the connection and list the tools.
+
+### Codex
+
+Command line:
+
+```bash
+codex mcp add magentic --url http://localhost:8080/mcp
+```
+
+User interface: in the Codex IDE extension, open the gear menu, choose **MCP settings → Open config.toml**, and add:
+
+```toml
+[mcp_servers.magentic]
+url = "http://localhost:8080/mcp"
+```
+
+The CLI and IDE extension share the same `~/.codex/config.toml`, so either method registers the server once.
+
+### Google Antigravity
+
+Antigravity is configured through its UI (no MCP CLI). Open **Settings → Customizations → Open MCP Config** to edit `mcp_config.json`, then add the server. Antigravity uses `serverUrl` (not `url`) for HTTP servers:
+
+```json
+{
+  "mcpServers": {
+    "magentic": {
+      "serverUrl": "http://localhost:8080/mcp"
+    }
+  }
+}
+```
+
 ### Telemetry / Logging (Optional)
 
 Magentic includes a pre-configured PLG (Promtail, Loki, Grafana) stack for centralized logging and telemetry. By default, these services are completely disabled to save local resources.
