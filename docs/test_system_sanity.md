@@ -363,7 +363,7 @@ Expected JSONL output (the class symbol fact; `symbolId` is the FQN verbatim, no
 {"file":"vendor/magento/composer/src/ConsoleArrayInputFactory.php","facts":[{"fact":"symbol","symbolId":"Magento\\Composer\\ConsoleArrayInputFactory","fqcn":"Magento\\Composer\\ConsoleArrayInputFactory","kind":"class","defined":true,"properties":{"abstract":false,"final":false,"readonly":false}}, ...]}
 ```
 
-The same `facts` array also contains the class's method symbols, `has_method` references, and any `param_type` / `returns_type` references for class-typed parameters and return values. Each symbol fact carries a `defined` flag: `true` for the symbol the file declares, `false` for symbols it only references (parent classes, implemented interfaces, used traits, and parameter/return types). See `docs/php_graph_mapping.json` for the full fact-to-graph mapping.
+The same `facts` array also contains the class's method symbols, `has_method` references, and any `param_type` / `returns_type` references for class-typed parameters and return values. Each symbol fact carries a `defined` flag: `true` for the symbol the file declares, `false` for symbols it only references (parent classes, implemented interfaces, used traits, and parameter/return types). See `packages/mcp/resource/graph-schema.json` and the worked example in `docs/architecture_world_mapping.md` for the full fact-to-graph mapping.
 
 Check an inherited class:
 

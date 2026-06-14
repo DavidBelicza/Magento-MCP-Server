@@ -6,7 +6,7 @@
 
 - `docs/architecture_project.md`: holistic project and service architecture.
 - `docs/architecture_world_mapping.md`: source-code indexing and graph/world-mapping architecture.
-- `docs/php_graph_mapping.json`: adjacency reference for the PHP source graph model (node kinds, relationships, edge properties, worked example).
+- `packages/mcp/resource/graph-schema.json`: slim graph schema served to agents by the MCP server (node kinds, relationships, edge properties, type-mapping rules). The worked example adjacency graph lives in `docs/architecture_world_mapping.md`.
 - `docs/test_system_sanity.md`: runtime and integration sanity checks.
 
 ## Installation

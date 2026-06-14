@@ -4,7 +4,7 @@ Magentic uses source-code indexing to build a graph-backed world model for AI gr
 
 The PHP analyzer maps PHP class, interface, trait, and enum declarations, their inheritance and composition references (`extends`, `implements`, `uses`), and their methods. Each method carries its signature, and its parameter and return **types** are mapped as edges to the referenced type nodes — drawn from both the native signature and the docblock. Scalar/fundamental types stay as string fields rather than nodes. The method-call graph and member-level nodes (properties, constants, enum cases) are intentionally out of scope; see "Scope and Non-Goals" at the end of this document.
 
-For a single, self-contained reference of every node kind, relationship type, edge property, and type-mapping rule — with a worked example graph in adjacency form — see `docs/php_graph_mapping.json` and the "PHP Source Graph Mapping" section below.
+For a compact, machine-readable reference of every node kind, relationship type, edge property, and type-mapping rule, see `packages/mcp/resource/graph-schema.json` (the slim schema the MCP server serves to agents). A worked example graph in adjacency form is embedded in the "PHP Source Graph Mapping" section below.
 
 ```mermaid
 flowchart TD
@@ -171,14 +171,148 @@ The constraints this workflow relies on are defined in `packages/core/schema/neo
 
 ## PHP Source Graph Mapping
 
-`docs/php_graph_mapping.json` is the authoritative, self-contained reference for the graph model. It is a single adjacency structure: a `legend` documenting every node kind, label, property, relationship type, and edge property, plus a `graph` of worked example nodes — each keyed by its id and listing its outbound relationships (`out`) — that together cover the main scenarios (inheritance, trait use, methods, native and docblock type edges, unions, array elements, scalar backfill, and referenced-only anchors).
+The graph model has two complementary references:
 
-Highlights of the model (the JSON has the full detail):
+- `packages/mcp/resource/graph-schema.json` — the slim, machine-readable schema (node kinds, labels, properties, relationship types, edge properties, type-mapping rules). This is the source of truth the MCP server serves to agents via the `get_graph_schema` tool, kept terse for low token cost.
+- The worked example below — a single adjacency structure where each node is keyed by its id and lists its outbound relationships (`out`), covering the main scenarios (inheritance, trait use, methods, native and docblock type edges, unions, array elements, scalar backfill, and referenced-only anchors).
+
+Highlights of the model (the schema JSON and the worked example have the full detail):
 
 - **Node id is the FQN.** A method id is `<owner FQN>::<name>`. Kind is never in the id; it lives in the label and the `kind` property. PHP guarantees one symbol per FQN, so the FQN alone is a stable, kind-agnostic key, which is what lets a parameter/return type reference a symbol without yet knowing whether it is a class, interface, or enum.
 - **Type edges.** Class/interface/enum/trait parameter and return types become `PARAM_TYPE` / `RETURNS_TYPE` edges to the type node. Fundamental scalars (`int`, `string`, `array`, `void`, ...) stay as the `returnType` / `paramTypes` string fields and never become nodes, which avoids scalar supernodes.
 - **Native vs docblock provenance.** Native signature types are edges with `source: "native"`. Docblock `@param`/`@return` class types are added with `source: "docblock"`, but only when the class is not already in the native set at that position — so identical native/doc types are not stored twice. Array/list/iterable element types from docblocks carry `is_array: true`. Untyped parameters and returns backfill a fundamental scalar from the docblock. Unresolvable, pseudo, or malformed docblock types are dropped entirely.
 - **Parameter edges** carry `name` and `position`; the `position` is folded into the edge identity so two parameters of the same type remain distinct edges, and a union type fans out into one edge per class constituent.
+
+### Worked Example
+
+Each node below is keyed by its id and lists its outbound relationships (`out`); targets in `out[].to` reference other node ids in the same structure. Together these cover inheritance, trait use, methods, native and docblock type edges, a union type, a docblock array element, scalar backfill, an enum, and referenced-only anchors (`defined: false`).
+
+```json
+{
+  "Magento\\Catalog\\Model\\ProductRepository": {
+    "labels": ["Symbol", "PHP", "Class"],
+    "defined": true,
+    "properties": { "fqcn": "Magento\\Catalog\\Model\\ProductRepository", "kind": "class", "file": "Magento/Catalog/Model/ProductRepository.php", "abstract": false, "final": false, "readonly": false },
+    "out": [
+      { "type": "EXTENDS", "to": "Magento\\Catalog\\Model\\AbstractRepository" },
+      { "type": "IMPLEMENTS", "to": "Magento\\Catalog\\Api\\ProductRepositoryInterface" },
+      { "type": "USES", "to": "Magento\\Framework\\Cache\\CacheAwareTrait" },
+      { "type": "HAS_METHOD", "to": "Magento\\Catalog\\Model\\ProductRepository::__construct" },
+      { "type": "HAS_METHOD", "to": "Magento\\Catalog\\Model\\ProductRepository::save" },
+      { "type": "HAS_METHOD", "to": "Magento\\Catalog\\Model\\ProductRepository::getById" },
+      { "type": "DECLARED_IN_PACKAGE", "to": "package:magento/module-catalog" }
+    ]
+  },
+  "package:magento/module-catalog": {
+    "labels": ["Package"],
+    "comment": "A composer-lock graph node, linked in by the index-links pipeline via PSR-4 (Magento\\Catalog\\ prefixes the class FQN). Properties abbreviated here; see the composer-lock graph for the full Package shape.",
+    "properties": { "id": "package:magento/module-catalog", "name": "magento/module-catalog", "type": "magento2-module", "psr4Namespaces": ["Magento\\Catalog\\"] },
+    "out": []
+  },
+  "Magento\\Catalog\\Model\\ProductRepository::__construct": {
+    "labels": ["Symbol", "PHP", "Method"],
+    "defined": true,
+    "comment": "Constructor-promoted dependency: the DI graph is captured here as a PARAM_TYPE edge (no separate property node).",
+    "properties": { "fqcn": "Magento\\Catalog\\Model\\ProductRepository::__construct", "kind": "method", "file": "Magento/Catalog/Model/ProductRepository.php", "name": "__construct", "visibility": "public", "static": false, "abstract": false, "final": false, "hasBody": true, "returnType": "", "paramNames": ["resource"], "paramTypes": [""], "parametersJson": "[{\"optional\":false,\"variadic\":false,\"byRef\":false,\"promoted\":true}]" },
+    "out": [
+      { "type": "PARAM_TYPE", "to": "Magento\\Catalog\\Model\\ResourceModel\\Product", "properties": { "name": "resource", "position": 0, "source": "native" } }
+    ]
+  },
+  "Magento\\Catalog\\Model\\ProductRepository::save": {
+    "labels": ["Symbol", "PHP", "Method"],
+    "defined": true,
+    "comment": "Native object param + scalar param (scalar stays a field, no edge) + docblock-only array-element param + native and docblock return.",
+    "properties": { "fqcn": "Magento\\Catalog\\Model\\ProductRepository::save", "kind": "method", "file": "Magento/Catalog/Model/ProductRepository.php", "name": "save", "visibility": "public", "static": false, "abstract": false, "final": false, "hasBody": true, "returnType": "", "paramNames": ["product", "storeId", "items"], "paramTypes": ["", "int", "array"], "parametersJson": "[{\"optional\":false,\"variadic\":false,\"byRef\":false,\"promoted\":false},{\"optional\":true,\"variadic\":false,\"byRef\":false,\"promoted\":false},{\"optional\":true,\"variadic\":false,\"byRef\":false,\"promoted\":false}]" },
+    "out": [
+      { "type": "PARAM_TYPE", "to": "Magento\\Catalog\\Api\\Data\\ProductInterface", "properties": { "name": "product", "position": 0, "source": "native" } },
+      { "type": "PARAM_TYPE", "to": "Magento\\Catalog\\Api\\Data\\ProductTierPriceInterface", "properties": { "name": "items", "position": 2, "source": "docblock", "is_array": true } },
+      { "type": "RETURNS_TYPE", "to": "Magento\\Catalog\\Api\\Data\\ProductInterface", "properties": { "source": "native" } }
+    ]
+  },
+  "Magento\\Catalog\\Model\\ProductRepository::getById": {
+    "labels": ["Symbol", "PHP", "Method"],
+    "defined": true,
+    "comment": "Untyped param `id` backfills its scalar from the docblock; return type is documented only (no native return) so it is a docblock RETURNS_TYPE edge.",
+    "properties": { "fqcn": "Magento\\Catalog\\Model\\ProductRepository::getById", "kind": "method", "file": "Magento/Catalog/Model/ProductRepository.php", "name": "getById", "visibility": "public", "static": false, "abstract": false, "final": false, "hasBody": true, "returnType": "", "paramNames": ["id"], "paramTypes": ["int"], "parametersJson": "[{\"optional\":false,\"variadic\":false,\"byRef\":false,\"promoted\":false}]" },
+    "out": [
+      { "type": "RETURNS_TYPE", "to": "Magento\\Catalog\\Api\\Data\\ProductInterface", "properties": { "source": "docblock", "is_array": false } }
+    ]
+  },
+  "Magento\\Catalog\\Api\\ProductRepositoryInterface": {
+    "labels": ["Symbol", "PHP", "Interface"],
+    "defined": true,
+    "properties": { "fqcn": "Magento\\Catalog\\Api\\ProductRepositoryInterface", "kind": "interface", "file": "Magento/Catalog/Api/ProductRepositoryInterface.php" },
+    "out": [
+      { "type": "EXTENDS", "to": "Magento\\Framework\\Api\\RepositoryInterface" },
+      { "type": "HAS_METHOD", "to": "Magento\\Catalog\\Api\\ProductRepositoryInterface::save" }
+    ]
+  },
+  "Magento\\Catalog\\Api\\ProductRepositoryInterface::save": {
+    "labels": ["Symbol", "PHP", "Method"],
+    "defined": true,
+    "comment": "Interface method: abstract with no body. Implementations are resolvable at query time via IMPLEMENTS/EXTENDS/USES + HAS_METHOD name match (no override edge stored).",
+    "properties": { "fqcn": "Magento\\Catalog\\Api\\ProductRepositoryInterface::save", "kind": "method", "file": "Magento/Catalog/Api/ProductRepositoryInterface.php", "name": "save", "visibility": "public", "static": false, "abstract": false, "final": false, "hasBody": false, "returnType": "", "paramNames": ["product"], "paramTypes": [""], "parametersJson": "[{\"optional\":false,\"variadic\":false,\"byRef\":false,\"promoted\":false}]" },
+    "out": [
+      { "type": "PARAM_TYPE", "to": "Magento\\Catalog\\Api\\Data\\ProductInterface", "properties": { "name": "product", "position": 0, "source": "native" } },
+      { "type": "RETURNS_TYPE", "to": "Magento\\Catalog\\Api\\Data\\ProductInterface", "properties": { "source": "native" } }
+    ]
+  },
+  "Magento\\Framework\\Cache\\CacheAwareTrait": {
+    "labels": ["Symbol", "PHP", "Trait"],
+    "defined": true,
+    "properties": { "fqcn": "Magento\\Framework\\Cache\\CacheAwareTrait", "kind": "trait", "file": "Magento/Framework/Cache/CacheAwareTrait.php" },
+    "out": [
+      { "type": "HAS_METHOD", "to": "Magento\\Framework\\Cache\\CacheAwareTrait::flushCache" }
+    ]
+  },
+  "Magento\\Framework\\Cache\\CacheAwareTrait::flushCache": {
+    "labels": ["Symbol", "PHP", "Method"],
+    "defined": true,
+    "properties": { "fqcn": "Magento\\Framework\\Cache\\CacheAwareTrait::flushCache", "kind": "method", "file": "Magento/Framework/Cache/CacheAwareTrait.php", "name": "flushCache", "visibility": "protected", "static": false, "abstract": false, "final": false, "hasBody": true, "returnType": "void", "paramNames": [], "paramTypes": [], "parametersJson": "[]" },
+    "out": []
+  },
+  "Magento\\Catalog\\Model\\Product\\Visibility": {
+    "labels": ["Symbol", "PHP", "Enum"],
+    "defined": true,
+    "comment": "Enum: implements an interface and may use a trait, exactly like a class. Enum cases are not modeled as nodes.",
+    "properties": { "fqcn": "Magento\\Catalog\\Model\\Product\\Visibility", "kind": "enum", "file": "Magento/Catalog/Model/Product/Visibility.php" },
+    "out": [
+      { "type": "IMPLEMENTS", "to": "Magento\\Framework\\Data\\OptionSourceInterface" },
+      { "type": "HAS_METHOD", "to": "Magento\\Catalog\\Model\\Product\\Visibility::label" }
+    ]
+  },
+  "Magento\\Catalog\\Model\\Product\\Visibility::label": {
+    "labels": ["Symbol", "PHP", "Method"],
+    "defined": true,
+    "properties": { "fqcn": "Magento\\Catalog\\Model\\Product\\Visibility::label", "kind": "method", "file": "Magento/Catalog/Model/Product/Visibility.php", "name": "label", "visibility": "public", "static": false, "abstract": false, "final": false, "hasBody": true, "returnType": "string", "paramNames": [], "paramTypes": [], "parametersJson": "[]" },
+    "out": []
+  },
+  "Magento\\Framework\\Mview\\View::__construct": {
+    "labels": ["Symbol", "PHP", "Method"],
+    "defined": true,
+    "comment": "Union-typed parameter: `ConfigInterface|ConfigReader $config` fans out into two PARAM_TYPE edges that share name and position but target different nodes (distinct identities). A second param of the SAME type as another would also be its own edge, distinguished by position.",
+    "properties": { "fqcn": "Magento\\Framework\\Mview\\View::__construct", "kind": "method", "file": "Magento/Framework/Mview/View.php", "name": "__construct", "visibility": "public", "static": false, "abstract": false, "final": false, "hasBody": true, "returnType": "", "paramNames": ["config"], "paramTypes": [""], "parametersJson": "[{\"optional\":false,\"variadic\":false,\"byRef\":false,\"promoted\":false}]" },
+    "out": [
+      { "type": "PARAM_TYPE", "to": "Magento\\Framework\\Mview\\ConfigInterface", "properties": { "name": "config", "position": 0, "source": "native" } },
+      { "type": "PARAM_TYPE", "to": "Magento\\Framework\\Mview\\Config\\Reader", "properties": { "name": "config", "position": 0, "source": "native" } }
+    ]
+  },
+  "Magento\\Catalog\\Model\\AbstractRepository": {
+    "labels": ["Symbol", "PHP", "Class"],
+    "defined": false,
+    "comment": "Referenced-only parent declared elsewhere in scope: emitted as a defined:false anchor so EXTENDS has an endpoint; gains its full properties when its own file is indexed.",
+    "properties": { "fqcn": "Magento\\Catalog\\Model\\AbstractRepository" },
+    "out": []
+  },
+  "Magento\\Catalog\\Api\\Data\\ProductTierPriceInterface": {
+    "labels": ["Symbol", "PHP"],
+    "defined": false,
+    "comment": "Kind-unknown anchor: this type is only ever referenced (here as a docblock array element). Its declaring file was not in the analyzed scope, so the kind is unknown and the bare :Symbol:PHP label is used until (if ever) it is declared.",
+    "properties": { "fqcn": "Magento\\Catalog\\Api\\Data\\ProductTierPriceInterface" },
+    "out": []
+  }
+}
+```
 
 ## Package Linking
 

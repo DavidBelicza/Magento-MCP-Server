@@ -7,9 +7,9 @@ export const MCPSetupView: React.FC = () => {
       <Panel className="p-5">
         <SectionHeader title="MCP Setup" eyebrow="Connection" />
         <div className="mt-5 grid gap-3">
-          <WireRow title="Server" value="Not running" />
-          <WireRow title="IDE integration" value="Pending" />
-          <WireRow title="Client links" value="Planned" />
+          <WireRow title="Transport" value="Streamable HTTP" />
+          <WireRow title="Endpoint" value="http://localhost:8080/mcp" />
+          <WireRow title="Tools" value="get_status, graph_search, get_graph_schema" />
         </div>
       </Panel>
 
@@ -18,8 +18,8 @@ export const MCPSetupView: React.FC = () => {
         <pre className="mt-5 overflow-auto rounded-lg border border-slate-200 bg-[#183d28] p-4 text-xs leading-6 text-white">
 {`{
   "mcpServers": {
-    "graphrag": {
-      "command": "..."
+    "magentic": {
+      "url": "http://localhost:8080/mcp"
     }
   }
 }`}

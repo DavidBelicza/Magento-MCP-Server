@@ -14,9 +14,10 @@ Magentic is a Docker-based, self-hosted MCP server for agentic AI workflows. It 
 
 - `docs/architecture_project.md`: holistic project and service architecture.
 - `docs/architecture_world_mapping.md`: source indexing and graph/world-mapping workflow, including the worker ingestion flow.
-- `docs/php_graph_mapping.json`: adjacency reference for the PHP source graph model — node kinds, relationship types, edge properties, and a worked example graph.
+- `packages/mcp/resource/graph-schema.json`: slim, machine-readable graph schema (node kinds, relationship types, edge properties, type-mapping rules) served to agents by the MCP server's `get_graph_schema` tool. The worked example adjacency graph lives in `docs/architecture_world_mapping.md`.
 - `docs/test_system_sanity.md`: runtime and integration sanity checks.
 - `docs/README-performance.md`: PHP analyzer file-scanning performance notes.
+- `docs/architecture_mcp.md`: the `packages/mcp` service — a thin MCP adapter exposing `get_status`, `graph_search`, and `get_graph_schema` over Streamable HTTP at `/mcp`.
 
 ## Docker Services
 

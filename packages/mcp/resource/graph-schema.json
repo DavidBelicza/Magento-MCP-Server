@@ -1,0 +1,36 @@
+{
+  "idScheme": "A symbol id (fqcn) is its fully-qualified name verbatim; a method id is `<owner FQN>::<method name>`. Kind is never in the id; it lives in the label and the `kind` property. Package ids are `package:<vendor>/<name>`; author ids are `author:<name>|<email>|<homepage>`.",
+  "nodeKinds": [
+    { "labels": ["Symbol", "PHP", "Class"], "defined": true, "properties": ["fqcn", "kind=class", "file", "abstract", "final", "readonly"] },
+    { "labels": ["Symbol", "PHP", "Interface"], "defined": true, "properties": ["fqcn", "kind=interface", "file"] },
+    { "labels": ["Symbol", "PHP", "Trait"], "defined": true, "properties": ["fqcn", "kind=trait", "file"] },
+    { "labels": ["Symbol", "PHP", "Enum"], "defined": true, "properties": ["fqcn", "kind=enum", "file"], "note": "Enum cases are not modeled as nodes." },
+    { "labels": ["Symbol", "PHP", "Method"], "defined": true, "properties": ["fqcn", "kind=method", "file", "name", "visibility", "static", "abstract", "final", "hasBody", "returnType", "paramNames", "paramTypes", "parametersJson"], "note": "returnType/paramTypes hold scalar spellings only; class-like types are edges. paramTypes is index-aligned with paramNames. parametersJson is a JSON string of per-parameter optional/variadic/byRef/promoted flags." },
+    { "labels": ["Symbol", "PHP"], "defined": false, "properties": ["fqcn"], "note": "Referenced-only anchor whose declaring file was outside the analyzed scope, so its kind is unknown. Bare :Symbol:PHP label until (if ever) declared." },
+    { "labels": ["Package"], "properties": ["id", "name", "vendor", "packageName", "composerNodeKind", "version", "type", "description", "sourceReference", "distReference", "distShasum", "license", "isMagentoPackage", "magentoModuleName", "autoload", "psr4Namespaces", "phpRequirements", "phpExtensions"], "note": "composerNodeKind is `installed` (present in composer.lock) or `placeholder` (only referenced as a dependency target; carries just id/name/vendor/packageName/composerNodeKind)." },
+    { "labels": ["Author"], "properties": ["id", "name", "email", "homepage"] }
+  ],
+  "relationshipTypes": [
+    { "type": "EXTENDS", "from": "class | interface", "to": "class | interface", "edgeProperties": ["identity"] },
+    { "type": "IMPLEMENTS", "from": "class | enum", "to": "interface", "edgeProperties": ["identity"] },
+    { "type": "USES", "from": "class | enum | trait", "to": "trait", "edgeProperties": ["identity"] },
+    { "type": "HAS_METHOD", "from": "class | interface | trait | enum", "to": "method", "edgeProperties": ["identity"] },
+    { "type": "PARAM_TYPE", "from": "method", "to": "class | interface | enum | trait | anchor", "edgeProperties": ["identity", "name", "position", "source(native|docblock)", "is_array"], "note": "Union types and per-position params each get their own edge (identity folds in position)." },
+    { "type": "RETURNS_TYPE", "from": "method", "to": "class | interface | enum | trait | anchor", "edgeProperties": ["identity", "source(native|docblock)", "is_array"] },
+    { "type": "DECLARED_IN_PACKAGE", "from": "class | interface | trait | enum", "to": "Package", "edgeProperties": ["identity"], "note": "Built by index-links via longest-matching PSR-4 prefix against Package.psr4Namespaces. Methods inherit their owner's package. classmap/psr-0 symbols are not linked." },
+    { "type": "PACKAGE_REQUIRES_PACKAGE", "from": "Package", "to": "Package", "edgeProperties": ["versionConstraint", "scope", "identity"], "note": "Platform requirements (php, ext-*, lib-*) are excluded." },
+    { "type": "PACKAGE_REQUIRES_DEV_PACKAGE", "from": "Package", "to": "Package", "edgeProperties": ["versionConstraint", "scope", "identity"] },
+    { "type": "PACKAGE_AUTHORED_BY", "from": "Package", "to": "Author", "edgeProperties": ["role", "identity"] },
+    { "type": "PACKAGE_SUGGESTS_PACKAGE", "from": "Package", "to": "Package", "edgeProperties": ["description", "identity"] },
+    { "type": "PACKAGE_REPLACES_PACKAGE", "from": "Package", "to": "Package", "edgeProperties": ["versionConstraint", "identity"] },
+    { "type": "PACKAGE_PROVIDES_PACKAGE", "from": "Package", "to": "Package", "edgeProperties": ["versionConstraint", "isVirtual", "identity"] },
+    { "type": "PACKAGE_CONFLICTS_WITH_PACKAGE", "from": "Package", "to": "Package", "edgeProperties": ["versionConstraint", "identity"] }
+  ],
+  "typeMappingRules": [
+    "Class/interface/enum/trait param and return types become PARAM_TYPE / RETURNS_TYPE edges; fundamental scalars (int, string, bool, float, array, void, null, ...) stay as returnType/paramTypes string fields and never become nodes.",
+    "Native signature types are edges with source=native; docblock @param/@return class types are added with source=docblock only when not already present natively at that position.",
+    "A docblock array element (Foo[], array<int,Foo>, list<Foo>, iterable<Foo>) becomes an edge with is_array=true; native `array` stays a scalar field.",
+    "An untyped param/return backfills a fundamental scalar from the docblock. Unresolvable, pseudo, or malformed docblock types (class-string, names with '-', unparsable text) are dropped entirely.",
+    "Implementations of an interface method are resolvable at query time via IMPLEMENTS/EXTENDS/USES + HAS_METHOD name match; no override edge is stored. The method-call graph and member nodes (properties, constants, enum cases) are out of scope."
+  ]
+}

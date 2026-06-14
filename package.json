@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "packages/core",
-    "packages/site"
+    "packages/site",
+    "packages/mcp"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
@@ -12,7 +13,8 @@
     "docker:dev:build": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
     "dev:backend": "npm run dev:backend --workspace @magentic/core",
     "dev:worker": "npm run dev:worker --workspace @magentic/core",
-    "dev:site": "npm run dev --workspace @magentic/site"
+    "dev:site": "npm run dev --workspace @magentic/site",
+    "dev:mcp": "npm run dev --workspace @magentic/mcp"
   },
   "engines": {
     "node": ">=24 <25",
