@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import Fastify from "fastify";
-import { createBackendClient } from "./client.js";
+import { BackendError, createBackendClient } from "./client.js";
 import { readConfig } from "./config.js";
 import { registerGetGraphSchema } from "./tools/get-graph-schema.js";
 import { registerGetStatus } from "./tools/get-status.js";
@@ -49,6 +49,12 @@ app.post("/mcp", async (request, reply) => {
       id: null
     });
   }
+
+  void backend.ping().catch((error) => {
+    if (!(error instanceof BackendError)) {
+      app.log.error(error);
+    }
+  });
 
   const server = buildMcpServer();
   const transport = new StreamableHTTPServerTransport({

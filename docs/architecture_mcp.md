@@ -14,6 +14,10 @@ Public path: client → `http://localhost:8080/mcp` → nginx (`magentic_fronten
 - `graph_search` — proxies `POST /api/graph/search` with `{ description, cypherQuery }`. Read-only Cypher is validated by the backend; a backend `400` is returned as a repairable tool error. The tool description carries a compact schema cheat sheet.
 - `get_graph_schema` — returns `resource/graph-schema.json` directly (no backend call, since the schema is static). The slim schema lists node kinds, relationship types, edge properties, and type-mapping rules; the worked example lives in `docs/architecture_world_mapping.md`.
 
+## Usage signal
+
+On every `POST /mcp` (after the Origin check), the service fires a non-blocking `POST /api/usage/ping` to the backend so the frontend can show an "AI agent connected" indicator. It never delays or fails the agent's request: a `BackendError` (backend down or 4xx) is swallowed, anything unexpected is logged via `app.log`. The MCP service opens no Redis itself — it is still a thin HTTP adapter; the backend owns the `usage:last` key (120s TTL) and serves `GET /api/status`.
+
 ## Layout
 
 ```text

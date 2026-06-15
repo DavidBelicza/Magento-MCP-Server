@@ -17,6 +17,8 @@ import { registerIndexSourceRoute } from "./api/graph/index-source.js";
 import { registerIndexStatusRoute } from "./api/graph/index-status.js";
 import { registerSearchRoute } from "./api/graph/search.js";
 import { registerHealthApi } from "./api/health.js";
+import { registerStatusRoute } from "./api/usage/status.js";
+import { registerUsagePingRoute } from "./api/usage/ping.js";
 
 const config = readConfig();
 const app = Fastify({
@@ -51,6 +53,8 @@ registerIndexDeltaRoute(app, { redis });
 registerIndexReindexRoute(app, { indexFlowProducer, redis, getAnalyzedSourcePath });
 registerIndexResetAndReindexRoute(app, { indexFlowProducer, redis, getAnalyzedSourcePath });
 registerIndexStatusRoute(app, { indexStatus, redis });
+registerStatusRoute(app, { indexStatus, redis });
+registerUsagePingRoute(app, { redis });
 
 async function start() {
   try {

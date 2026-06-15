@@ -70,6 +70,7 @@ Important core paths:
 - `src/modules/processing/composer-lock/`: Composer lock parsing and graph record building (writes a queryable `psr4Namespaces` list on each Package node).
 - `src/modules/processing/package-linking/`: `index-links` pipeline that connects declared `:Symbol` nodes to `:Package` nodes with `DECLARED_IN_PACKAGE` edges via PSR-4 longest-prefix matching, entirely in Cypher. Entry point `src/worker/index-links-worker.ts`; triggered by `POST /api/graph/index/links` (optional `{ "symbolId": "<FQN>" }` for a scoped relink).
 - `src/modules/graph/`: generic graph write helpers (`upsert.ts` for the source path, `merge-sync.ts` for the composer path — merge nodes/edges then prune what is no longer present).
+- `src/api/usage/`: `GET /api/status` (combined frontend status: indexing in-progress/locked + AI-agent connected) and `POST /api/usage/ping` (clients record recent activity). Backed by `src/modules/usage.ts`, a neutral `usage:last` Redis key with a 120s TTL (the TTL is the idle window; key present = connected).
 - `src/config.ts`: environment-backed config, including `GRAPH_BATCH_SIZE` (source ingestion batch and transaction size, default 5000).
 - `src/schema/install-schemas.ts`: startup schema installer.
 - `schema/postgresql/`: PostgreSQL `.sql` schema scripts.

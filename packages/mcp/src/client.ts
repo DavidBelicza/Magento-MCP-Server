@@ -64,6 +64,9 @@ export function createBackendClient(baseUrl: string) {
   }
 
   return {
+    ping(): Promise<{ ok: boolean }> {
+      return request<{ ok: boolean }>("/api/usage/ping", { method: "POST" });
+    },
     getStatus(): Promise<StatusResponse> {
       return request<StatusResponse>("/api/graph/index/status", { method: "GET" });
     },
