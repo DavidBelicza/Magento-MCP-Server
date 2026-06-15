@@ -17,6 +17,7 @@ services:
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
     volumes:
       - ./packages/site/src:/app/src
+      - ./packages/site/public:/app/public
       - ./packages/site/index.html:/app/index.html
       - ./packages/site/vite.config.ts:/app/vite.config.ts
       - ./packages/site/postcss.config.js:/app/postcss.config.js

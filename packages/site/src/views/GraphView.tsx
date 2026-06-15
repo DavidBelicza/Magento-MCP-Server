@@ -188,7 +188,7 @@ const GraphStateMessage: React.FC<{ label: string; showHistoryLink?: boolean }> 
       {showHistoryLink ? (
         <Link
           to="/history"
-          className="mt-3 inline-flex h-8 items-center rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-bold text-[#ff4e08] transition hover:border-[#ff4e08] hover:bg-[#fff0e8] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
+          className="mt-3 inline-flex h-8 items-center rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-bold text-[#fd8504] transition hover:border-[#fd8504] hover:bg-[#fff3e6] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
         >
           View query history
         </Link>

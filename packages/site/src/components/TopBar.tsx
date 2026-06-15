@@ -18,12 +18,12 @@ export const TopBar: React.FC<{ activeLabel: string }> = ({ activeLabel }) => {
   const agentConnected = status?.agent.connected ?? false
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between px-4 backdrop-blur md:px-6">
-      <div className="min-w-0">
+    <header className="pointer-events-none absolute inset-x-0 top-3 z-30 hidden h-16 items-center justify-between px-4 md:flex md:px-6">
+      <div className="pointer-events-auto min-w-0 rounded-2xl border border-white/40 bg-white/55 px-4 py-1.5 shadow-sm backdrop-blur-md">
         <h1 className="truncate text-lg font-bold tracking-wide text-[#111827]">{activeLabel}</h1>
         <p className="truncate text-xs text-[#4b5563]">Local graph workspace</p>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/40 bg-white/55 p-1 shadow-sm backdrop-blur-md">
         <StatusPill
           label="AI agent"
           value={agentConnected ? 'Connected' : 'Idle'}
@@ -49,17 +49,17 @@ type StatusPillProps = {
 }
 
 const StatusPill: React.FC<StatusPillProps> = ({ label, value, tone, onClick }) => {
-  const toneClass = tone === 'emerald' ? 'bg-[#00e676]' : 'bg-[#ff4e08]'
+  const toneClass = tone === 'emerald' ? 'bg-[#00e676]' : 'bg-[#fd8504]'
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="hidden h-8 cursor-pointer items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white px-3 font-[inherit] text-xs font-normal leading-none text-[#111827] transition-colors hover:border-[#cbd5e1] sm:flex"
+      className="hidden h-7 cursor-pointer items-center gap-2 rounded-xl px-2.5 font-[inherit] font-normal leading-none text-[#111827] transition-colors hover:bg-white/60 sm:flex"
     >
-      <span className={`h-2 w-2 rounded-full ${toneClass}`} />
-      <span className="text-[#6b7280]">{label}</span>
-      <span>{value}</span>
+      <span className={`h-1.5 w-1.5 rounded-full ${toneClass}`} />
+      <span className="text-[10px] text-[#6b7280]">{label}</span>
+      <span className="text-[10px]">{value}</span>
     </button>
   )
 }

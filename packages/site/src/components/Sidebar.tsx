@@ -26,17 +26,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="mb-8 flex items-center gap-3">
         <div
           className={[
-            'grid size-[54px] shrink-0 place-items-center rounded-lg border border-[#00e676] bg-[#00e676] text-[#111827]',
+            'grid size-[54px] shrink-0 place-items-center overflow-hidden rounded-lg',
           ].join(' ')}
         >
-          <Icon name="graph" />
+          <img src="/logo.png" alt="Magentic logo" className="size-full object-contain" />
         </div>
         {!isCollapsed && (
           <div className="min-w-0">
-            <div className="truncate text-[9px] font-black leading-[1] tracking-wide text-[#374151]">
-              DAVID BEL'S
-            </div>
-            <div className="-ml-px truncate text-2xl font-black tracking-tighter leading-[1.1] text-[#ff4e08]">
+            <div className="-ml-px truncate text-2xl font-black tracking-tighter leading-[1.1] text-[#111827]">
               Magentic
             </div>
             <div className="truncate text-xs leading-[1] text-[#4b5563]">MCP Server for Agentic AI</div>
@@ -56,9 +53,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ))}
       </nav>
 
+      {!isCollapsed && (
+        <a
+          href="https://davidbel.com?magentic=1"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-4 block shrink-0 truncate text-center text-[9px] font-black tracking-wide text-[#9ca3af] transition-colors hover:text-[#111827]"
+        >
+          Made by David Belicza
+        </a>
+      )}
+
       <button
         type="button"
-        className="mt-4 flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#4b5563] transition hover:border-[#ff4e08] hover:bg-[#fff0e8] hover:text-[#ff4e08] focus:outline-none"
+        className="mt-3 flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#111827] transition hover:border-[#cbd5e1] hover:bg-[#e5e7eb] focus:outline-none"
         onClick={onToggle}
         aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -84,11 +92,11 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ item, isActive, isCollapsed, 
     <button
       type="button"
       className={[
-        'group flex h-9 items-center gap-2.5 rounded-lg border px-[18px] text-left transition focus:outline-none',
+        'group flex h-9 cursor-pointer items-center gap-2.5 rounded-lg border px-[18px] text-left transition focus:outline-none',
         isCollapsed ? 'justify-center' : 'justify-start',
         isActive
-          ? 'border-[#8ff0b1] bg-[#d8ffe8] text-[#111827]'
-          : 'border-transparent text-[#374151] hover:border-[#ffb18d] hover:bg-[#fff0e8] hover:text-[#ff4e08]',
+          ? 'border-[#cbd5e1] bg-[#e5e7eb] text-[#111827]'
+          : 'border-transparent text-[#111827] hover:border-[#cbd5e1] hover:bg-[#e5e7eb]',
       ].join(' ')}
       onClick={onClick}
       aria-label={item.label}

@@ -157,7 +157,7 @@ const QueryHistoryRow: React.FC<{
         return
       }
 
-      setCanExpand(description.scrollHeight > 24 + 1)
+      setCanExpand(description.scrollHeight > 20 + 1)
       setExpandedHeight(description.scrollHeight)
     }
 
@@ -180,18 +180,18 @@ const QueryHistoryRow: React.FC<{
         <h3 className="truncate text-sm font-bold">
           <Link
             to={`/graph?queryHistoryId=${encodeURIComponent(item.id)}`}
-            className="text-[#111827] transition hover:text-[#ff4e08] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
+            className="text-[#111827] transition hover:text-[#6b7280] focus:outline-none"
           >
             {title}
           </Link>
         </h3>
         <div
           className="mt-1 overflow-hidden transition-[height] duration-200 ease-out"
-          style={{ height: isExpanded ? expandedHeight : 24 }}
+          style={{ height: isExpanded ? expandedHeight : 20 }}
         >
           <p
             ref={descriptionRef}
-            className="text-sm leading-6 text-[#4b5563]"
+            className="text-sm leading-5 text-[#4b5563]"
           >
             {item.description}
           </p>
@@ -199,7 +199,7 @@ const QueryHistoryRow: React.FC<{
         {canExpand || isExpanded ? (
           <button
             type="button"
-            className="mt-1 text-xs font-bold text-[#ff4e08] transition hover:text-[#c93400] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
+            className="mt-1 cursor-pointer text-[11px] font-bold text-[#111827] transition hover:text-[#6b7280] focus:outline-none"
             onClick={onToggle}
           >
             {isExpanded ? 'Less' : 'More'}
@@ -216,13 +216,16 @@ const QueryHistoryRow: React.FC<{
 
       <div className="text-xs font-semibold text-[#111827] lg:pt-1">
         <span className="mr-2 font-bold uppercase tracking-[0.12em] text-[#6b7280] lg:hidden">Created</span>
-        {formatTimestamp(item.createdAt)}
+        <span className="inline-flex flex-col leading-tight align-top">
+          <span>{formatDate(item.createdAt)}</span>
+          <span className="text-[11px] font-normal text-[#6b7280]">{formatTime(item.createdAt)}</span>
+        </span>
       </div>
 
       <div className="lg:pt-0.5">
         <Link
           to={`/graph?queryHistoryId=${encodeURIComponent(item.id)}`}
-          className="inline-flex h-7 items-center rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-bold text-[#ff4e08] transition hover:border-[#ff4e08] hover:bg-[#fff0e8] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
+          className="inline-flex h-7 cursor-pointer items-center rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-bold text-[#111827] transition hover:border-[#cbd5e1] hover:bg-[#e5e7eb] focus:outline-none"
         >
           Open graph
         </Link>
@@ -245,9 +248,10 @@ function createTitle(description: string): string {
   return `${words.slice(0, 10).join(' ')}...`
 }
 
-function formatTimestamp(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(new Date(value))
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
+}
+
+function formatTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, { timeStyle: 'short' }).format(new Date(value))
 }

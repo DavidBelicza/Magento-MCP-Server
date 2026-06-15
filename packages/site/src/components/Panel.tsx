@@ -30,7 +30,7 @@ export const ToolbarButton: React.FC<{ label: string }> = ({ label }) => {
   return (
     <button
       type="button"
-      className="h-8 rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#111827] transition hover:border-[#ff4e08] hover:bg-[#fff0e8] hover:text-[#ff4e08] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
+      className="h-8 rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#111827] transition hover:border-[#fd8504] hover:bg-[#fff3e6] hover:text-[#fd8504] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
     >
       {label}
     </button>

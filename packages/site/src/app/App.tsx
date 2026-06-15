@@ -30,10 +30,10 @@ export function App() {
         onToggle={() => setIsSidebarCollapsed((currentValue) => !currentValue)}
       />
 
-      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden border-l border-[#e5e7eb] bg-white md:rounded-l-[18px]">
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-white md:rounded-l-[18px]">
         <div className="pointer-events-none absolute right-0 top-0 h-80 w-[520px] bg-[radial-gradient(circle_at_70%_18%,rgba(0,255,140,0.24),transparent_54%),radial-gradient(circle_at_85%_58%,rgba(255,78,8,0.34),transparent_24%)] blur-lg" />
+        <TopBar activeLabel={activeItem.label} />
         <div className="relative z-10 shrink-0">
-          <TopBar activeLabel={activeItem.label} />
           <nav
             className="flex shrink-0 gap-1 overflow-x-auto border-y border-[#e5e7eb] bg-white/88 px-3 py-2 backdrop-blur md:hidden"
             aria-label="Mobile navigation"
@@ -59,7 +59,7 @@ export function App() {
           </nav>
         </div>
         <section className="relative z-10 min-h-0 flex-1 overflow-auto px-4 pb-5 md:px-6 md:pb-6">
-          <div className="h-full min-h-full pt-0">
+          <div className="h-full min-h-full pt-0 md:pt-28">
             <Routes>
               <Route path="/" element={<WelcomeView />} />
               <Route path="/graph" element={<GraphView />} />

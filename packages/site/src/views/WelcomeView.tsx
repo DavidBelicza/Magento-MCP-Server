@@ -40,7 +40,7 @@ const GraphSessionStub: React.FC<{ title: string; meta: string }> = ({ title, me
   return (
     <div className="rounded-lg border border-[#e5e7eb] bg-white p-4">
       <div className="text-sm font-semibold text-[#111827]">{title}</div>
-      <div className="mt-1 text-xs font-bold text-[#ff4e08]">{meta}</div>
+      <div className="mt-1 text-xs font-bold text-[#fd8504]">{meta}</div>
     </div>
   )
 }
