@@ -5,7 +5,7 @@ export type IndexSourceOperation = "index" | "delete";
 
 export type IndexSourceJob = {
   analyzedSourcePath: string;
-  directory: unknown | null;
+  directories: string[];
   operation: IndexSourceOperation;
   phpVersion?: string;
   requestedAt: string;
@@ -26,28 +26,22 @@ export function createIndexSourceQueue() {
   return {
     add: async (
       analyzedSourcePath: string,
-      directories: unknown[] | null,
+      directories: string[],
       operation: IndexSourceOperation = "index",
       phpVersion?: string
     ) => {
-      const requestedAt = new Date().toISOString();
-      const jobDirectories = directories ?? [null];
-      const jobs = await Promise.all(jobDirectories.map(async (directory) => {
-        const job = await queue.add(indexSourceJobName, {
-          analyzedSourcePath,
-          directory,
-          operation,
-          phpVersion,
-          requestedAt
-        });
+      const job = await queue.add(indexSourceJobName, {
+        analyzedSourcePath,
+        directories,
+        operation,
+        phpVersion,
+        requestedAt: new Date().toISOString()
+      });
 
-        return {
-          id: job.id,
-          state: await job.getState()
-        };
-      }));
-
-      return jobs;
+      return {
+        id: job.id,
+        state: await job.getState()
+      };
     },
     close: () => queue.close()
   };

@@ -3,38 +3,45 @@ import type { createIndexSourceQueue } from "../../queue/index-source.js";
 
 type Dependencies = {
   indexSourceQueue: ReturnType<typeof createIndexSourceQueue>;
-  getAnalyzedSourcePath: () => string;
+  getMountPath: () => string;
+  getSourceDirectories: () => string[];
   getPhpVersion: () => string;
 };
 
+function toStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
 export function registerIndexSourceRoute(app: FastifyInstance, deps: Dependencies): void {
-  const { indexSourceQueue, getAnalyzedSourcePath, getPhpVersion } = deps;
+  const { indexSourceQueue, getMountPath, getSourceDirectories, getPhpVersion } = deps;
 
   app.post<{ Body: { directories?: unknown[] | null } }>("/api/graph/index/source", async (request, reply) => {
-    const jobs = await indexSourceQueue.add(getAnalyzedSourcePath(), request.body?.directories ?? null, "index", getPhpVersion());
+    const requested = toStringList(request.body?.directories);
+    const directories = requested.length > 0 ? requested : getSourceDirectories();
+    const job = await indexSourceQueue.add(getMountPath(), directories, "index", getPhpVersion());
 
     return reply.status(202).send({
       ok: true,
-      jobs,
+      job,
       message: "Source indexing request accepted."
     });
   });
 
   app.delete<{ Body: { directories?: unknown[] | null } }>("/api/graph/index/source", async (request, reply) => {
-    const directories = request.body?.directories;
+    const directories = toStringList(request.body?.directories);
 
-    if (!Array.isArray(directories) || directories.length === 0) {
+    if (directories.length === 0) {
       return reply.status(400).send({
         ok: false,
         error: "directories is required and must be a non-empty array for deletion"
       });
     }
 
-    const jobs = await indexSourceQueue.add(getAnalyzedSourcePath(), directories, "delete");
+    const job = await indexSourceQueue.add(getMountPath(), directories, "delete");
 
     return reply.status(202).send({
       ok: true,
-      jobs,
+      job,
       message: "Source deletion request accepted."
     });
   });

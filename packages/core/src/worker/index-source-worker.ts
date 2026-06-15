@@ -11,7 +11,7 @@ import {
 
 type IndexSourceResult = {
   analyzedSourcePath: string;
-  directory: unknown | null;
+  directories: string[];
   status: "accepted";
 };
 
@@ -40,18 +40,32 @@ async function handleJob(job: Job<IndexSourceJob>, driver: Driver, batchSize: nu
     return handleDeleteJob(job, driver);
   }
 
-  await job.updateProgress({ phase: "accepted", percent: 0 });
+  const directories = job.data.directories.length > 0 ? job.data.directories : ["."];
+  const total = directories.length;
+  let nodes = 0;
+  let edges = 0;
 
-  const directory = extractDirectory(job.data.directory);
-  const reader = await fetchAnalyzerStream(directory, analyzerPhpUrl, job.data.phpVersion);
+  await job.updateProgress({ phase: "accepted", percent: 0, directories, total });
 
-  await consumeFactStream(reader, driver, batchSize, () => job.updateProgress({ phase: "processing" }));
+  for (let index = 0; index < total; index += 1) {
+    const directory = directories[index];
+    const current = index + 1;
 
-  await job.updateProgress({ phase: "completed", percent: 100 });
+    await job.updateProgress({ phase: "processing", directory, current, total, directories, nodes, edges });
+
+    const reader = await fetchAnalyzerStream(directory, analyzerPhpUrl, job.data.phpVersion);
+    await consumeFactStream(reader, driver, batchSize, async (counts) => {
+      nodes += counts.nodes;
+      edges += counts.relationships;
+      await job.updateProgress({ phase: "processing", directory, current, total, directories, nodes, edges });
+    });
+  }
+
+  await job.updateProgress({ phase: "completed", percent: 100, directories, total, nodes, edges });
 
   return {
     analyzedSourcePath: job.data.analyzedSourcePath,
-    directory: job.data.directory,
+    directories: job.data.directories,
     status: "accepted"
   };
 }
@@ -59,22 +73,16 @@ async function handleJob(job: Job<IndexSourceJob>, driver: Driver, batchSize: nu
 async function handleDeleteJob(job: Job<IndexSourceJob>, driver: Driver): Promise<IndexSourceResult> {
   await job.updateProgress({ phase: "deleting", percent: 0 });
 
-  const path = extractDirectory(job.data.directory);
-  await deleteSourceByPaths(driver, [path]);
+  const paths = job.data.directories.length > 0 ? job.data.directories : ["."];
+  await deleteSourceByPaths(driver, paths);
 
   await job.updateProgress({ phase: "completed", percent: 100 });
 
   return {
     analyzedSourcePath: job.data.analyzedSourcePath,
-    directory: job.data.directory,
+    directories: job.data.directories,
     status: "accepted"
   };
-}
-
-function extractDirectory(directory: unknown): string {
-  return typeof directory === "string" && directory.trim() !== ""
-    ? directory
-    : ".";
 }
 
 async function fetchAnalyzerStream(directory: string, analyzerPhpUrl: string, phpVersion?: string): Promise<ReadableStreamDefaultReader<Uint8Array>> {

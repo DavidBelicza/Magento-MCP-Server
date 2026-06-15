@@ -45,10 +45,14 @@ function getMountPath(): string {
   return process.env.MAGENTIC_ANALYZED_SOURCE_PATH ?? "/mnt/analyzed-source";
 }
 
-function getAnalyzedSourcePath(): string {
-  const subpath = getAppSettings().analyzedSubpath;
+function getComposerRoot(): string {
+  const root = getAppSettings().projectRoot;
 
-  return subpath === "" ? getMountPath() : posix.join(getMountPath(), subpath);
+  return root === "" ? getMountPath() : posix.join(getMountPath(), root);
+}
+
+function getSourceDirectories(): string[] {
+  return getAppSettings().sourceSubpaths;
 }
 
 function getPhpVersion(): string {
@@ -63,12 +67,12 @@ registerHealthApi(app, {
 
 registerSearchRoute(app, { postgres, neo4jDriver });
 registerGetQueryHistoryRoute(app, { postgres });
-registerIndexPackagesRoute(app, { indexPackagesQueue, getAnalyzedSourcePath });
-registerIndexSourceRoute(app, { indexSourceQueue, getAnalyzedSourcePath, getPhpVersion });
+registerIndexPackagesRoute(app, { indexPackagesQueue, getComposerRoot });
+registerIndexSourceRoute(app, { indexSourceQueue, getMountPath, getSourceDirectories, getPhpVersion });
 registerIndexLinksRoute(app, { indexLinksQueue });
 registerIndexDeltaRoute(app, { redis });
-registerIndexReindexRoute(app, { indexFlowProducer, redis, getAnalyzedSourcePath, getPhpVersion });
-registerIndexResetAndReindexRoute(app, { indexFlowProducer, redis, getAnalyzedSourcePath, getPhpVersion });
+registerIndexReindexRoute(app, { indexFlowProducer, redis, getComposerRoot, getSourceDirectories, getPhpVersion });
+registerIndexResetAndReindexRoute(app, { indexFlowProducer, redis, getComposerRoot, getSourceDirectories, getPhpVersion });
 registerIndexStatusRoute(app, { indexStatus, redis });
 registerStatusRoute(app, { indexStatus, redis });
 registerGetConfigRoute(app, { getMountPath });

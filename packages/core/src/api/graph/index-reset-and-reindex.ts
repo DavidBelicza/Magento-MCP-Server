@@ -7,12 +7,13 @@ import { buildIndexFlow } from "./build-index-flow.js";
 type Dependencies = {
   indexFlowProducer: FlowProducer;
   redis: Redis;
-  getAnalyzedSourcePath: () => string;
+  getComposerRoot: () => string;
+  getSourceDirectories: () => string[];
   getPhpVersion: () => string;
 };
 
 export function registerIndexResetAndReindexRoute(app: FastifyInstance, deps: Dependencies): void {
-  const { indexFlowProducer, redis, getAnalyzedSourcePath, getPhpVersion } = deps;
+  const { indexFlowProducer, redis, getComposerRoot, getSourceDirectories, getPhpVersion } = deps;
 
   app.post("/api/graph/index/reset-and-reindex", async (_request, reply) => {
     if (!(await acquireFullIndexLock(redis))) {
@@ -22,7 +23,9 @@ export function registerIndexResetAndReindexRoute(app: FastifyInstance, deps: De
       });
     }
 
-    const flow = await indexFlowProducer.add(buildIndexFlow(getAnalyzedSourcePath(), true, getPhpVersion()));
+    const flow = await indexFlowProducer.add(
+      buildIndexFlow(getComposerRoot(), getSourceDirectories(), true, getPhpVersion())
+    );
 
     return reply.status(202).send({
       ok: true,

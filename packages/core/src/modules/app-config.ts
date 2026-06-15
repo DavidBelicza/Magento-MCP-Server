@@ -3,14 +3,16 @@ import { dirname } from "node:path";
 
 export type AppSettings = {
   phpVersion: string;
-  analyzedSubpath: string;
+  projectRoot: string;
+  sourceSubpaths: string[];
 };
 
 export const phpVersionOptions = ["8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"] as const;
 
 const defaults: AppSettings = {
   phpVersion: "8.5",
-  analyzedSubpath: ""
+  projectRoot: "",
+  sourceSubpaths: []
 };
 
 let current: AppSettings | null = null;
@@ -33,22 +35,52 @@ function sanitizeSubpath(value: unknown): string {
   return trimmed;
 }
 
+function sanitizeSubpathList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+
+  for (const entry of value) {
+    const subpath = sanitizeSubpath(entry);
+
+    if (subpath !== "") {
+      seen.add(subpath);
+    }
+  }
+
+  return [...seen];
+}
+
 function sanitizePhpVersion(value: unknown): string {
   return phpVersionOptions.includes(value as (typeof phpVersionOptions)[number])
     ? (value as string)
     : defaults.phpVersion;
 }
 
-function normalize(raw: Partial<AppSettings> | null): AppSettings {
+function normalize(raw: Record<string, unknown> | null): AppSettings {
+  // Migrate the previous single `analyzedSubpath` field if present.
+  const legacy = sanitizeSubpath(raw?.analyzedSubpath);
+
+  const projectRoot = raw?.projectRoot !== undefined ? sanitizeSubpath(raw.projectRoot) : legacy;
+  const sourceSubpaths =
+    raw?.sourceSubpaths !== undefined
+      ? sanitizeSubpathList(raw.sourceSubpaths)
+      : legacy !== ""
+        ? [legacy]
+        : [];
+
   return {
     phpVersion: sanitizePhpVersion(raw?.phpVersion),
-    analyzedSubpath: sanitizeSubpath(raw?.analyzedSubpath)
+    projectRoot,
+    sourceSubpaths
   };
 }
 
 export function loadAppSettings(): AppSettings {
   try {
-    const raw = JSON.parse(readFileSync(configPath(), "utf8")) as Partial<AppSettings>;
+    const raw = JSON.parse(readFileSync(configPath(), "utf8")) as Record<string, unknown>;
     current = normalize(raw);
   } catch {
     current = { ...defaults };

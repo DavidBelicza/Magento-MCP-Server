@@ -3,7 +3,8 @@ import { getAppSettings, phpVersionOptions, updateAppSettings } from "../../modu
 
 type Body = {
   phpVersion?: string;
-  analyzedSubpath?: string;
+  projectRoot?: string;
+  sourceSubpaths?: string[];
 };
 
 export function registerUpdateConfigRoute(app: FastifyInstance): void {
@@ -14,13 +15,16 @@ export function registerUpdateConfigRoute(app: FastifyInstance): void {
       return reply.status(400).send({ ok: false, error: "unsupported phpVersion" });
     }
 
+    const settings = getAppSettings();
+
     try {
-      const settings = updateAppSettings({
-        phpVersion: body.phpVersion ?? getAppSettings().phpVersion,
-        analyzedSubpath: body.analyzedSubpath ?? getAppSettings().analyzedSubpath
+      const updated = updateAppSettings({
+        phpVersion: body.phpVersion ?? settings.phpVersion,
+        projectRoot: body.projectRoot ?? settings.projectRoot,
+        sourceSubpaths: body.sourceSubpaths ?? settings.sourceSubpaths
       });
 
-      return reply.send({ ok: true, settings });
+      return reply.send({ ok: true, settings: updated });
     } catch (error) {
       app.log.error(error);
 

@@ -3,11 +3,20 @@ import { writeGraphUpsert } from "../../graph/upsert.js";
 import { mapFactBatch } from "./map-records.js";
 import type { FileFacts } from "./types.js";
 
-export async function saveSourceBatch(session: Session, batch: FileFacts[], batchSize: number): Promise<void> {
+export type SaveSourceBatchCounts = {
+  nodes: number;
+  relationships: number;
+};
+
+export async function saveSourceBatch(
+  session: Session,
+  batch: FileFacts[],
+  batchSize: number
+): Promise<SaveSourceBatchCounts> {
   const { nodes, relationships, clearOutboundFromNodeIds } = mapFactBatch(batch);
 
   if (nodes.length === 0 && relationships.length === 0) {
-    return;
+    return { nodes: 0, relationships: 0 };
   }
 
   const labels = [...new Set(nodes.map((node) => node.label))];
@@ -22,4 +31,6 @@ export async function saveSourceBatch(session: Session, batch: FileFacts[], batc
     clearNodeLabel: "Symbol",
     batchSize
   });
+
+  return { nodes: nodes.length, relationships: relationships.length };
 }

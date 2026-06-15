@@ -3,14 +3,14 @@ import type { createIndexPackagesQueue } from "../../queue/index-packages.js";
 
 type Dependencies = {
   indexPackagesQueue: ReturnType<typeof createIndexPackagesQueue>;
-  getAnalyzedSourcePath: () => string;
+  getComposerRoot: () => string;
 };
 
 export function registerIndexPackagesRoute(app: FastifyInstance, deps: Dependencies): void {
-  const { indexPackagesQueue, getAnalyzedSourcePath } = deps;
+  const { indexPackagesQueue, getComposerRoot } = deps;
 
   app.post("/api/graph/index/packages", async (_request, reply) => {
-    const job = await indexPackagesQueue.add(getAnalyzedSourcePath());
+    const job = await indexPackagesQueue.add(getComposerRoot());
 
     return reply.status(202).send({
       ok: true,

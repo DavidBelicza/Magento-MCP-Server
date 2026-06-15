@@ -3,11 +3,24 @@ import { Panel, SectionHeader } from '../components/Panel'
 
 const readmeUrl = 'https://github.com/DavidBelicza/Magentic/blob/main/README.md'
 
+type JobProgress = {
+  phase?: string
+  directory?: string
+  directories?: string[]
+  current?: number
+  total?: number
+  processed?: number
+  percent?: number
+  nodes?: number
+  edges?: number
+}
+
 type IndexJob = {
   queue?: string
   name?: string
   state?: string
   timestamp?: number
+  progress?: JobProgress | number | null
 }
 
 type IndexStatus = {
@@ -23,7 +36,8 @@ type AgentStatus = {
 
 type AppSettings = {
   phpVersion: string
-  analyzedSubpath: string
+  projectRoot: string
+  sourceSubpaths: string[]
 }
 
 type ConfigResponse = {
@@ -108,12 +122,18 @@ const IndexingSection: React.FC = () => {
                 key={`${item.queue}-${item.name}-${index}`}
                 className="flex items-center justify-between gap-4 rounded-lg border border-[#e5e7eb] bg-white px-4 py-2.5"
               >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-[#111827]">{item.queue ?? 'job'}</div>
-                  <div className="truncate text-xs text-[#6b7280]">{item.name}</div>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="relative flex h-2.5 w-2.5 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#fd8504] opacity-60" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#fd8504]" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-[#111827]">{item.queue ?? 'job'}</div>
+                    <ProgressDetail progress={item.progress} fallback={item.name} />
+                  </div>
                 </div>
                 <span className="shrink-0 rounded-md bg-[#fff3e6] px-2 py-1 text-[11px] font-bold text-[#fd8504]">
-                  {item.state}
+                  {formatState(item.state)}
                 </span>
               </li>
             ))}
@@ -179,20 +199,34 @@ const AgentSection: React.FC = () => {
 const ConfigSection: React.FC = () => {
   const [config, setConfig] = useState<ConfigResponse | null>(null)
   const [phpVersion, setPhpVersion] = useState('8.5')
-  const [analyzedSubpath, setAnalyzedSubpath] = useState('')
+  const [projectRoot, setProjectRoot] = useState('')
+  const [sourceSubpaths, setSourceSubpaths] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+
+  const applySettings = (settings: AppSettings) => {
+    setPhpVersion(settings.phpVersion)
+    setProjectRoot(settings.projectRoot)
+    setSourceSubpaths(settings.sourceSubpaths.length > 0 ? settings.sourceSubpaths : [''])
+  }
 
   useEffect(() => {
     fetch('/api/config')
       .then((response) => response.json())
       .then((data: ConfigResponse) => {
         setConfig(data)
-        setPhpVersion(data.settings.phpVersion)
-        setAnalyzedSubpath(data.settings.analyzedSubpath)
+        applySettings(data.settings)
       })
       .catch(() => setConfig(null))
   }, [])
+
+  const updateSubpath = (index: number, value: string) => {
+    setSourceSubpaths((current) => current.map((entry, position) => (position === index ? value : entry)))
+  }
+
+  const removeSubpath = (index: number) => {
+    setSourceSubpaths((current) => current.filter((_, position) => position !== index))
+  }
 
   const save = () => {
     setSaving(true)
@@ -200,13 +234,16 @@ const ConfigSection: React.FC = () => {
     fetch('/api/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phpVersion, analyzedSubpath })
+      body: JSON.stringify({
+        phpVersion,
+        projectRoot,
+        sourceSubpaths: sourceSubpaths.map((entry) => entry.trim()).filter((entry) => entry !== '')
+      })
     })
       .then((response) => response.json())
       .then((data) => {
         if (data.ok) {
-          setPhpVersion(data.settings.phpVersion)
-          setAnalyzedSubpath(data.settings.analyzedSubpath)
+          applySettings(data.settings)
           setMessage('Saved. Applies to the next indexing run.')
         } else {
           setMessage(data.error ?? 'Failed to save.')
@@ -239,14 +276,38 @@ const ConfigSection: React.FC = () => {
         </label>
 
         <label className="grid gap-1.5">
-          <span className="text-sm text-[#4b5563]">Analyzed subpath (within the mount)</span>
+          <span className="text-sm text-[#4b5563]">Project root (composer.lock location)</span>
           <input
-            value={analyzedSubpath}
-            onChange={(event) => setAnalyzedSubpath(event.target.value)}
-            placeholder="e.g. vendor/magento (empty = whole mount)"
+            value={projectRoot}
+            onChange={(event) => setProjectRoot(event.target.value)}
+            placeholder="empty = mount root"
             className="h-9 rounded-lg border border-[#e5e7eb] bg-white px-3 text-sm text-[#111827] focus:border-[#cbd5e1] focus:outline-none"
           />
+          <span className="text-xs text-[#9ca3af]">Where composer.lock is read, relative to the mount.</span>
         </label>
+
+        <div className="grid gap-1.5">
+          <span className="text-sm text-[#4b5563]">Source directories to scan</span>
+          <div className="grid gap-2">
+            {sourceSubpaths.map((entry, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input
+                  value={entry}
+                  onChange={(event) => updateSubpath(index, event.target.value)}
+                  placeholder="e.g. vendor, app/code"
+                  className="h-9 flex-1 rounded-lg border border-[#e5e7eb] bg-white px-3 text-sm text-[#111827] focus:border-[#cbd5e1] focus:outline-none"
+                />
+                <ActionButton label="Remove" onClick={() => removeSubpath(index)} />
+              </div>
+            ))}
+          </div>
+          <div>
+            <ActionButton label="Add directory" onClick={() => setSourceSubpaths((current) => [...current, ''])} />
+          </div>
+          <span className="text-xs text-[#9ca3af]">
+            Each is scanned in its own analyzer pass. Leave empty to scan the whole mount.
+          </span>
+        </div>
 
         <label className="grid gap-1.5">
           <span className="text-sm text-[#4b5563]">Mounted directory (read-only)</span>
@@ -350,6 +411,112 @@ const ActionButton: React.FC<{ label: string; disabled?: boolean; onClick: () =>
       {label}
     </button>
   )
+}
+
+const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: string }> = ({ progress, fallback }) => {
+  if (!progress || typeof progress !== 'object') {
+    return <div className="truncate text-xs text-[#6b7280]">{fallback}</div>
+  }
+
+  const line = describeProgress(progress) ?? fallback
+  const hasCounts = typeof progress.nodes === 'number' || typeof progress.edges === 'number'
+  const directories = progress.directories
+  const current = typeof progress.current === 'number' ? progress.current : 0
+
+  return (
+    <div className="min-w-0">
+      {line ? <div className="truncate text-xs text-[#6b7280]">{line}</div> : null}
+      {hasCounts ? (
+        <div className="mt-0.5 text-xs text-[#111827]">
+          <CountUp value={progress.nodes ?? 0} /> nodes · <CountUp value={progress.edges ?? 0} /> edges
+        </div>
+      ) : null}
+      {Array.isArray(directories) && directories.length > 1 ? (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {directories.map((directory, index) => {
+            const status = index + 1 < current ? 'done' : index + 1 === current ? 'active' : 'waiting'
+            const tone =
+              status === 'done'
+                ? 'bg-[#e5e7eb] text-[#6b7280]'
+                : status === 'active'
+                  ? 'bg-[#fff3e6] text-[#fd8504]'
+                  : 'border border-[#e5e7eb] text-[#9ca3af]'
+
+            return (
+              <span key={`${directory}-${index}`} className={`rounded px-1.5 py-0.5 text-[10px] ${tone}`}>
+                {directory}
+              </span>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+const CountUp: React.FC<{ value: number }> = ({ value }) => {
+  return <>{useCountUp(value).toLocaleString()}</>
+}
+
+function useCountUp(target: number, duration = 1500): number {
+  const [display, setDisplay] = useState(target)
+  const displayRef = useRef(target)
+  displayRef.current = display
+
+  useEffect(() => {
+    const from = displayRef.current
+
+    if (from === target) {
+      return
+    }
+
+    let raf = 0
+    const start = performance.now()
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration)
+      const eased = 1 - Math.pow(1 - t, 3)
+      setDisplay(Math.round(from + (target - from) * eased))
+
+      if (t < 1) {
+        raf = requestAnimationFrame(tick)
+      }
+    }
+
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target, duration])
+
+  return display
+}
+
+function formatState(state: string | undefined): string {
+  return state === 'active' ? 'in progress' : (state ?? 'unknown')
+}
+
+function describeProgress(progress: IndexJob['progress']): string | null {
+  if (!progress || typeof progress !== 'object') {
+    return null
+  }
+
+  const parts: string[] = []
+
+  if (progress.phase) {
+    parts.push(progress.phase)
+  }
+
+  if (progress.directory && progress.directory !== '.') {
+    parts.push(progress.directory)
+  }
+
+  if (typeof progress.current === 'number' && typeof progress.total === 'number' && progress.total > 1) {
+    parts.push(`(${progress.current}/${progress.total})`)
+  }
+
+  if (typeof progress.percent === 'number' && progress.percent > 0 && progress.percent < 100) {
+    parts.push(`${Math.round(progress.percent)}%`)
+  }
+
+  return parts.length > 0 ? parts.join(' · ') : null
 }
 
 function formatRelative(timestamp: number): string {

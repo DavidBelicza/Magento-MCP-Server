@@ -1,19 +1,19 @@
 import type { Driver } from "neo4j-driver";
 import { createFactAccumulator, type FactAccumulator } from "./fact-accumulator.js";
-import { saveSourceBatch } from "./save-source.js";
+import { saveSourceBatch, type SaveSourceBatchCounts } from "./save-source.js";
 import type { FileFacts } from "./types.js";
 
 export async function consumeFactStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   driver: Driver,
   batchSize: number,
-  onBatchSaved: () => Promise<void>
+  onBatchSaved: (counts: SaveSourceBatchCounts) => Promise<void>
 ): Promise<void> {
   const session = driver.session();
   const decoder = new TextDecoder();
   const accumulator = createFactAccumulator(batchSize, async (batch) => {
-    await saveSourceBatch(session, batch, batchSize);
-    await onBatchSaved();
+    const counts = await saveSourceBatch(session, batch, batchSize);
+    await onBatchSaved(counts);
   });
   let buffer = "";
 
