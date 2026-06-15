@@ -7,6 +7,7 @@ export type IndexSourceJob = {
   analyzedSourcePath: string;
   directory: unknown | null;
   operation: IndexSourceOperation;
+  phpVersion?: string;
   requestedAt: string;
   fullIndexFlow?: boolean;
 };
@@ -26,7 +27,8 @@ export function createIndexSourceQueue() {
     add: async (
       analyzedSourcePath: string,
       directories: unknown[] | null,
-      operation: IndexSourceOperation = "index"
+      operation: IndexSourceOperation = "index",
+      phpVersion?: string
     ) => {
       const requestedAt = new Date().toISOString();
       const jobDirectories = directories ?? [null];
@@ -35,6 +37,7 @@ export function createIndexSourceQueue() {
           analyzedSourcePath,
           directory,
           operation,
+          phpVersion,
           requestedAt
         });
 

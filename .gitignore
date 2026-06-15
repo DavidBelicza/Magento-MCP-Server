@@ -8,3 +8,9 @@ www/
 .DS_Store
 **/.DS_Store
 npm-debug.log*
+
+# Local runtime config (file-backed app settings)
+/data/
+
+# Synced copy of the repo-root README for the site bundle
+/packages/site/README.md

@@ -28,12 +28,13 @@ if ($uri === '/analyze' && $method === 'POST') {
     }
     
     $path = $payload['path'] ?? '';
+    $phpVersion = is_string($payload['phpVersion'] ?? null) ? $payload['phpVersion'] : null;
 
     $logger = LoggerFactory::create();
-    $logger->info('Incoming PHP analysis request', ['path' => $path]);
+    $logger->info('Incoming PHP analysis request', ['path' => $path, 'phpVersion' => $phpVersion]);
 
     $handler = new StreamAnalyzerHandler($logger);
-    $response = $handler->handle($path);
+    $response = $handler->handle($path, $phpVersion);
     $response->send();
     exit(0);
 }

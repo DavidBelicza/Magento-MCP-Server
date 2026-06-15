@@ -8,7 +8,7 @@ export const DatabaseView: React.FC = () => {
       <MetricPanel label="Authors" value="158" />
       <MetricPanel label="Edges" value="4,960" />
       <Panel className="p-5 lg:col-span-3">
-        <SectionHeader title="Database" eyebrow="Local graph" />
+        <SectionHeader title="Database" />
         <div className="mt-5 grid gap-3">
           <WireRow title="Source" value="/mnt/analyzed-source/composer.lock" />
           <WireRow title="Storage" value="Neo4j local graph" />

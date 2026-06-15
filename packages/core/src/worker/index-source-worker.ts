@@ -43,7 +43,7 @@ async function handleJob(job: Job<IndexSourceJob>, driver: Driver, batchSize: nu
   await job.updateProgress({ phase: "accepted", percent: 0 });
 
   const directory = extractDirectory(job.data.directory);
-  const reader = await fetchAnalyzerStream(directory, analyzerPhpUrl);
+  const reader = await fetchAnalyzerStream(directory, analyzerPhpUrl, job.data.phpVersion);
 
   await consumeFactStream(reader, driver, batchSize, () => job.updateProgress({ phase: "processing" }));
 
@@ -77,13 +77,13 @@ function extractDirectory(directory: unknown): string {
     : ".";
 }
 
-async function fetchAnalyzerStream(directory: string, analyzerPhpUrl: string): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+async function fetchAnalyzerStream(directory: string, analyzerPhpUrl: string, phpVersion?: string): Promise<ReadableStreamDefaultReader<Uint8Array>> {
   const response = await fetch(`${analyzerPhpUrl}/analyze`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ path: directory })
+    body: JSON.stringify({ path: directory, phpVersion })
   });
 
   if (!response.ok) {

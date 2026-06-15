@@ -8,6 +8,7 @@ use Magentic\PhpAnalyzer\Parse\DocBlockTypeResolver;
 use Magentic\PhpAnalyzer\Parse\FileParser;
 use Magentic\PhpAnalyzer\Parse\PathScanner;
 use PhpParser\ParserFactory;
+use PhpParser\PhpVersion;
 use PHPStan\PhpDocParser\Lexer\Lexer;
 use PHPStan\PhpDocParser\Parser\ConstExprParser;
 use PHPStan\PhpDocParser\Parser\PhpDocParser;
@@ -29,10 +30,10 @@ readonly class StreamAnalyzerHandler
         $this->logger = $logger ?? new NullLogger();
     }
 
-    public function handle(string $path): Response
+    public function handle(string $path, ?string $phpVersion = null): Response
     {
         try {
-            $pathScanner = new PathScanner($this->validateAnalyzedSourcePath(), $this->createFileParser());
+            $pathScanner = new PathScanner($this->validateAnalyzedSourcePath(), $this->createFileParser($phpVersion));
 
             $response = new StreamedResponse(function () use ($pathScanner, $path) {
                 foreach ($pathScanner->scan([$path]) as $scanResponse) {
@@ -70,13 +71,18 @@ readonly class StreamAnalyzerHandler
         return $realPath;
     }
 
-    private function createFileParser(): FileParser
+    private function createFileParser(?string $phpVersion): FileParser
     {
         $parserConfig = new ParserConfig([]);
         $constExprParser = new ConstExprParser($parserConfig);
         $phpDocParser = new PhpDocParser($parserConfig, new TypeParser($parserConfig, $constExprParser), $constExprParser);
         $docBlockResolver = new DocBlockTypeResolver(new Lexer($parserConfig), $phpDocParser);
 
-        return new FileParser((new ParserFactory())->createForNewestSupportedVersion(), $docBlockResolver);
+        $factory = new ParserFactory();
+        $parser = $phpVersion === null || $phpVersion === 'newest'
+            ? $factory->createForNewestSupportedVersion()
+            : $factory->createForVersion(PhpVersion::fromString($phpVersion));
+
+        return new FileParser($parser, $docBlockResolver);
     }
 }

@@ -4,13 +4,14 @@ import type { createIndexSourceQueue } from "../../queue/index-source.js";
 type Dependencies = {
   indexSourceQueue: ReturnType<typeof createIndexSourceQueue>;
   getAnalyzedSourcePath: () => string;
+  getPhpVersion: () => string;
 };
 
 export function registerIndexSourceRoute(app: FastifyInstance, deps: Dependencies): void {
-  const { indexSourceQueue, getAnalyzedSourcePath } = deps;
+  const { indexSourceQueue, getAnalyzedSourcePath, getPhpVersion } = deps;
 
   app.post<{ Body: { directories?: unknown[] | null } }>("/api/graph/index/source", async (request, reply) => {
-    const jobs = await indexSourceQueue.add(getAnalyzedSourcePath(), request.body?.directories ?? null);
+    const jobs = await indexSourceQueue.add(getAnalyzedSourcePath(), request.body?.directories ?? null, "index", getPhpVersion());
 
     return reply.status(202).send({
       ok: true,

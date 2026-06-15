@@ -60,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           rel="noreferrer"
           className="mt-4 block shrink-0 truncate text-center text-[9px] font-black tracking-wide text-[#9ca3af] transition-colors hover:text-[#111827]"
         >
-          Made by David Belicza
+          Built by David Belicza
         </a>
       )}
 

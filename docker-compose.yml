@@ -32,8 +32,11 @@ services:
       NEO4J_USERNAME: "${NEO4J_USERNAME:-neo4j}"
       NEO4J_PASSWORD: "${NEO4J_PASSWORD:-dev-password}"
       MAGENTIC_ANALYZED_SOURCE_PATH: "${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}"
+      MAGENTIC_CONFIG_PATH: "/app/data/config.json"
       ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-true}"
-    volumes: *magentic_analyzed_source_volumes
+    volumes:
+      - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}:ro
+      - ${MAGENTIC_CONFIG_HOST_PATH:-./data}:/app/data
     expose:
       - "3000"
     depends_on:

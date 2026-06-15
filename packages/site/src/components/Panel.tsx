@@ -8,11 +8,10 @@ export const Panel: React.FC<React.PropsWithChildren<{ className?: string }>> = 
   )
 }
 
-export const SectionHeader: React.FC<{ title: string; eyebrow: string }> = ({ title, eyebrow }) => {
+export const SectionHeader: React.FC<{ title: string }> = ({ title }) => {
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#00a85a]">{eyebrow}</p>
-      <h2 className="mt-1 text-xl font-bold text-[#111827]">{title}</h2>
+      <h2 className="text-xl font-bold text-[#111827]">{title}</h2>
     </div>
   )
 }

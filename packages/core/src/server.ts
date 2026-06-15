@@ -19,6 +19,11 @@ import { registerSearchRoute } from "./api/graph/search.js";
 import { registerHealthApi } from "./api/health.js";
 import { registerStatusRoute } from "./api/usage/status.js";
 import { registerUsagePingRoute } from "./api/usage/ping.js";
+import { registerGetConfigRoute } from "./api/config/get.js";
+import { registerUpdateConfigRoute } from "./api/config/update.js";
+import { registerGraphStatsRoute } from "./api/graph/stats.js";
+import { getAppSettings, loadAppSettings } from "./modules/app-config.js";
+import { posix } from "node:path";
 
 const config = readConfig();
 const app = Fastify({
@@ -34,8 +39,20 @@ const indexLinksQueue = createIndexLinksQueue();
 const indexFlowProducer = new FlowProducer({ connection: createRedisConnectionOptions() });
 const indexStatus = createIndexStatus();
 
-function getAnalyzedSourcePath(): string {
+loadAppSettings();
+
+function getMountPath(): string {
   return process.env.MAGENTIC_ANALYZED_SOURCE_PATH ?? "/mnt/analyzed-source";
+}
+
+function getAnalyzedSourcePath(): string {
+  const subpath = getAppSettings().analyzedSubpath;
+
+  return subpath === "" ? getMountPath() : posix.join(getMountPath(), subpath);
+}
+
+function getPhpVersion(): string {
+  return getAppSettings().phpVersion;
 }
 
 registerHealthApi(app, {
@@ -47,13 +64,16 @@ registerHealthApi(app, {
 registerSearchRoute(app, { postgres, neo4jDriver });
 registerGetQueryHistoryRoute(app, { postgres });
 registerIndexPackagesRoute(app, { indexPackagesQueue, getAnalyzedSourcePath });
-registerIndexSourceRoute(app, { indexSourceQueue, getAnalyzedSourcePath });
+registerIndexSourceRoute(app, { indexSourceQueue, getAnalyzedSourcePath, getPhpVersion });
 registerIndexLinksRoute(app, { indexLinksQueue });
 registerIndexDeltaRoute(app, { redis });
-registerIndexReindexRoute(app, { indexFlowProducer, redis, getAnalyzedSourcePath });
-registerIndexResetAndReindexRoute(app, { indexFlowProducer, redis, getAnalyzedSourcePath });
+registerIndexReindexRoute(app, { indexFlowProducer, redis, getAnalyzedSourcePath, getPhpVersion });
+registerIndexResetAndReindexRoute(app, { indexFlowProducer, redis, getAnalyzedSourcePath, getPhpVersion });
 registerIndexStatusRoute(app, { indexStatus, redis });
 registerStatusRoute(app, { indexStatus, redis });
+registerGetConfigRoute(app, { getMountPath });
+registerUpdateConfigRoute(app);
+registerGraphStatsRoute(app, { neo4jDriver });
 registerUsagePingRoute(app, { redis });
 
 async function start() {

@@ -4,7 +4,7 @@ import { indexLinksJobName, indexLinksQueueName } from "../../queue/index-links.
 import { indexPackagesJobName, indexPackagesQueueName } from "../../queue/index-packages.js";
 import { indexSourceJobName, indexSourceQueueName } from "../../queue/index-source.js";
 
-export function buildIndexFlow(analyzedSourcePath: string, withDelete: boolean): FlowJob {
+export function buildIndexFlow(analyzedSourcePath: string, withDelete: boolean, phpVersion?: string): FlowJob {
   const requestedAt = new Date().toISOString();
   const failParent = { failParentOnFailure: true };
   const deleteChildren: FlowJob[] = withDelete
@@ -26,7 +26,7 @@ export function buildIndexFlow(analyzedSourcePath: string, withDelete: boolean):
       {
         name: indexSourceJobName,
         queueName: indexSourceQueueName,
-        data: { analyzedSourcePath, directory: null, operation: "index", requestedAt, fullIndexFlow: true },
+        data: { analyzedSourcePath, directory: null, operation: "index", phpVersion, requestedAt, fullIndexFlow: true },
         opts: failParent,
         children: [
           {
