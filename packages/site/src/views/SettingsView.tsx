@@ -178,7 +178,7 @@ const AgentSection: React.FC = () => {
 
 const ConfigSection: React.FC = () => {
   const [config, setConfig] = useState<ConfigResponse | null>(null)
-  const [phpVersion, setPhpVersion] = useState('newest')
+  const [phpVersion, setPhpVersion] = useState('8.5')
   const [analyzedSubpath, setAnalyzedSubpath] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -227,9 +227,9 @@ const ConfigSection: React.FC = () => {
             onChange={(event) => setPhpVersion(event.target.value)}
             className="h-9 cursor-pointer rounded-lg border border-[#e5e7eb] bg-white px-3 text-sm text-[#111827] focus:border-[#cbd5e1] focus:outline-none"
           >
-            {(config?.phpVersionOptions ?? ['newest']).map((option) => (
+            {(config?.phpVersionOptions ?? ['8.5']).map((option) => (
               <option key={option} value={option}>
-                {option === 'newest' ? 'Newest supported' : option}
+                {option}
               </option>
             ))}
           </select>

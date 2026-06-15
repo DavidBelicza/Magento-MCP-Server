@@ -6,10 +6,10 @@ export type AppSettings = {
   analyzedSubpath: string;
 };
 
-export const phpVersionOptions = ["newest", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"] as const;
+export const phpVersionOptions = ["8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"] as const;
 
 const defaults: AppSettings = {
-  phpVersion: "newest",
+  phpVersion: "8.5",
   analyzedSubpath: ""
 };
 

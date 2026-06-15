@@ -79,7 +79,7 @@ readonly class StreamAnalyzerHandler
         $docBlockResolver = new DocBlockTypeResolver(new Lexer($parserConfig), $phpDocParser);
 
         $factory = new ParserFactory();
-        $parser = $phpVersion === null || $phpVersion === 'newest'
+        $parser = $phpVersion === null
             ? $factory->createForNewestSupportedVersion()
             : $factory->createForVersion(PhpVersion::fromString($phpVersion));
 
