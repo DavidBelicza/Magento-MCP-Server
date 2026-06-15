@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Panel } from '../components/Panel'
 
 type QueryHistoryItem = {
   id: string
@@ -89,47 +88,39 @@ export const QueryHistoryView: React.FC = () => {
 
   return (
     <section className="min-h-full">
-      <Panel className="p-5">
-        <div className="flex justify-end">
-          <div className="rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-xs font-semibold text-[#4b5563]">
-            {itemCountLabel}
-          </div>
+      <div className="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white">
+        <div className="flex justify-start border-b border-[#e5e7eb] px-4 py-3">
+          <span className="text-xs font-semibold text-[#4b5563]">{itemCountLabel}</span>
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-lg border border-[#e5e7eb]">
-          {status === 'loading' ? (
-            <QueryHistoryMessage title="Loading query history" />
-          ) : null}
+        {status === 'loading' ? <QueryHistoryMessage title="Loading query history" /> : null}
 
-          {status === 'error' ? (
-            <QueryHistoryMessage title={error ?? 'Query history could not be loaded'} />
-          ) : null}
+        {status === 'error' ? (
+          <QueryHistoryMessage title={error ?? 'Query history could not be loaded'} />
+        ) : null}
 
-          {status === 'ready' && items.length === 0 ? (
-            <QueryHistoryMessage title="No query history yet" />
-          ) : null}
+        {status === 'ready' && items.length === 0 ? <QueryHistoryMessage title="No query history yet" /> : null}
 
-          {status === 'ready' && items.length > 0 ? (
-            <div>
-              <div className="hidden grid-cols-[minmax(0,1fr)_150px_170px_110px] gap-4 border-b border-[#e5e7eb] bg-[#f9fafb] px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#6b7280] lg:grid">
-                <div>Query</div>
-                <div>Graph</div>
-                <div>Created</div>
-                <div>Action</div>
-              </div>
-              {items.map((item, index) => (
-                <QueryHistoryRow
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  isExpanded={expandedIds.has(item.id)}
-                  onToggle={() => toggleExpanded(item.id)}
-                />
-              ))}
+        {status === 'ready' && items.length > 0 ? (
+          <div>
+            <div className="hidden grid-cols-[minmax(0,1fr)_150px_170px_110px] gap-4 border-b border-[#e5e7eb] bg-[#f9fafb] px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#6b7280] lg:grid">
+              <div>Query</div>
+              <div>Graph</div>
+              <div>Created</div>
+              <div>Action</div>
             </div>
-          ) : null}
-        </div>
-      </Panel>
+            {items.map((item, index) => (
+              <QueryHistoryRow
+                key={item.id}
+                item={item}
+                index={index}
+                isExpanded={expandedIds.has(item.id)}
+                onToggle={() => toggleExpanded(item.id)}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
     </section>
   )
 }

@@ -140,7 +140,7 @@ export const GraphView: React.FC = () => {
   }, [queryHistoryId])
 
   return (
-    <div className="grid h-full min-h-[360px] grid-cols-1">
+    <div className="grid min-h-[360px] flex-1 grid-cols-1">
       <Panel className="flex min-h-0 flex-col overflow-hidden">
         <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#e5e7eb] px-4">
           <div className="min-w-0 truncate text-xs font-semibold text-[#4b5563]" title={queryDescription ?? undefined}>

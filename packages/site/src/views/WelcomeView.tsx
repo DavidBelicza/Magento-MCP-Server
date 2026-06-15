@@ -80,10 +80,10 @@ const LinkRow: React.FC<{ title: string; meta: string; href: string }> = ({ titl
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-lg border border-[#e5e7eb] bg-white p-4 transition hover:border-[#cbd5e1] hover:bg-[#e5e7eb]"
+      className="block rounded-lg border border-[#e5e7eb] bg-white p-4 transition hover:border-[#cbd5e1] hover:bg-[#f3f4f6]"
     >
       <div className="text-sm font-semibold text-[#111827]">{title}</div>
-      <div className="mt-1 text-xs font-bold text-[#fd8504]">{meta}</div>
+      <div className="mt-1 text-xs font-bold text-[#00a85a]">{meta}</div>
     </a>
   )
 }

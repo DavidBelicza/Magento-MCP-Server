@@ -5,7 +5,6 @@ import { Sidebar } from "../components/Sidebar";
 import { TopBar } from "../components/TopBar";
 import { DatabaseView } from "../views/DatabaseView";
 import { GraphView } from "../views/GraphView";
-import { MCPSetupView } from "../views/MCPSetupView";
 import { QueryHistoryView } from "../views/QueryHistoryView";
 import { SettingsView } from "../views/SettingsView";
 import { WelcomeView } from "../views/WelcomeView";
@@ -30,7 +29,7 @@ export function App() {
         onToggle={() => setIsSidebarCollapsed((currentValue) => !currentValue)}
       />
 
-      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-white md:rounded-l-[18px]">
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden border-l border-[#e5e7eb] bg-white md:rounded-l-[18px]">
         <div className="pointer-events-none absolute right-0 top-0 h-80 w-[520px] bg-[radial-gradient(circle_at_70%_18%,rgba(0,255,140,0.24),transparent_54%),radial-gradient(circle_at_85%_58%,rgba(255,78,8,0.34),transparent_24%)] blur-lg" />
         <TopBar activeLabel={activeItem.label} />
         <div className="relative z-10 shrink-0">
@@ -58,14 +57,13 @@ export function App() {
             ))}
           </nav>
         </div>
-        <section className="relative z-10 min-h-0 flex-1 overflow-auto px-4 pb-5 md:px-6 md:pb-6">
-          <div className="h-full min-h-full pt-0 md:pt-28">
+        <section className="relative z-10 min-h-0 flex-1 overflow-auto px-4 md:px-6">
+          <div className="flex min-h-full flex-col pt-0 pb-8 md:pt-28 md:pb-10">
             <Routes>
               <Route path="/" element={<WelcomeView />} />
               <Route path="/graph" element={<GraphView />} />
               <Route path="/history" element={<QueryHistoryView />} />
               <Route path="/database" element={<DatabaseView />} />
-              <Route path="/setup" element={<MCPSetupView />} />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

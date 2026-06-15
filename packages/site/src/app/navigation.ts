@@ -1,6 +1,6 @@
-export type ViewId = 'welcome' | 'graph' | 'history' | 'database' | 'setup' | 'settings'
+export type ViewId = 'welcome' | 'graph' | 'history' | 'database' | 'settings'
 
-export type IconName = 'home' | 'graph' | 'history' | 'database' | 'plug' | 'settings' | 'chevron'
+export type IconName = 'home' | 'graph' | 'history' | 'database' | 'activity' | 'plug' | 'settings' | 'chevron'
 
 export type NavigationItem = {
   id: ViewId
@@ -13,7 +13,6 @@ export const viewRoutes: Record<ViewId, string> = {
   graph: '/graph',
   history: '/history',
   database: '/database',
-  setup: '/setup',
   settings: '/settings',
 }
 
@@ -21,7 +20,6 @@ export const navigationItems: NavigationItem[] = [
   { id: 'welcome', label: 'Welcome', icon: 'home' },
   { id: 'graph', label: 'Graph', icon: 'graph' },
   { id: 'history', label: 'Query History', icon: 'history' },
-  { id: 'database', label: 'Database', icon: 'database' },
-  { id: 'setup', label: 'MCP Setup', icon: 'plug' },
+  { id: 'database', label: 'Self Diagnosis', icon: 'activity' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ]

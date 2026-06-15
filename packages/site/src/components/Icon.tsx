@@ -48,6 +48,12 @@ export const Icon: React.FC<{ name: IconName }> = ({ name }) => {
           <path d="M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
         </svg>
       )
+    case 'activity':
+      return (
+        <svg {...commonProps} aria-hidden="true">
+          <path d="M3 12h4l2.5-7 5 14 2.5-7H21" />
+        </svg>
+      )
     case 'plug':
       return (
         <svg {...commonProps} aria-hidden="true">

@@ -23,7 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isCollapsed ? 'w-[78px]' : 'w-[244px]',
       ].join(' ')}
     >
-      <div className="mb-8 flex items-center gap-3">
+      <div className="mb-10 flex items-center gap-3">
         <div
           className={[
             'grid size-[54px] shrink-0 place-items-center overflow-hidden rounded-lg',
@@ -33,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         {!isCollapsed && (
           <div className="min-w-0">
-            <div className="-ml-px truncate text-2xl font-black tracking-tighter leading-[1.1] text-[#111827]">
+            <div className="-ml-px truncate text-3xl font-black tracking-tighter leading-[1.2] text-[#111827]">
               Magentic
             </div>
             <div className="truncate text-xs leading-[1] text-[#4b5563]">MCP Server for Agentic AI</div>

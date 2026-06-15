@@ -29,11 +29,6 @@ type IndexStatus = {
   items: IndexJob[]
 }
 
-type AgentStatus = {
-  connected: boolean
-  lastSeenAt: number | null
-}
-
 type AppSettings = {
   phpVersion: string
   projectRoot: string
@@ -46,19 +41,11 @@ type ConfigResponse = {
   phpVersionOptions: string[]
 }
 
-type GraphStats = {
-  nodeCount: number
-  relationshipCount: number
-  byLabel: { label: string; count: number }[]
-}
-
 export const SettingsView: React.FC = () => {
   return (
     <section className="grid min-h-full grid-cols-1 gap-5 xl:grid-cols-2">
-      <IndexingSection />
-      <AgentSection />
       <ConfigSection />
-      <GraphSection />
+      <IndexingSection />
       <McpSection />
     </section>
   )
@@ -110,6 +97,9 @@ const IndexingSection: React.FC = () => {
   }
 
   const running = (status?.inProgress ?? 0) > 0 || (status?.locked ?? false)
+  const sortedItems = status
+    ? [...status.items].sort((a, b) => Number(b.state === 'active') - Number(a.state === 'active'))
+    : []
 
   return (
     <Panel className="p-5">
@@ -117,26 +107,32 @@ const IndexingSection: React.FC = () => {
       <div className="mt-5">
         {status && status.items.length > 0 ? (
           <ul className="grid gap-2">
-            {status.items.map((item, index) => (
-              <li
-                key={`${item.queue}-${item.name}-${index}`}
-                className="flex items-center justify-between gap-4 rounded-lg border border-[#e5e7eb] bg-white px-4 py-2.5"
-              >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="relative flex h-2.5 w-2.5 shrink-0">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#fd8504] opacity-60" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#fd8504]" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-[#111827]">{item.queue ?? 'job'}</div>
-                    <ProgressDetail progress={item.progress} fallback={item.name} />
+            {sortedItems.map((item, index) => {
+              const active = item.state === 'active'
+              const dotColor = active ? 'bg-[#00e676]' : 'bg-[#fd8504]'
+              const badgeTone = active ? 'bg-[#d8ffe8] text-[#00a85a]' : 'bg-[#fff3e6] text-[#fd8504]'
+
+              return (
+                <li
+                  key={`${item.queue}-${item.name}-${index}`}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-[#e5e7eb] bg-white px-4 py-2.5"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="relative flex h-2.5 w-2.5 shrink-0">
+                      <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${dotColor}`} />
+                      <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dotColor}`} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-[#111827]">{item.queue ?? 'job'}</div>
+                      <ProgressDetail progress={item.progress} fallback={item.name} active={active} />
+                    </div>
                   </div>
-                </div>
-                <span className="shrink-0 rounded-md bg-[#fff3e6] px-2 py-1 text-[11px] font-bold text-[#fd8504]">
-                  {formatState(item.state)}
-                </span>
-              </li>
-            ))}
+                  <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-bold ${badgeTone}`}>
+                    {formatState(item.state)}
+                  </span>
+                </li>
+              )
+            })}
           </ul>
         ) : (
           <p className="text-sm text-[#6b7280]">
@@ -158,47 +154,9 @@ const IndexingSection: React.FC = () => {
   )
 }
 
-const AgentSection: React.FC = () => {
-  const [agent, setAgent] = useState<AgentStatus | null>(null)
-
-  useEffect(() => {
-    const load = () => {
-      fetch('/api/status')
-        .then((response) => response.json())
-        .then((data) => setAgent(data.agent ?? null))
-        .catch(() => setAgent(null))
-    }
-
-    load()
-    const timer = window.setInterval(load, 3000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  const connected = agent?.connected ?? false
-
-  return (
-    <Panel className="p-5">
-      <SectionHeader title="AI Agent Activity" />
-      <div className="mt-5 grid gap-3">
-        <Row label="Status">
-          <span className="inline-flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${connected ? 'bg-[#00e676]' : 'bg-[#fd8504]'}`} />
-            {connected ? 'Connected' : 'Idle'}
-          </span>
-        </Row>
-        <Row label="Last interaction">{agent?.lastSeenAt ? formatRelative(agent.lastSeenAt) : 'No activity yet'}</Row>
-        <Row label="At">{agent?.lastSeenAt ? new Date(agent.lastSeenAt).toLocaleString() : '—'}</Row>
-      </div>
-      <p className="mt-3 text-xs text-[#6b7280]">
-        Connected means an agent called the MCP server within the last 120 seconds.
-      </p>
-    </Panel>
-  )
-}
-
 const ConfigSection: React.FC = () => {
   const [config, setConfig] = useState<ConfigResponse | null>(null)
-  const [phpVersion, setPhpVersion] = useState('8.5')
+  const [phpVersion, setPhpVersion] = useState('8.4')
   const [projectRoot, setProjectRoot] = useState('')
   const [sourceSubpaths, setSourceSubpaths] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
@@ -264,7 +222,7 @@ const ConfigSection: React.FC = () => {
             onChange={(event) => setPhpVersion(event.target.value)}
             className="h-9 cursor-pointer rounded-lg border border-[#e5e7eb] bg-white px-3 text-sm text-[#111827] focus:border-[#cbd5e1] focus:outline-none"
           >
-            {(config?.phpVersionOptions ?? ['8.5']).map((option) => (
+            {(config?.phpVersionOptions ?? ['8.4']).map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
@@ -328,32 +286,6 @@ const ConfigSection: React.FC = () => {
   )
 }
 
-const GraphSection: React.FC = () => {
-  const [stats, setStats] = useState<GraphStats | null>(null)
-
-  useEffect(() => {
-    fetch('/api/graph/stats')
-      .then((response) => response.json())
-      .then((data) => setStats(data.ok ? data : null))
-      .catch(() => setStats(null))
-  }, [])
-
-  return (
-    <Panel className="p-5">
-      <SectionHeader title="Graph Summary" />
-      <div className="mt-5 grid gap-3">
-        <Row label="Total nodes">{stats ? stats.nodeCount.toLocaleString() : '—'}</Row>
-        <Row label="Total relationships">{stats ? stats.relationshipCount.toLocaleString() : '—'}</Row>
-        {stats?.byLabel.slice(0, 6).map((item) => (
-          <Row key={item.label} label={item.label}>
-            {item.count.toLocaleString()}
-          </Row>
-        ))}
-      </div>
-    </Panel>
-  )
-}
-
 const McpSection: React.FC = () => {
   return (
     <Panel className="p-5 xl:col-span-2">
@@ -373,7 +305,7 @@ const McpSection: React.FC = () => {
             Open the README on GitHub →
           </a>
         </div>
-        <pre className="overflow-auto rounded-lg border border-slate-200 bg-[#183d28] p-4 text-xs leading-6 text-white">
+        <pre className="overflow-auto rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] p-4 text-xs leading-6 text-[#111827]">
 {`{
   "mcpServers": {
     "magentic": {
@@ -413,7 +345,11 @@ const ActionButton: React.FC<{ label: string; disabled?: boolean; onClick: () =>
   )
 }
 
-const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: string }> = ({ progress, fallback }) => {
+const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: string; active?: boolean }> = ({
+  progress,
+  fallback,
+  active
+}) => {
   if (!progress || typeof progress !== 'object') {
     return <div className="truncate text-xs text-[#6b7280]">{fallback}</div>
   }
@@ -435,11 +371,12 @@ const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: stri
         <div className="mt-1 flex flex-wrap gap-1">
           {directories.map((directory, index) => {
             const status = index + 1 < current ? 'done' : index + 1 === current ? 'active' : 'waiting'
+            const activeTone = active ? 'bg-[#d8ffe8] text-[#00a85a]' : 'bg-[#fff3e6] text-[#fd8504]'
             const tone =
               status === 'done'
                 ? 'bg-[#e5e7eb] text-[#6b7280]'
                 : status === 'active'
-                  ? 'bg-[#fff3e6] text-[#fd8504]'
+                  ? activeTone
                   : 'border border-[#e5e7eb] text-[#9ca3af]'
 
             return (
@@ -519,20 +456,3 @@ function describeProgress(progress: IndexJob['progress']): string | null {
   return parts.length > 0 ? parts.join(' · ') : null
 }
 
-function formatRelative(timestamp: number): string {
-  const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000))
-
-  if (seconds < 60) {
-    return `${seconds}s ago`
-  }
-
-  if (seconds < 3600) {
-    return `${Math.round(seconds / 60)}m ago`
-  }
-
-  if (seconds < 86400) {
-    return `${Math.round(seconds / 3600)}h ago`
-  }
-
-  return `${Math.round(seconds / 86400)}d ago`
-}
