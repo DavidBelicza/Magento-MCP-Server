@@ -5,6 +5,7 @@ type Body = {
   phpVersion?: string;
   projectRoot?: string;
   sourceSubpaths?: string[];
+  watcherEnabled?: boolean;
 };
 
 export function registerUpdateConfigRoute(app: FastifyInstance): void {
@@ -21,7 +22,8 @@ export function registerUpdateConfigRoute(app: FastifyInstance): void {
       const updated = updateAppSettings({
         phpVersion: body.phpVersion ?? settings.phpVersion,
         projectRoot: body.projectRoot ?? settings.projectRoot,
-        sourceSubpaths: body.sourceSubpaths ?? settings.sourceSubpaths
+        sourceSubpaths: body.sourceSubpaths ?? settings.sourceSubpaths,
+        watcherEnabled: body.watcherEnabled ?? settings.watcherEnabled
       });
 
       return reply.send({ ok: true, settings: updated });

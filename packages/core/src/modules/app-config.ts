@@ -5,6 +5,7 @@ export type AppSettings = {
   phpVersion: string;
   projectRoot: string;
   sourceSubpaths: string[];
+  watcherEnabled: boolean;
 };
 
 export const phpVersionOptions = ["8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"] as const;
@@ -12,7 +13,8 @@ export const phpVersionOptions = ["8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4
 const defaults: AppSettings = {
   phpVersion: "8.4",
   projectRoot: "",
-  sourceSubpaths: []
+  sourceSubpaths: [],
+  watcherEnabled: true
 };
 
 let current: AppSettings | null = null;
@@ -74,7 +76,8 @@ function normalize(raw: Record<string, unknown> | null): AppSettings {
   return {
     phpVersion: sanitizePhpVersion(raw?.phpVersion),
     projectRoot,
-    sourceSubpaths
+    sourceSubpaths,
+    watcherEnabled: typeof raw?.watcherEnabled === "boolean" ? raw.watcherEnabled : defaults.watcherEnabled
   };
 }
 

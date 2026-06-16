@@ -33,6 +33,7 @@ type AppSettings = {
   phpVersion: string
   projectRoot: string
   sourceSubpaths: string[]
+  watcherEnabled: boolean
 }
 
 type ConfigResponse = {
@@ -55,7 +56,24 @@ const IndexingSection: React.FC = () => {
   const [status, setStatus] = useState<IndexStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [watcherEnabled, setWatcherEnabled] = useState<boolean | null>(null)
   const wasRunning = useRef(false)
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((response) => response.json())
+      .then((data) => setWatcherEnabled(data.settings?.watcherEnabled ?? null))
+      .catch(() => setWatcherEnabled(null))
+  }, [])
+
+  const toggleWatcher = (enabled: boolean) => {
+    setWatcherEnabled(enabled)
+    void fetch('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ watcherEnabled: enabled })
+    }).catch(() => undefined)
+  }
 
   const load = useCallback(() => {
     fetch('/api/graph/index/status')
@@ -149,6 +167,17 @@ const IndexingSection: React.FC = () => {
           />
         </div>
         {message ? <p className="mt-3 text-xs text-[#6b7280]">{message}</p> : null}
+
+        <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-[#e5e7eb] bg-white px-4 py-2.5">
+          <span className="text-sm text-[#4b5563]">File watcher (auto-reindex on change)</span>
+          <input
+            type="checkbox"
+            checked={watcherEnabled ?? false}
+            disabled={watcherEnabled === null}
+            onChange={(event) => toggleWatcher(event.target.checked)}
+            className="h-4 w-4 cursor-pointer accent-[#00a85a]"
+          />
+        </label>
       </div>
     </Panel>
   )

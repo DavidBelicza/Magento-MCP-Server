@@ -4,7 +4,8 @@
   "workspaces": [
     "packages/core",
     "packages/site",
-    "packages/mcp"
+    "packages/mcp",
+    "packages/watcher"
   ],
   "scripts": {
     "build": "npm run build --workspaces",

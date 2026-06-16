@@ -60,6 +60,20 @@ services:
       - ./packages/mcp/package.json:/app/package.json
       - ./packages/mcp/tsconfig.json:/app/tsconfig.json
 
+  magentic_watcher:
+    image: magentic_watcher_dev:latest
+    build:
+      context: .
+      dockerfile: services/watcher/Dockerfile
+      target: dev
+    environment:
+      NODE_ENV: development
+    command: ["npm", "run", "dev"]
+    volumes:
+      - ./packages/watcher/src:/app/src
+      - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:${MAGENTIC_ANALYZED_SOURCE_CONTAINER_PATH:-/mnt/analyzed-source}:ro
+      - ${MAGENTIC_CONFIG_HOST_PATH:-./data}:/app/data:ro
+
   magentic_analyzer_php:
     image: magentic_analyzer_php_dev:latest
     build: *magentic_analyzer_php_dev_build

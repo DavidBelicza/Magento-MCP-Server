@@ -27,6 +27,7 @@ The Compose project is named `magentic`. Main services:
 - `magentic_backend`: private Fastify API service; routes live in `packages/core/src/server.ts`.
 - `magentic_worker`: private BullMQ worker; entrypoint is `packages/core/src/worker.ts`.
 - `magentic_analyzer_php`: private PHP analyzer runtime.
+- `magentic_watcher`: standalone file watcher (`packages/watcher`). Reads `config.json` (read-only `./data` mount) for `watcherEnabled`, `sourceSubpaths` (or whole mount), and `projectRoot`/`composer.lock`, watches `*.php` + the lock with chokidar (native events; `MAGENTIC_WATCH_POLLING=true` forces polling), re-scopes when the config file changes, and currently only logs debounced change events. Independent of the worker/backend at runtime.
 - `magentic_redis`: queue backend for BullMQ.
 - `magentic_postgres`: persistent application storage and schema history.
 - `magentic_graphdb`: Neo4j graph database, exposed for local browser/debug access.
