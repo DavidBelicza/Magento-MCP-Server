@@ -1,33 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Panel, SectionHeader } from '../components/Panel'
+import { IndexingStatusList } from '../components/IndexingStatusList'
+import { useStatus } from '../app/StatusContext'
 
 const readmeUrl = 'https://github.com/DavidBelicza/Magentic/blob/main/README.md'
-
-type JobProgress = {
-  phase?: string
-  directory?: string
-  directories?: string[]
-  current?: number
-  total?: number
-  processed?: number
-  percent?: number
-  nodes?: number
-  edges?: number
-}
-
-type IndexJob = {
-  queue?: string
-  name?: string
-  state?: string
-  timestamp?: number
-  progress?: JobProgress | number | null
-}
-
-type IndexStatus = {
-  inProgress: number
-  locked: boolean
-  items: IndexJob[]
-}
 
 type AppSettings = {
   phpVersion: string
@@ -53,49 +29,37 @@ export const SettingsView: React.FC = () => {
 }
 
 const IndexingSection: React.FC = () => {
-  const [status, setStatus] = useState<IndexStatus | null>(null)
+  const status = useStatus()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const [watcherEnabled, setWatcherEnabled] = useState<boolean | null>(null)
+  const [watcherOverride, setWatcherOverride] = useState<boolean | null>(null)
   const wasRunning = useRef(false)
 
+  const running = (status?.indexing.inProgress ?? 0) > 0 || (status?.indexing.locked ?? false)
+
   useEffect(() => {
-    fetch('/api/config')
-      .then((response) => response.json())
-      .then((data) => setWatcherEnabled(data.settings?.watcherEnabled ?? null))
-      .catch(() => setWatcherEnabled(null))
-  }, [])
+    if (wasRunning.current && !running) {
+      setMessage(null)
+    }
+    wasRunning.current = running
+  }, [running])
+
+  const watcherEnabled = watcherOverride ?? status?.watcherEnabled ?? null
+
+  useEffect(() => {
+    if (watcherOverride !== null && status?.watcherEnabled === watcherOverride) {
+      setWatcherOverride(null)
+    }
+  }, [status?.watcherEnabled, watcherOverride])
 
   const toggleWatcher = (enabled: boolean) => {
-    setWatcherEnabled(enabled)
+    setWatcherOverride(enabled)
     void fetch('/api/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ watcherEnabled: enabled })
     }).catch(() => undefined)
   }
-
-  const load = useCallback(() => {
-    fetch('/api/graph/index/status')
-      .then((response) => response.json())
-      .then((data) => {
-        const next = { inProgress: data.inProgress ?? 0, locked: data.locked ?? false, items: data.items ?? [] }
-        setStatus(next)
-
-        const running = next.inProgress > 0 || next.locked
-        if (wasRunning.current && !running) {
-          setMessage(null)
-        }
-        wasRunning.current = running
-      })
-      .catch(() => setStatus(null))
-  }, [])
-
-  useEffect(() => {
-    load()
-    const timer = window.setInterval(load, 3000)
-    return () => window.clearInterval(timer)
-  }, [load])
 
   const run = (endpoint: string, label: string) => {
     if (!window.confirm(`Start ${label}? This runs against the configured source.`)) {
@@ -108,55 +72,14 @@ const IndexingSection: React.FC = () => {
       .then((response) => response.json())
       .then((data) => setMessage(data.ok ? `${label} started.` : data.error ?? `${label} failed.`))
       .catch(() => setMessage(`${label} failed.`))
-      .finally(() => {
-        setBusy(false)
-        load()
-      })
+      .finally(() => setBusy(false))
   }
-
-  const running = (status?.inProgress ?? 0) > 0 || (status?.locked ?? false)
-  const sortedItems = status
-    ? [...status.items].sort((a, b) => Number(b.state === 'active') - Number(a.state === 'active'))
-    : []
 
   return (
     <Panel className="p-5">
       <SectionHeader title="Indexing Pipeline" />
       <div className="mt-5">
-        {status && status.items.length > 0 ? (
-          <ul className="grid gap-2">
-            {sortedItems.map((item, index) => {
-              const active = item.state === 'active'
-              const dotColor = active ? 'bg-[#00e676]' : 'bg-[#fd8504]'
-              const badgeTone = active ? 'bg-[#d8ffe8] text-[#00a85a]' : 'bg-[#fff3e6] text-[#fd8504]'
-
-              return (
-                <li
-                  key={`${item.queue}-${item.name}-${index}`}
-                  className="flex items-center justify-between gap-4 rounded-lg border border-[#e5e7eb] bg-white px-4 py-2.5"
-                >
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="relative flex h-2.5 w-2.5 shrink-0">
-                      <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${dotColor}`} />
-                      <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dotColor}`} />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[#111827]">{item.queue ?? 'job'}</div>
-                      <ProgressDetail progress={item.progress} fallback={item.name} active={active} />
-                    </div>
-                  </div>
-                  <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-bold ${badgeTone}`}>
-                    {formatState(item.state)}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        ) : (
-          <p className="text-sm text-[#6b7280]">
-            {status?.locked ? 'A full index is locked and starting…' : 'No indexing in progress.'}
-          </p>
-        )}
+        <IndexingStatusList items={status?.indexing.items ?? []} locked={status?.indexing.locked ?? false} />
 
         <div className="mt-4 flex flex-wrap gap-2">
           <ActionButton label="Reindex" disabled={busy || running} onClick={() => run('/api/graph/index/reindex', 'reindex')} />
@@ -372,116 +295,5 @@ const ActionButton: React.FC<{ label: string; disabled?: boolean; onClick: () =>
       {label}
     </button>
   )
-}
-
-const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: string; active?: boolean }> = ({
-  progress,
-  fallback,
-  active
-}) => {
-  if (!progress || typeof progress !== 'object') {
-    return <div className="truncate text-xs text-[#6b7280]">{fallback}</div>
-  }
-
-  const line = describeProgress(progress) ?? fallback
-  const hasCounts = typeof progress.nodes === 'number' || typeof progress.edges === 'number'
-  const directories = progress.directories
-  const current = typeof progress.current === 'number' ? progress.current : 0
-
-  return (
-    <div className="min-w-0">
-      {line ? <div className="truncate text-xs text-[#6b7280]">{line}</div> : null}
-      {hasCounts ? (
-        <div className="mt-0.5 text-xs text-[#111827]">
-          <CountUp value={progress.nodes ?? 0} /> nodes · <CountUp value={progress.edges ?? 0} /> edges
-        </div>
-      ) : null}
-      {Array.isArray(directories) && directories.length > 1 ? (
-        <div className="mt-1 flex flex-wrap gap-1">
-          {directories.map((directory, index) => {
-            const status = index + 1 < current ? 'done' : index + 1 === current ? 'active' : 'waiting'
-            const activeTone = active ? 'bg-[#d8ffe8] text-[#00a85a]' : 'bg-[#fff3e6] text-[#fd8504]'
-            const tone =
-              status === 'done'
-                ? 'bg-[#e5e7eb] text-[#6b7280]'
-                : status === 'active'
-                  ? activeTone
-                  : 'border border-[#e5e7eb] text-[#9ca3af]'
-
-            return (
-              <span key={`${directory}-${index}`} className={`rounded px-1.5 py-0.5 text-[10px] ${tone}`}>
-                {directory}
-              </span>
-            )
-          })}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-const CountUp: React.FC<{ value: number }> = ({ value }) => {
-  return <>{useCountUp(value).toLocaleString()}</>
-}
-
-function useCountUp(target: number, duration = 1500): number {
-  const [display, setDisplay] = useState(target)
-  const displayRef = useRef(target)
-  displayRef.current = display
-
-  useEffect(() => {
-    const from = displayRef.current
-
-    if (from === target) {
-      return
-    }
-
-    let raf = 0
-    const start = performance.now()
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration)
-      const eased = 1 - Math.pow(1 - t, 3)
-      setDisplay(Math.round(from + (target - from) * eased))
-
-      if (t < 1) {
-        raf = requestAnimationFrame(tick)
-      }
-    }
-
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [target, duration])
-
-  return display
-}
-
-function formatState(state: string | undefined): string {
-  return state === 'active' ? 'in progress' : (state ?? 'unknown')
-}
-
-function describeProgress(progress: IndexJob['progress']): string | null {
-  if (!progress || typeof progress !== 'object') {
-    return null
-  }
-
-  const parts: string[] = []
-
-  if (progress.phase) {
-    parts.push(progress.phase)
-  }
-
-  if (progress.directory && progress.directory !== '.') {
-    parts.push(progress.directory)
-  }
-
-  if (typeof progress.current === 'number' && typeof progress.total === 'number' && progress.total > 1) {
-    parts.push(`(${progress.current}/${progress.total})`)
-  }
-
-  if (typeof progress.percent === 'number' && progress.percent > 0 && progress.percent < 100) {
-    parts.push(`${Math.round(progress.percent)}%`)
-  }
-
-  return parts.length > 0 ? parts.join(' · ') : null
 }
 

@@ -9,6 +9,7 @@ import { QueryHistoryView } from "../views/QueryHistoryView";
 import { SettingsView } from "../views/SettingsView";
 import { WelcomeView } from "../views/WelcomeView";
 import { navigationItems, viewRoutes, type ViewId } from "./navigation";
+import { StatusProvider } from "./StatusContext";
 
 export function App() {
   const location = useLocation();
@@ -21,6 +22,7 @@ export function App() {
   );
 
   return (
+    <StatusProvider>
     <div className="flex h-screen overflow-hidden bg-[#f4f6f8] text-[#111827]">
       <Sidebar
         activeView={activeView}
@@ -71,6 +73,7 @@ export function App() {
         </section>
       </main>
     </div>
+    </StatusProvider>
   );
 }
 

@@ -1,10 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Panel, SectionHeader } from '../components/Panel'
-
-type AgentStatus = {
-  connected: boolean
-  lastSeenAt: number | null
-}
+import { IndexingStatusList } from '../components/IndexingStatusList'
+import { useStatus } from '../app/StatusContext'
 
 type GraphStats = {
   nodeCount: number
@@ -16,27 +13,16 @@ export const DatabaseView: React.FC = () => {
   return (
     <section className="grid gap-5 xl:grid-cols-2">
       <AgentSection />
+      <WatcherSection />
+      <IndexingPanel />
       <GraphSection />
     </section>
   )
 }
 
 const AgentSection: React.FC = () => {
-  const [agent, setAgent] = useState<AgentStatus | null>(null)
-
-  useEffect(() => {
-    const load = () => {
-      fetch('/api/status')
-        .then((response) => response.json())
-        .then((data) => setAgent(data.agent ?? null))
-        .catch(() => setAgent(null))
-    }
-
-    load()
-    const timer = window.setInterval(load, 3000)
-    return () => window.clearInterval(timer)
-  }, [])
-
+  const status = useStatus()
+  const agent = status?.agent ?? null
   const connected = agent?.connected ?? false
 
   return (
@@ -59,19 +45,83 @@ const AgentSection: React.FC = () => {
   )
 }
 
+const WatcherSection: React.FC = () => {
+  const status = useStatus()
+
+  const { label, tone } = (() => {
+    if (!status) {
+      return { label: 'Unknown', tone: 'bg-[#9ca3af]' }
+    }
+    if (!status.watcherEnabled) {
+      return { label: 'Disabled', tone: 'bg-[#9ca3af]' }
+    }
+    if (status.indexing.locked) {
+      return { label: 'Paused (full reindex)', tone: 'bg-[#fd8504]' }
+    }
+    return { label: 'Enabled', tone: 'bg-[#00e676]' }
+  })()
+
+  return (
+    <Panel className="p-5">
+      <SectionHeader title="File Watcher" />
+      <div className="mt-5 grid gap-3">
+        <Row label="Status">
+          <span className="inline-flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${tone}`} />
+            {label}
+          </span>
+        </Row>
+      </div>
+      <p className="mt-3 text-xs text-[#6b7280]">
+        Auto-reindexes changed files. Pauses while a full reindex runs. Toggle it on the Settings page.
+      </p>
+    </Panel>
+  )
+}
+
+const IndexingPanel: React.FC = () => {
+  const status = useStatus()
+
+  return (
+    <Panel className="p-5">
+      <SectionHeader title="Indexing Pipeline" />
+      <div className="mt-5">
+        <IndexingStatusList items={status?.indexing.items ?? []} locked={status?.indexing.locked ?? false} />
+      </div>
+    </Panel>
+  )
+}
+
 const GraphSection: React.FC = () => {
   const [stats, setStats] = useState<GraphStats | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true)
     fetch('/api/graph/stats')
       .then((response) => response.json())
       .then((data) => setStats(data.ok ? data : null))
       .catch(() => setStats(null))
+      .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   return (
     <Panel className="p-5">
-      <SectionHeader title="Graph Summary" />
+      <div className="flex items-center justify-between gap-4">
+        <SectionHeader title="Graph Summary" />
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="h-8 shrink-0 cursor-pointer rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#111827] transition hover:border-[#cbd5e1] hover:bg-[#e5e7eb] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
       <div className="mt-5 grid gap-3">
         <Row label="Total nodes">{stats ? stats.nodeCount.toLocaleString() : '—'}</Row>
         <Row label="Total relationships">{stats ? stats.relationshipCount.toLocaleString() : '—'}</Row>

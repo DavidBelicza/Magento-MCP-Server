@@ -1,13 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { viewRoutes } from '../app/navigation'
-
-type StatusState = {
-  indexing: { inProgress: number; locked: boolean }
-  agent: { connected: boolean; lastSeenAt: number | null }
-}
-
-const pollIntervalMs = 3000
+import { useStatus } from '../app/StatusContext'
 
 export const TopBar: React.FC<{ activeLabel: string }> = ({ activeLabel }) => {
   const status = useStatus()
@@ -62,43 +56,4 @@ const StatusPill: React.FC<StatusPillProps> = ({ label, value, tone, onClick }) 
       <span className="text-[10px]">{value}</span>
     </button>
   )
-}
-
-function useStatus(): StatusState | null {
-  const [status, setStatus] = useState<StatusState | null>(null)
-
-  useEffect(() => {
-    let active = true
-
-    const poll = () => {
-      fetch('/api/status')
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(`Status check failed with ${response.status}`)
-          }
-
-          return response.json()
-        })
-        .then((data: StatusState) => {
-          if (active) {
-            setStatus(data)
-          }
-        })
-        .catch(() => {
-          if (active) {
-            setStatus(null)
-          }
-        })
-    }
-
-    poll()
-    const timer = window.setInterval(poll, pollIntervalMs)
-
-    return () => {
-      active = false
-      window.clearInterval(timer)
-    }
-  }, [])
-
-  return status
 }

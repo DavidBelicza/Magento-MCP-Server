@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { Redis } from "ioredis";
+import { getAppSettings } from "../../modules/app-config.js";
 import { isFullIndexLocked } from "../../modules/index-lock.js";
 import type { createIndexStatus } from "../../modules/index-status.js";
 import { getUsage } from "../../modules/usage.js";
@@ -22,8 +23,9 @@ export function registerStatusRoute(app: FastifyInstance, deps: Dependencies): v
 
       return reply.send({
         ok: true,
-        indexing: { inProgress: inProgress.length, locked },
-        agent
+        indexing: { inProgress: inProgress.length, locked, items: inProgress },
+        agent,
+        watcherEnabled: getAppSettings().watcherEnabled
       });
     } catch (error) {
       app.log.error(error);
