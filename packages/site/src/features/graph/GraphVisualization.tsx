@@ -278,20 +278,16 @@ function createEmptyGraphData(): ForceGraphData {
 
 type NodeColor = { fill: string; border: string }
 
-// Fixed, predictable color per node category. A category is always the same
-// color across every graph. Unknown/future types fall back to FALLBACK_COLORS.
-const CATEGORY_COLORS: Record<string, NodeColor> = {
-  type: { fill: '#00e676', border: '#009f52' }, // class / interface / trait / enum / anchor
-  method: { fill: '#ffb38a', border: '#ff4e08' },
-  'composer-package': { fill: '#8ce6cf', border: '#0e9e8e' }, // teal
-  'composer-author': { fill: '#ffe08a', border: '#eaa600' }, // yellow
-}
-
-const FALLBACK_COLORS: NodeColor[] = [
-  { fill: '#cdf08a', border: '#7cb342' }, // yellow-green
-  { fill: '#ff9e8e', border: '#e53935' }, // red-ish
-  { fill: '#5fd0a0', border: '#0b7a4b' }, // deeper green
-  { fill: '#ffcf9e', border: '#d97004' }, // amber
+// Ordered green/orange tiers: brand green, brand orange, then second green,
+// second orange, and so on. Assigned to node types by frequency (most common
+// type gets the brand green, next the brand orange, ...).
+const NODE_PALETTE: NodeColor[] = [
+  { fill: '#00e676', border: '#009f52' }, // green 1 (brand)
+  { fill: '#ffb38a', border: '#ff4e08' }, // orange 1 (brand)
+  { fill: '#5fd0a0', border: '#0b7a4b' }, // green 2
+  { fill: '#ffcf9e', border: '#d97004' }, // orange 2
+  { fill: '#8ce6cf', border: '#0e9e8e' }, // green 3 (teal)
+  { fill: '#ffe08a', border: '#eaa600' }, // orange 3 (amber)
 ]
 
 const MIN_NODE_RADIUS = 3
@@ -301,22 +297,24 @@ function getNodeType(node: GraphVisualizationNode): string {
   return node.type || node.labels?.[0] || 'unknown'
 }
 
-// Fixed map first; any type not in CATEGORY_COLORS gets a stable fallback shade
-// assigned in first-seen order so new/unknown types still render distinctly.
+// Assign palette entries by most-frequent type first, so the dominant type gets
+// the brand green, the next the brand orange, and so on down the tiers.
 function assignPalette(graph: GraphVisualizationData): Map<string, NodeColor> {
-  const palette = new Map<string, NodeColor>()
-  let fallbackIndex = 0
+  const counts = new Map<string, number>()
 
   for (const node of graph.nodes) {
     const type = getNodeType(node)
-
-    if (palette.has(type)) {
-      continue
-    }
-
-    const fixed = CATEGORY_COLORS[type]
-    palette.set(type, fixed ?? FALLBACK_COLORS[fallbackIndex++ % FALLBACK_COLORS.length])
+    counts.set(type, (counts.get(type) ?? 0) + 1)
   }
+
+  const orderedTypes = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([type]) => type)
+
+  const palette = new Map<string, NodeColor>()
+  orderedTypes.forEach((type, index) => {
+    palette.set(type, NODE_PALETTE[index % NODE_PALETTE.length])
+  })
 
   return palette
 }
@@ -357,7 +355,7 @@ export function buildGraphStyle(graph: GraphVisualizationData): { data: StyledGr
 
   const data: StyledGraphData = {
     nodes: graph.nodes.map((node) => {
-      const colors = palette.get(getNodeType(node)) ?? CATEGORY_COLORS.type
+      const colors = palette.get(getNodeType(node)) ?? NODE_PALETTE[0]
 
       return {
         id: node.id,
@@ -606,6 +604,14 @@ function getHighlightedLinkColor(_type: string): string {
 // Generic label: prefer the common `name`/`id` graph conventions, then any
 // string property, then the node label/type. No backend-specific keys.
 function getNodeLabel(node: GraphVisualizationNode): string {
+  // PHP symbols carry a fully-qualified name; prefer it (compacted) so methods
+  // are disambiguated, e.g. "FinalPrice::__construct" rather than "__construct".
+  const fqcn = node.properties.fqcn
+
+  if (typeof fqcn === 'string' && fqcn.trim()) {
+    return compactFqcn(fqcn)
+  }
+
   const name = node.properties.name
 
   if (typeof name === 'string' && name.trim()) {
@@ -625,4 +631,21 @@ function getNodeLabel(node: GraphVisualizationNode): string {
   }
 
   return node.labels?.[0] ?? node.type
+}
+
+// Methods ("Vendor\...\FinalPrice::getMinimalPrice") are compacted to
+// "FinalPrice::getMinimalPrice" so members named __construct stay distinguishable.
+// Everything else (classes, interfaces, ...) keeps its full FQN.
+function compactFqcn(fqcn: string): string {
+  const separator = fqcn.indexOf('::')
+
+  if (separator === -1) {
+    return fqcn
+  }
+
+  const owner = fqcn.slice(0, separator)
+  const member = fqcn.slice(separator + 2)
+  const ownerShort = owner.split('\\').pop() ?? owner
+
+  return `${ownerShort}::${member}`
 }

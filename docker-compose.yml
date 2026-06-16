@@ -105,6 +105,7 @@ services:
       NODE_ENV: production
       MCP_PORT: "3000"
       MAGENTIC_BACKEND_URL: "${MAGENTIC_BACKEND_URL:-http://magentic_backend:3000}"
+      MCP_PUBLIC_BASE_URL: "${MCP_PUBLIC_BASE_URL:-http://localhost:${FRONTEND_HTTP_PORT:-8080}}"
       MCP_ALLOWED_ORIGINS: "${MCP_ALLOWED_ORIGINS:-http://localhost:${FRONTEND_HTTP_PORT:-8080},http://127.0.0.1:${FRONTEND_HTTP_PORT:-8080}}"
     expose:
       - "3000"

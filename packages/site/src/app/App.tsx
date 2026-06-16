@@ -46,7 +46,7 @@ export function App() {
                 className={[
                   "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-medium",
                   activeView === item.id
-                    ? "border-[#8ff0b1] bg-[#d8ffe8] text-[#111827]"
+                    ? "border-[#cbd5e1] bg-[#e5e7eb] text-[#111827]"
                     : "border-transparent text-[#374151]"
                 ].join(" ")}
                 onClick={() => navigate(viewRoutes[item.id])}
@@ -60,7 +60,7 @@ export function App() {
           </nav>
         </div>
         <section className="relative z-10 min-h-0 flex-1 overflow-auto px-4 md:px-6">
-          <div className="flex min-h-full flex-col pt-0 pb-8 md:pt-28 md:pb-10">
+          <div className="flex min-h-full flex-col pt-4 pb-8 md:pt-28 md:pb-10">
             <Routes>
               <Route path="/" element={<WelcomeView />} />
               <Route path="/graph" element={<GraphView />} />

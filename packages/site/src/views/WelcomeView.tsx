@@ -6,7 +6,13 @@ import { Panel, SectionHeader } from '../components/Panel'
 export const WelcomeView: React.FC = () => {
   return (
     <div className="grid min-h-full grid-rows-[auto_auto_auto] gap-5">
-      <section className="flex items-stretch overflow-hidden rounded-lg border border-[#e5e7eb] bg-white text-[#111827] lg:h-64">
+      <section className="flex flex-col overflow-hidden rounded-lg border border-[#e5e7eb] bg-white text-[#111827] lg:h-64 lg:flex-row lg:items-stretch">
+        <div
+          role="img"
+          aria-label="Magentic logo"
+          className="mx-auto mt-6 h-[200px] w-[200px] shrink-0 rounded-lg bg-cover bg-center lg:hidden"
+          style={{ backgroundImage: "url('/logo.png')" }}
+        />
         <div className="min-w-0 flex-1 overflow-hidden p-6">
           <h2 className="mt-4 text-3xl font-black tracking-wide text-[#111827]">Magentic MCP Server</h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[#4b5563]">

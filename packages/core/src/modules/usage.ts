@@ -1,6 +1,9 @@
 import type { Redis } from "ioredis";
 
-const usageKey = "usage:last";
+// Presence key: TTL is the idle window (present = connected). The last-seen
+// timestamp is stored separately without a TTL so it survives going idle.
+const activeKey = "usage:active";
+const lastSeenKey = "usage:lastSeen";
 const idleWindowSeconds = 120;
 
 export type UsageStatus = {
@@ -9,20 +12,21 @@ export type UsageStatus = {
 };
 
 export async function recordUsage(redis: Redis): Promise<void> {
-  await redis.set(usageKey, Date.now().toString(), "EX", idleWindowSeconds);
+  const now = Date.now().toString();
+
+  await Promise.all([
+    redis.set(activeKey, now, "EX", idleWindowSeconds),
+    redis.set(lastSeenKey, now)
+  ]);
 }
 
 export async function getUsage(redis: Redis): Promise<UsageStatus> {
-  const value = await redis.get(usageKey);
+  const [active, lastSeen] = await Promise.all([redis.exists(activeKey), redis.get(lastSeenKey)]);
 
-  if (!value) {
-    return { connected: false, lastSeenAt: null };
-  }
-
-  const lastSeenAt = Number(value);
+  const lastSeenAt = lastSeen === null ? null : Number(lastSeen);
 
   return {
-    connected: true,
-    lastSeenAt: Number.isFinite(lastSeenAt) ? lastSeenAt : null
+    connected: active === 1,
+    lastSeenAt: lastSeenAt !== null && Number.isFinite(lastSeenAt) ? lastSeenAt : null
   };
 }

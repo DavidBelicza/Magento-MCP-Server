@@ -47,6 +47,8 @@ export async function listQueryHistory(postgres: Pool): Promise<QueryHistoryItem
        jsonb_array_length(COALESCE(result #> '{graph,nodes}', '[]'::jsonb)) AS node_count,
        jsonb_array_length(COALESCE(result #> '{graph,relationships}', '[]'::jsonb)) AS relationship_count
      FROM query_history
+     WHERE jsonb_array_length(COALESCE(result #> '{graph,nodes}', '[]'::jsonb)) > 0
+        OR jsonb_array_length(COALESCE(result #> '{graph,relationships}', '[]'::jsonb)) > 0
      ORDER BY created_at DESC
      LIMIT 20`
   );

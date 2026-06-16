@@ -15,7 +15,7 @@ function buildMcpServer(): McpServer {
   const server = new McpServer({ name: "magentic", version: "0.1.0" });
 
   registerGetStatus(server, backend);
-  registerGraphSearch(server, backend);
+  registerGraphSearch(server, backend, config.frontendBaseUrl);
   registerGetGraphSchema(server);
 
   return server;

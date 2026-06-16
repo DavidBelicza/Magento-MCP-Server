@@ -1,6 +1,7 @@
 export type McpConfig = {
   port: number;
   backendUrl: string;
+  frontendBaseUrl: string;
   allowedOrigins: string[];
 };
 
@@ -22,6 +23,7 @@ export function readConfig(): McpConfig {
   return {
     port: readNumber(process.env.MCP_PORT, 3000),
     backendUrl: process.env.MAGENTIC_BACKEND_URL ?? "http://magentic_backend:3000",
+    frontendBaseUrl: (process.env.MCP_PUBLIC_BASE_URL ?? "http://localhost:8080").replace(/\/+$/, ""),
     allowedOrigins
   };
 }

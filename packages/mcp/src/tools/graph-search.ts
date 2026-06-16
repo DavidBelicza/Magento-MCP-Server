@@ -12,15 +12,14 @@ const cheatSheet = [
 ].join(" ");
 
 const description = [
-  "Run a read-only Cypher query against the Magentic code graph.",
-  "Always include a LIMIT.",
-  "Call get_status first if graph freshness matters, and get_graph_schema if labels or relationships are uncertain.",
-  "Writes, admin procedures, multiple statements, and unsafe procedures are rejected by the backend.",
+  "Read-only Cypher over the Magentic code graph — use it to find and explore the project's code: locate specific symbols (e.g. a class or method by name like getMinimalPrice), and answer structural or general questions about classes, methods, dependencies, composer packages, and their relationships. Always include a LIMIT.",
+  "Always also produce a visualization: run a query that RETURNs nodes/relationships/paths so a graphUrl comes back, and give that URL to the user. If they asked for a count or single value, return that too, but still run the graph query and share its graphUrl.",
+  "graphUrl is only present when the result contains graph nodes/relationships. Call get_graph_schema if labels/relationships are uncertain, get_status if freshness matters.",
   "Schema cheat sheet:",
   cheatSheet
 ].join(" ");
 
-export function registerGraphSearch(server: McpServer, backend: BackendClient): void {
+export function registerGraphSearch(server: McpServer, backend: BackendClient, frontendBaseUrl: string): void {
   server.registerTool(
     "graph_search",
     {
@@ -34,12 +33,18 @@ export function registerGraphSearch(server: McpServer, backend: BackendClient): 
     async ({ cypherQuery, description: queryDescription }) => {
       try {
         const response = await backend.searchGraph({ cypherQuery, description: queryDescription });
-        const payload = {
-          historyId: response.historyId,
-          description: response.description,
-          cypherQuery: response.cypherQuery,
-          result: response.structuredResult
+        const result = (response.result ?? {}) as { columns?: unknown; rows?: unknown };
+        const structured = (response.structuredResult ?? {}) as { nodes?: unknown[]; relationships?: unknown[] };
+        const hasGraph = (structured.nodes?.length ?? 0) > 0 || (structured.relationships?.length ?? 0) > 0;
+
+        const payload: Record<string, unknown> = {
+          columns: result.columns ?? [],
+          rows: result.rows ?? []
         };
+
+        if (hasGraph) {
+          payload.graphUrl = `${frontendBaseUrl}/graph?queryHistoryId=${response.historyId}`;
+        }
 
         return {
           content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
