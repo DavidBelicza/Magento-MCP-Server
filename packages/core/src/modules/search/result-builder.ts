@@ -63,6 +63,25 @@ const nodeBuilders: NodeBuilder[] = [
       labels: node.labels,
       properties: node.properties
     })
+  },
+  {
+    canBuild: (node) => node.kind === "method" || node.labels.includes("Method"),
+    build: (node) => ({
+      id: node.id,
+      type: "method",
+      labels: node.labels,
+      properties: node.properties
+    })
+  },
+  {
+    // Class, Interface, Trait, Enum, and referenced-only anchors are all type declarations.
+    canBuild: (node) => node.labels.includes("Symbol"),
+    build: (node) => ({
+      id: node.id,
+      type: "type",
+      labels: node.labels,
+      properties: node.properties
+    })
   }
 ];
 
@@ -102,7 +121,7 @@ function buildRelationship(relationship: GraphSearchRelationship): StructuredGra
 
   return builder?.build(relationship) ?? {
     id: relationship.id,
-    type: "unknown-relationship",
+    type: relationship.type,
     startNodeId: relationship.startNodeId,
     endNodeId: relationship.endNodeId,
     properties: relationship.properties

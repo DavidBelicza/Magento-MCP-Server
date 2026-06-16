@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { GraphVisualization } from '../features/graph'
-import type { GraphVisualizationData, GraphVisualizationHandle } from '../features/graph'
+import { GraphVisualization, buildGraphStyle } from '../features/graph'
+import type { GraphVisualizationData, GraphVisualizationHandle, GraphLegendEntry } from '../features/graph'
 import { Panel } from '../components/Panel'
 
 type QueryHistoryGraphResponse =
@@ -41,6 +41,7 @@ export const GraphView: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const graphCounts = useMemo(() => (queryGraph ? getStructuredGraphCounts(queryGraph) : { nodes: 0, edges: 0 }), [queryGraph])
+  const graphStyle = useMemo(() => (queryGraph ? buildGraphStyle(queryGraph) : null), [queryGraph])
   const hasQueryGraphData = !queryGraph || queryGraph.nodes.length > 0 || queryGraph.relationships.length > 0
   const shouldRenderGraph = status === 'ready' && hasQueryGraphData && Boolean(queryGraph)
   const graphRef = useRef<GraphVisualizationHandle | null>(null)
@@ -142,11 +143,14 @@ export const GraphView: React.FC = () => {
   return (
     <div className="grid min-h-[360px] flex-1 grid-cols-1">
       <Panel className="flex min-h-0 flex-col overflow-hidden">
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#e5e7eb] px-4">
-          <div className="min-w-0 truncate text-xs font-semibold text-[#4b5563]" title={queryDescription ?? undefined}>
-            {getGraphHeaderTitle(status, queryDescription)}
+        <div className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-[#e5e7eb] px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            {graphStyle && graphStyle.legend.length > 0 ? <GraphLegend entries={graphStyle.legend} /> : null}
+            <div className="min-w-0 truncate text-xs font-semibold text-[#4b5563]" title={queryDescription ?? undefined}>
+              {getGraphHeaderTitle(status, queryDescription)}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <div className="text-xs font-semibold text-[#4b5563]">
               {graphCounts.nodes} nodes / {graphCounts.edges} edges
             </div>
@@ -172,14 +176,32 @@ export const GraphView: React.FC = () => {
             <GraphStateMessage label="This saved query did not return graph nodes or relationships" showHistoryLink />
           ) : null}
 
-          {shouldRenderGraph && queryGraph ? (
-            <GraphVisualization ref={graphRef} graph={queryGraph} />
+          {shouldRenderGraph && graphStyle ? (
+            <GraphVisualization ref={graphRef} data={graphStyle.data} />
           ) : null}
         </div>
       </Panel>
     </div>
   )
 }
+
+const LEGEND_LABELS: Record<string, string> = {
+  type: 'Type',
+  method: 'Method',
+  'composer-package': 'Package',
+  'composer-author': 'Author',
+}
+
+const GraphLegend: React.FC<{ entries: GraphLegendEntry[] }> = ({ entries }) => (
+  <div className="flex shrink-0 items-center gap-3 overflow-x-auto">
+    {entries.map((entry) => (
+      <span key={entry.type} className="flex items-center gap-1.5 text-xs text-[#4b5563]">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
+        <span className="truncate">{LEGEND_LABELS[entry.type] ?? entry.type}</span>
+      </span>
+    ))}
+  </div>
+)
 
 const GraphStateMessage: React.FC<{ label: string; showHistoryLink?: boolean }> = ({ label, showHistoryLink = false }) => (
   <div className="flex h-full items-center justify-center px-4 text-center">

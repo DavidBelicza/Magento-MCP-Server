@@ -27,6 +27,7 @@ type ForceGraphNode = {
   type: string
   val: number
   color: string
+  borderColor: string
   x?: number
   y?: number
 }
@@ -51,24 +52,32 @@ type ForceGraphData = {
   links: ForceGraphLink[]
 }
 
+export type StyledGraphData = ForceGraphData
+
+export type GraphLegendEntry = {
+  type: string
+  color: string
+}
+
 type GraphVisualizationProps = {
-  graph?: GraphVisualizationData
+  data?: StyledGraphData
 }
 
 export type GraphVisualizationHandle = {
   resetView: () => void
 }
 
-export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisualizationProps>(({ graph }, ref) => {
+export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisualizationProps>(({ data }, ref) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const graphRef = useRef<any>(undefined)
   const selectedNodeIdRef = useRef<string | null>(null)
   const adjacencyRef = useRef<Adjacency | null>(null)
   const viewportBoundsRef = useRef<GraphViewportBounds | null>(null)
   const lastNodeClickTimeRef = useRef(0)
+  const zoomRef = useRef(1)
   const pointerDownRef = useRef<{ x: number; y: number } | null>(null)
   const [size, setSize] = useState({ width: 1, height: 1 })
-  const graphData = useMemo(() => (graph ? createForceGraphData(graph) : createEmptyGraphData()), [graph])
+  const graphData = useMemo(() => data ?? createEmptyGraphData(), [data])
   const adjacency = useMemo(() => createAdjacency(graphData), [graphData])
   const simulationProfile = useMemo(() => getSimulationProfile(graphData.nodes.length), [graphData.nodes.length])
   const getSelectedNodeId = useCallback(() => selectedNodeIdRef.current, [])
@@ -153,6 +162,26 @@ export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisu
 
   const getNodeCanvasObjectMode = useCallback(() => 'replace', [])
 
+  // DOM tooltip on hover (no canvas repaint): only when zoomed in, and — if a node
+  // is selected — only for edges connected to that node.
+  const getLinkLabel = useCallback((link: ForceGraphLink) => {
+    if (zoomRef.current < 1.15) {
+      return ''
+    }
+
+    const selectedNodeId = selectedNodeIdRef.current
+
+    if (selectedNodeId && !isLinkConnectedToNode(link, selectedNodeId)) {
+      return ''
+    }
+
+    return humanizeRelationship(link.type)
+  }, [])
+
+  const handleZoom = useCallback((transform: { k: number }) => {
+    zoomRef.current = transform.k
+  }, [])
+
   const handleNodeClick = useCallback(
     (node: ForceGraphNode) => {
       const nodeId = String(node.id)
@@ -218,6 +247,8 @@ export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisu
         nodeRelSize={3.2}
         linkSource="source"
         linkTarget="target"
+        linkLabel={getLinkLabel}
+        onZoom={handleZoom}
         linkColor={getLinkColorForRender}
         linkWidth={getLinkWidthForRender}
         linkDirectionalArrowLength={0}
@@ -245,15 +276,98 @@ function createEmptyGraphData(): ForceGraphData {
   }
 }
 
-function createForceGraphData(graph: GraphVisualizationData): ForceGraphData {
-  return {
-    nodes: graph.nodes.map((node) => ({
-      id: node.id,
-      label: getNodeLabel(node),
-      type: node.type,
-      val: getNodeValue(node.type),
-      color: getNodeColor(node.type),
-    })),
+type NodeColor = { fill: string; border: string }
+
+// Fixed, predictable color per node category. A category is always the same
+// color across every graph. Unknown/future types fall back to FALLBACK_COLORS.
+const CATEGORY_COLORS: Record<string, NodeColor> = {
+  type: { fill: '#00e676', border: '#009f52' }, // class / interface / trait / enum / anchor
+  method: { fill: '#ffb38a', border: '#ff4e08' },
+  'composer-package': { fill: '#8ce6cf', border: '#0e9e8e' }, // teal
+  'composer-author': { fill: '#ffe08a', border: '#eaa600' }, // yellow
+}
+
+const FALLBACK_COLORS: NodeColor[] = [
+  { fill: '#cdf08a', border: '#7cb342' }, // yellow-green
+  { fill: '#ff9e8e', border: '#e53935' }, // red-ish
+  { fill: '#5fd0a0', border: '#0b7a4b' }, // deeper green
+  { fill: '#ffcf9e', border: '#d97004' }, // amber
+]
+
+const MIN_NODE_RADIUS = 3
+const MAX_NODE_RADIUS = 10
+
+function getNodeType(node: GraphVisualizationNode): string {
+  return node.type || node.labels?.[0] || 'unknown'
+}
+
+// Fixed map first; any type not in CATEGORY_COLORS gets a stable fallback shade
+// assigned in first-seen order so new/unknown types still render distinctly.
+function assignPalette(graph: GraphVisualizationData): Map<string, NodeColor> {
+  const palette = new Map<string, NodeColor>()
+  let fallbackIndex = 0
+
+  for (const node of graph.nodes) {
+    const type = getNodeType(node)
+
+    if (palette.has(type)) {
+      continue
+    }
+
+    const fixed = CATEGORY_COLORS[type]
+    palette.set(type, fixed ?? FALLBACK_COLORS[fallbackIndex++ % FALLBACK_COLORS.length])
+  }
+
+  return palette
+}
+
+function computeNodeValues(graph: GraphVisualizationData): Map<string, number> {
+  const degree = new Map<string, number>()
+
+  for (const node of graph.nodes) {
+    degree.set(node.id, 0)
+  }
+
+  for (const relationship of graph.relationships) {
+    degree.set(relationship.startNodeId, (degree.get(relationship.startNodeId) ?? 0) + 1)
+    degree.set(relationship.endNodeId, (degree.get(relationship.endNodeId) ?? 0) + 1)
+  }
+
+  // sqrt-compress degree (Magento graphs are heavily skewed), then min-max
+  // normalize into the radius range and convert to the lib's `val` (radius = sqrt(val) * 3.2).
+  const scaled = [...degree.values()].map((value) => Math.sqrt(value))
+  const min = Math.min(...scaled)
+  const max = Math.max(...scaled)
+  const span = max - min
+
+  const values = new Map<string, number>()
+
+  for (const [id, value] of degree) {
+    const norm = span > 0 ? (Math.sqrt(value) - min) / span : 0.5
+    const radius = MIN_NODE_RADIUS + norm * (MAX_NODE_RADIUS - MIN_NODE_RADIUS)
+    values.set(id, (radius / 3.2) ** 2)
+  }
+
+  return values
+}
+
+export function buildGraphStyle(graph: GraphVisualizationData): { data: StyledGraphData; legend: GraphLegendEntry[] } {
+  const palette = assignPalette(graph)
+  const values = computeNodeValues(graph)
+
+  const data: StyledGraphData = {
+    nodes: graph.nodes.map((node) => {
+      const colors = palette.get(getNodeType(node)) ?? CATEGORY_COLORS.type
+
+      return {
+        id: node.id,
+        label: getNodeLabel(node),
+        type: getNodeType(node),
+        val: values.get(node.id) ?? 1,
+        color: colors.fill,
+        borderColor: colors.border,
+      }
+    }),
     links: graph.relationships.map((relationship) => ({
       id: relationship.id,
       source: relationship.startNodeId,
@@ -262,6 +376,13 @@ function createForceGraphData(graph: GraphVisualizationData): ForceGraphData {
       color: getLinkColor(relationship.type),
     })),
   }
+
+  const legend: GraphLegendEntry[] = [...palette.entries()].map(([type, colors]) => ({
+    type,
+    color: colors.border,
+  }))
+
+  return { data, legend }
 }
 
 function getSimulationProfile(nodeCount: number): { alphaDecay: number; cooldownTime: number; velocityDecay: number } {
@@ -391,14 +512,18 @@ function drawNode(
 
   canvas.beginPath()
   canvas.arc(x, y, radius, 0, 2 * Math.PI, false)
-  canvas.fillStyle = isSelected ? getNodeBorderColor(node.type) : node.color
+  canvas.fillStyle = isSelected ? node.borderColor : node.color
   canvas.fill()
   canvas.lineWidth = (isConnected ? 4.5 : isSelected ? 3 : 1) / globalScale
-  canvas.strokeStyle = getNodeBorderColor(node.type)
+  canvas.strokeStyle = node.borderColor
   canvas.stroke()
   canvas.globalAlpha = 1
 
-  if (globalScale < 1.15 && !isSelected && !isConnected) {
+  if (globalScale < 1.15) {
+    return
+  }
+
+  if (isUnrelated) {
     return
   }
 
@@ -466,61 +591,37 @@ function truncateLabel(label: string): string {
   return `${label.slice(0, 31)}...`
 }
 
-function getNodeValue(type: string): number {
-  if (type === 'composer-author') {
-    return 8
-  }
-
-  return 3
+function humanizeRelationship(type: string): string {
+  return type.toLowerCase().replaceAll('_', ' ')
 }
 
-function getNodeColor(type: string): string {
-  if (type === 'composer-author' || type === 'author') {
-    return '#00e676'
-  }
-
-  if (type === 'composer-package' || type === 'package') {
-    return '#ffb38a'
-  }
-
-  return '#d1d5db'
-}
-
-function getNodeBorderColor(type: string): string {
-  if (type === 'composer-author' || type === 'author') {
-    return '#009f52'
-  }
-
-  if (type === 'composer-package' || type === 'package') {
-    return '#ff4e08'
-  }
-
-  return '#9ca3af'
-}
-
-function getLinkColor(type: string): string {
+function getLinkColor(_type: string): string {
   return 'rgba(148, 163, 184, 0.28)'
 }
 
-function getHighlightedLinkColor(type: string): string {
+function getHighlightedLinkColor(_type: string): string {
   return 'rgba(99, 102, 241, 0.68)'
 }
 
+// Generic label: prefer the common `name`/`id` graph conventions, then any
+// string property, then the node label/type. No backend-specific keys.
 function getNodeLabel(node: GraphVisualizationNode): string {
   const name = node.properties.name
-  const packageName = node.properties.packageName
-  const id = node.properties.id
 
   if (typeof name === 'string' && name.trim()) {
     return name
   }
 
-  if (typeof packageName === 'string' && packageName.trim()) {
-    return packageName
-  }
+  const id = node.properties.id
 
   if (typeof id === 'string' && id.trim()) {
     return id
+  }
+
+  for (const value of Object.values(node.properties)) {
+    if (typeof value === 'string' && value.trim()) {
+      return value
+    }
   }
 
   return node.labels?.[0] ?? node.type
