@@ -14,3 +14,8 @@ npm-debug.log*
 
 # Synced copy of the repo-root README for the site bundle
 /packages/site/README.md
+
+# PHP analyzer tooling caches and local cs-fixer cache
+.phpunit.cache/
+.phpstan.cache/
+.php-cs-fixer.cache

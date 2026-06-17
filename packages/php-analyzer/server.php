@@ -33,7 +33,7 @@ if ($uri === '/analyze' && $method === 'POST') {
     $logger = LoggerFactory::create();
     $logger->info('Incoming PHP analysis request', ['path' => $path, 'phpVersion' => $phpVersion]);
 
-    $handler = new StreamAnalyzerHandler($logger);
+    $handler = new StreamAnalyzerHandler();
     $response = $handler->handle($path, $phpVersion);
     $response->send();
     exit(0);

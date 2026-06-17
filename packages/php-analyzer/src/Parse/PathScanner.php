@@ -33,14 +33,14 @@ readonly class PathScanner
 
         $fs = new \Symfony\Component\Filesystem\Filesystem();
 
-        if ((new \SplFileInfo($realPath))->isFile()) {
+        if (new \SplFileInfo($realPath)->isFile()) {
             $sourceFile = $this->validatePhpFile($realPath, $relativePath, (string) $path);
             yield from $this->parseAndYield($sourceFile);
 
             return;
         }
 
-        if (!$fs->exists($realPath) || !(new \SplFileInfo($realPath))->isDir()) {
+        if (!$fs->exists($realPath) || !new \SplFileInfo($realPath)->isDir()) {
             throw new \RuntimeException(sprintf('Path is not a file or directory: %s', (string) $path));
         }
 

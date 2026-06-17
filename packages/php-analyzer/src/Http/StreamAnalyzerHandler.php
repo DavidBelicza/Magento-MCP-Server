@@ -14,22 +14,13 @@ use PHPStan\PhpDocParser\Parser\ConstExprParser;
 use PHPStan\PhpDocParser\Parser\PhpDocParser;
 use PHPStan\PhpDocParser\Parser\TypeParser;
 use PHPStan\PhpDocParser\ParserConfig;
-use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 readonly class StreamAnalyzerHandler
 {
-    private LoggerInterface $logger;
-
-    public function __construct(?LoggerInterface $logger = null)
-    {
-        $this->logger = $logger ?? new NullLogger();
-    }
-
     public function handle(string $path, ?string $phpVersion = null): Response
     {
         try {
@@ -44,7 +35,7 @@ readonly class StreamAnalyzerHandler
                     flush();
                 }
             });
-            
+
             $response->headers->set('Content-Type', 'application/x-ndjson');
             return $response;
 
