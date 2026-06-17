@@ -34,8 +34,12 @@ export function createIndexStatus() {
 
       return grouped.flat().sort((left, right) => left.timestamp - right.timestamp);
     },
-    getJob: async (jobId: string): Promise<InProgressJob | null> => {
-      for (const queue of queues) {
+    getJob: async (jobId: string, queueName?: string): Promise<InProgressJob | null> => {
+      // BullMQ job ids are unique per queue but collide across queues, so a
+      // bare id is ambiguous. When a queue is given, look it up there only.
+      const candidates = queueName ? queues.filter((queue) => queue.name === queueName) : queues;
+
+      for (const queue of candidates) {
         const job = await queue.getJob(jobId);
 
         if (job) {

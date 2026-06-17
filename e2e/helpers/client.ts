@@ -102,31 +102,6 @@ export async function waitForIdle({
   throw new Error(`Indexing did not become idle within ${timeoutMs}ms`);
 }
 
-export async function pollJobUntilComplete(
-  jobId: string,
-  { timeoutMs = 60_000, intervalMs = 1_000 }: { timeoutMs?: number; intervalMs?: number } = {}
-): Promise<string> {
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    const { status, body } = await apiRequest(`/api/graph/index/status/${jobId}`);
-    const job = body.job as { state?: string } | undefined;
-    const state = job?.state;
-
-    if (status === 200 && state === "completed") {
-      return state;
-    }
-
-    if (state === "failed") {
-      throw new Error(`Job ${jobId} failed`);
-    }
-
-    await delay(intervalMs);
-  }
-
-  throw new Error(`Job ${jobId} did not complete within ${timeoutMs}ms`);
-}
-
 export type McpResult = {
   result?: JsonRecord;
   error?: { code: number; message: string };
