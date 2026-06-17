@@ -1,4 +1,4 @@
-import type { GraphFields, GraphFieldValue } from "../../graph/types.js";
+import type { GraphFields } from "../../graph/types.js";
 
 export type ComposerLock = {
   packages?: ComposerPackage[];

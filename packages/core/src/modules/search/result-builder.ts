@@ -74,7 +74,6 @@ const nodeBuilders: NodeBuilder[] = [
     })
   },
   {
-    // Class, Interface, Trait, Enum, and referenced-only anchors are all type declarations.
     canBuild: (node) => node.labels.includes("Symbol"),
     build: (node) => ({
       id: node.id,

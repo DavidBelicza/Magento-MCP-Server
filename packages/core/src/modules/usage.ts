@@ -1,7 +1,5 @@
 import type { Redis } from "ioredis";
 
-// Presence key: TTL is the idle window (present = connected). The last-seen
-// timestamp is stored separately without a TTL so it survives going idle.
 const activeKey = "usage:active";
 const lastSeenKey = "usage:lastSeen";
 const idleWindowSeconds = 120;

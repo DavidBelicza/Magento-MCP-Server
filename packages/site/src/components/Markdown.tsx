@@ -11,7 +11,6 @@ import 'highlight.js/styles/github.css'
 const lowlight = createLowlight({ bash, json, ini })
 lowlight.registerAlias({ ini: ['toml'], bash: ['sh', 'shell'] })
 
-// Minimal highlighter: only the languages registered above enter the bundle.
 function rehypeShellHighlight() {
   return (tree: unknown) => {
     visit(tree as never, 'element', (node: any, _index, parent: any) => {

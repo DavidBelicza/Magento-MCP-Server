@@ -86,9 +86,6 @@ export async function triggerLinks(symbolId: string | null = null): Promise<stri
   return body.jobId;
 }
 
-// Wait until no indexing job is in progress across any queue. This is robust to
-// the fact that BullMQ job ids are per-queue and collide across queues, which
-// makes polling a single /status/:jobId ambiguous.
 export async function waitForIdle({
   timeoutMs = 180_000,
   intervalMs = 1_000

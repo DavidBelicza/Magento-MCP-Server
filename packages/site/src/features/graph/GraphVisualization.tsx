@@ -162,8 +162,6 @@ export const GraphVisualization = forwardRef<GraphVisualizationHandle, GraphVisu
 
   const getNodeCanvasObjectMode = useCallback(() => 'replace', [])
 
-  // DOM tooltip on hover (no canvas repaint): only when zoomed in, and — if a node
-  // is selected — only for edges connected to that node.
   const getLinkLabel = useCallback((link: ForceGraphLink) => {
     if (zoomRef.current < 1.15) {
       return ''
@@ -278,16 +276,13 @@ function createEmptyGraphData(): ForceGraphData {
 
 type NodeColor = { fill: string; border: string }
 
-// Ordered green/orange tiers: brand green, brand orange, then second green,
-// second orange, and so on. Assigned to node types by frequency (most common
-// type gets the brand green, next the brand orange, ...).
 const NODE_PALETTE: NodeColor[] = [
-  { fill: '#00e676', border: '#009f52' }, // green 1 (brand)
-  { fill: '#ffb38a', border: '#ff4e08' }, // orange 1 (brand)
-  { fill: '#5fd0a0', border: '#0b7a4b' }, // green 2
-  { fill: '#ffcf9e', border: '#d97004' }, // orange 2
-  { fill: '#8ce6cf', border: '#0e9e8e' }, // green 3 (teal)
-  { fill: '#ffe08a', border: '#eaa600' }, // orange 3 (amber)
+  { fill: '#00e676', border: '#009f52' },
+  { fill: '#ffb38a', border: '#ff4e08' },
+  { fill: '#5fd0a0', border: '#0b7a4b' },
+  { fill: '#ffcf9e', border: '#d97004' },
+  { fill: '#8ce6cf', border: '#0e9e8e' },
+  { fill: '#ffe08a', border: '#eaa600' },
 ]
 
 const MIN_NODE_RADIUS = 3
@@ -297,8 +292,6 @@ function getNodeType(node: GraphVisualizationNode): string {
   return node.type || node.labels?.[0] || 'unknown'
 }
 
-// Assign palette entries by most-frequent type first, so the dominant type gets
-// the brand green, the next the brand orange, and so on down the tiers.
 function assignPalette(graph: GraphVisualizationData): Map<string, NodeColor> {
   const counts = new Map<string, number>()
 
@@ -331,8 +324,6 @@ function computeNodeValues(graph: GraphVisualizationData): Map<string, number> {
     degree.set(relationship.endNodeId, (degree.get(relationship.endNodeId) ?? 0) + 1)
   }
 
-  // sqrt-compress degree (Magento graphs are heavily skewed), then min-max
-  // normalize into the radius range and convert to the lib's `val` (radius = sqrt(val) * 3.2).
   const scaled = [...degree.values()].map((value) => Math.sqrt(value))
   const min = Math.min(...scaled)
   const max = Math.max(...scaled)
@@ -601,11 +592,7 @@ function getHighlightedLinkColor(_type: string): string {
   return 'rgba(99, 102, 241, 0.68)'
 }
 
-// Generic label: prefer the common `name`/`id` graph conventions, then any
-// string property, then the node label/type. No backend-specific keys.
 function getNodeLabel(node: GraphVisualizationNode): string {
-  // PHP symbols carry a fully-qualified name; prefer it (compacted) so methods
-  // are disambiguated, e.g. "FinalPrice::__construct" rather than "__construct".
   const fqcn = node.properties.fqcn
 
   if (typeof fqcn === 'string' && fqcn.trim()) {
@@ -633,9 +620,6 @@ function getNodeLabel(node: GraphVisualizationNode): string {
   return node.labels?.[0] ?? node.type
 }
 
-// Methods ("Vendor\...\FinalPrice::getMinimalPrice") are compacted to
-// "FinalPrice::getMinimalPrice" so members named __construct stay distinguishable.
-// Everything else (classes, interfaces, ...) keeps its full FQN.
 function compactFqcn(fqcn: string): string {
   const separator = fqcn.indexOf('::')
 

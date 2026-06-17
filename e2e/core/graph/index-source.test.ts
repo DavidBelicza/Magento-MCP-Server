@@ -1,10 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { searchScalar, triggerLinks, triggerSourceIndex, waitForIdle } from "../../helpers/client";
 
-// Scope source indexing to a single real module already present in the mounted
-// source, instead of the whole vendor tree. Override with MAGENTIC_E2E_SOURCE_MODULE.
-// This suite targets a real Magento source; the fixture stack uses
-// index-source.fixture.test.ts instead, so skip it when running in fixture mode.
 const sourceModule = process.env.MAGENTIC_E2E_SOURCE_MODULE ?? "vendor/magento/module-catalog";
 const modulePrefix = `${sourceModule.replace(/\/+$/, "")}/`;
 const packageName = sourceModule.split("/").slice(-2).join("/");

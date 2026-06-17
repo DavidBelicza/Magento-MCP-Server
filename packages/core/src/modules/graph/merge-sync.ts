@@ -1,4 +1,4 @@
-import type { Driver, ManagedTransaction } from "neo4j-driver";
+import type { Driver } from "neo4j-driver";
 import { mapGraphFieldsToStoredProperties } from "./properties.js";
 import type { GraphNodeRecord, GraphRelationshipRecord, GraphWriteProgress, GraphWriteSummary } from "./types.js";
 

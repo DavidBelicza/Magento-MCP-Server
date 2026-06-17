@@ -41,6 +41,9 @@ Root scripts are in `package.json`:
 
 ```bash
 npm run build
+npm run lint
+npm run typecheck
+npm test
 npm run docker:up
 npm run docker:dev
 npm run docker:dev:build
@@ -48,6 +51,8 @@ npm run dev:backend
 npm run dev:worker
 npm run dev:site
 ```
+
+ESLint (`eslint.config.mjs`, flat config) covers the TypeScript packages and `e2e/`; `npm run typecheck` runs `tsc --noEmit` per workspace. Run both before committing.
 
 Useful checks:
 
@@ -104,7 +109,7 @@ The analyzer package uses PSR-4 namespace `Magentic\PhpAnalyzer\`. The analyzed 
 
 ## Conventions
 
-- Keep source-code comments out unless they are genuinely necessary.
+- Keep source-code comments out. ESLint enforces this: the only comment form allowed is a `/** */` doc block (no `//` line comments, no inline comments). Add a doc block only for type information a native type cannot express.
 - Prefer dash-case filenames for consistency with the core package.
 - Keep Docker service names as `magentic_*`.
 - Keep Docker service Dockerfiles under matching `services/<service>/` directories when possible. `services/backend/Dockerfile` intentionally builds the shared backend image used by both `magentic_backend` and `magentic_worker`.

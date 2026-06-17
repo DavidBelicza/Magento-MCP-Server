@@ -7,10 +7,6 @@ import {
   waitForIdle
 } from "../../helpers/client";
 
-// Deterministic source + links assertions against the synthetic fixture
-// (e2e/fixtures/sample-project). Only runs when pointed at the fixture stack
-// (MAGENTIC_E2E_FIXTURE=1), where the graph contains the fixture alone, so exact
-// global counts are stable. See e2e/README.md.
 const runFixture = process.env.MAGENTIC_E2E_FIXTURE === "1";
 
 describe.skipIf(!runFixture)("e2e: source + links indexing (sample fixture)", () => {

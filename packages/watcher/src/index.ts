@@ -37,8 +37,6 @@ async function sendDelta(operation: "upsert" | "delete", paths: string[]): Promi
     });
 
     if (response.status === 409) {
-      // A full reindex is running; it re-scans everything, so these changes are
-      // covered by that pass. Expected, not an error.
       log(`delta ${operation} skipped: a full reindex is in progress`);
     } else if (!response.ok) {
       const body = await response.text().catch(() => "");
@@ -151,7 +149,6 @@ async function reconcile(): Promise<void> {
 
 async function reloadConfig(): Promise<void> {
   config = readConfig();
-  // Re-scope live: drop the current watcher so the next reconcile rebuilds it.
   await stopWatching("config changed");
   await reconcile();
 }
@@ -168,7 +165,7 @@ async function pollIndexLock(): Promise<void> {
       await reconcile();
     }
   } catch {
-    // Backend unreachable; keep current state and try again next tick.
+    return;
   }
 }
 

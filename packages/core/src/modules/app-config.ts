@@ -62,7 +62,6 @@ function sanitizePhpVersion(value: unknown): string {
 }
 
 function normalize(raw: Record<string, unknown> | null): AppSettings {
-  // Migrate the previous single `analyzedSubpath` field if present.
   const legacy = sanitizeSubpath(raw?.analyzedSubpath);
 
   const projectRoot = raw?.projectRoot !== undefined ? sanitizeSubpath(raw.projectRoot) : legacy;
