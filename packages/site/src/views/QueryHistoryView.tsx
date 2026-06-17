@@ -89,9 +89,9 @@ export const QueryHistoryView: React.FC = () => {
 
   return (
     <section className="min-h-full">
-      <div className="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white">
-        <div className="flex justify-start border-b border-[#e5e7eb] px-4 py-3">
-          <span className="text-xs font-semibold text-[#4b5563]">{itemCountLabel}</span>
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="flex justify-start border-b border-gray-200 px-4 py-3">
+          <span className="text-xs font-semibold text-gray-600">{itemCountLabel}</span>
         </div>
 
         {status === 'loading' ? <QueryHistoryMessage title="Loading query history" /> : null}
@@ -104,7 +104,7 @@ export const QueryHistoryView: React.FC = () => {
 
         {status === 'ready' && items.length > 0 ? (
           <div>
-            <div className="hidden grid-cols-[minmax(0,1fr)_150px_170px_110px] gap-4 border-b border-[#e5e7eb] bg-[#f9fafb] px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[#6b7280] lg:grid">
+            <div className="hidden grid-cols-[minmax(0,1fr)_150px_170px_110px] gap-4 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 lg:grid">
               <div>Query</div>
               <div>Graph</div>
               <div>Created</div>
@@ -165,14 +165,14 @@ const QueryHistoryRow: React.FC<{
     <article
       className={[
         'grid gap-3 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_150px_170px_110px] lg:gap-4',
-        index % 2 === 0 ? 'bg-white' : 'bg-[#f9fafb]'
+        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
       ].join(' ')}
     >
       <div className="min-w-0">
         <h3 className="truncate text-sm font-bold">
           <Link
             to={`/graph?queryHistoryId=${encodeURIComponent(item.id)}`}
-            className="text-[#111827] transition hover:text-[#6b7280] focus:outline-none"
+            className="text-gray-900 transition hover:text-gray-500 focus:outline-none"
           >
             {title}
           </Link>
@@ -183,7 +183,7 @@ const QueryHistoryRow: React.FC<{
         >
           <p
             ref={descriptionRef}
-            className="text-sm leading-5 text-[#4b5563]"
+            className="text-sm leading-5 text-gray-600"
           >
             {item.description}
           </p>
@@ -191,7 +191,7 @@ const QueryHistoryRow: React.FC<{
         {canExpand || isExpanded ? (
           <button
             type="button"
-            className="mt-1 cursor-pointer text-[11px] font-bold text-[#111827] transition hover:text-[#6b7280] focus:outline-none"
+            className="mt-1 cursor-pointer text-[11px] font-bold text-gray-900 transition hover:text-gray-500 focus:outline-none"
             onClick={onToggle}
           >
             {isExpanded ? 'Less' : 'More'}
@@ -199,25 +199,25 @@ const QueryHistoryRow: React.FC<{
         ) : null}
       </div>
 
-      <div className="text-xs font-semibold text-[#111827] lg:pt-1">
-        <span className="mr-2 font-bold uppercase tracking-[0.12em] text-[#6b7280] lg:hidden">Graph</span>
+      <div className="text-xs font-semibold text-gray-900 lg:pt-1">
+        <span className="mr-2 font-bold uppercase tracking-[0.12em] text-gray-500 lg:hidden">Graph</span>
         {item.nodeCount > 0 || item.relationshipCount > 0
           ? `${item.nodeCount} nodes / ${item.relationshipCount} edges`
           : 'No graph data'}
       </div>
 
-      <div className="text-xs font-semibold text-[#111827] lg:pt-1">
-        <span className="mr-2 font-bold uppercase tracking-[0.12em] text-[#6b7280] lg:hidden">Created</span>
+      <div className="text-xs font-semibold text-gray-900 lg:pt-1">
+        <span className="mr-2 font-bold uppercase tracking-[0.12em] text-gray-500 lg:hidden">Created</span>
         <span className="inline-flex flex-col leading-tight align-top">
           <span>{formatDate(item.createdAt)}</span>
-          <span className="text-[11px] font-normal text-[#6b7280]">{formatTime(item.createdAt)}</span>
+          <span className="text-[11px] font-normal text-gray-500">{formatTime(item.createdAt)}</span>
         </span>
       </div>
 
       <div className="lg:pt-0.5">
         <Link
           to={`/graph?queryHistoryId=${encodeURIComponent(item.id)}`}
-          className="inline-flex h-7 cursor-pointer items-center rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-bold text-[#111827] transition hover:border-[#cbd5e1] hover:bg-[#e5e7eb] focus:outline-none"
+          className="inline-flex h-7 cursor-pointer items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-gray-900 transition hover:border-slate-300 hover:bg-gray-200 focus:outline-none"
         >
           Open graph
         </Link>
@@ -227,7 +227,7 @@ const QueryHistoryRow: React.FC<{
 }
 
 const QueryHistoryMessage: React.FC<{ title: string }> = ({ title }) => (
-  <div className="bg-white px-4 py-8 text-center text-sm font-medium text-[#4b5563]">{title}</div>
+  <div className="bg-white px-4 py-8 text-center text-sm font-medium text-gray-600">{title}</div>
 )
 
 function createTitle(description: string): string {

@@ -25,7 +25,7 @@ export function App() {
   return (
     <StatusProvider>
     <TokenGate />
-    <div className="flex h-screen overflow-hidden bg-[#f4f6f8] text-[#111827]">
+    <div className="flex h-screen overflow-hidden bg-canvas text-gray-900">
       <Sidebar
         activeView={activeView}
         isCollapsed={isSidebarCollapsed}
@@ -33,12 +33,12 @@ export function App() {
         onToggle={() => setIsSidebarCollapsed((currentValue) => !currentValue)}
       />
 
-      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden border-l border-[#e5e7eb] bg-white md:rounded-l-[18px]">
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden border-l border-gray-200 bg-white md:rounded-l-[18px]">
         <div className="pointer-events-none absolute right-0 top-0 h-80 w-[520px] bg-[radial-gradient(circle_at_70%_18%,rgba(0,255,140,0.24),transparent_54%),radial-gradient(circle_at_85%_58%,rgba(255,78,8,0.34),transparent_24%)] blur-lg" />
         <TopBar activeLabel={activeItem.label} />
         <div className="relative z-10 shrink-0">
           <nav
-            className="flex shrink-0 gap-1 overflow-x-auto border-y border-[#e5e7eb] bg-white/88 px-3 py-2 backdrop-blur md:hidden"
+            className="flex shrink-0 gap-1 overflow-x-auto border-y border-gray-200 bg-white/88 px-3 py-2 backdrop-blur md:hidden"
             aria-label="Mobile navigation"
           >
             {navigationItems.map((item) => (
@@ -48,8 +48,8 @@ export function App() {
                 className={[
                   "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-medium",
                   activeView === item.id
-                    ? "border-[#cbd5e1] bg-[#e5e7eb] text-[#111827]"
-                    : "border-transparent text-[#374151]"
+                    ? "border-slate-300 bg-gray-200 text-gray-900"
+                    : "border-transparent text-gray-700"
                 ].join(" ")}
                 onClick={() => navigate(viewRoutes[item.id])}
               >

@@ -144,20 +144,20 @@ export const GraphView: React.FC = () => {
   return (
     <div className="grid min-h-[360px] flex-1 grid-cols-1">
       <Panel className="flex min-h-0 flex-col overflow-hidden">
-        <div className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-[#e5e7eb] px-4">
+        <div className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-gray-200 px-4">
           <div className="flex min-w-0 items-center gap-3">
             {graphStyle && graphStyle.legend.length > 0 ? <GraphLegend entries={graphStyle.legend} /> : null}
-            <div className="min-w-0 truncate text-xs font-semibold text-[#4b5563]" title={queryDescription ?? undefined}>
+            <div className="min-w-0 truncate text-xs font-semibold text-gray-600" title={queryDescription ?? undefined}>
               {getGraphHeaderTitle(status, queryDescription)}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-3">
-            <div className="text-xs font-semibold text-[#4b5563]">
+            <div className="text-xs font-semibold text-gray-600">
               {graphCounts.nodes} nodes / {graphCounts.edges} edges
             </div>
             <button
               type="button"
-              className="h-7 rounded-lg border border-[#e5e7eb] px-3 text-[#4b5563] transition hover:border-[#cbd5e1] hover:bg-[#f9fafb] focus:outline-none inline-flex items-center justify-center"
+              className="h-7 rounded-lg border border-gray-200 px-3 text-gray-600 transition hover:border-slate-300 hover:bg-gray-50 focus:outline-none inline-flex items-center justify-center"
               onClick={() => graphRef.current?.resetView()}
             >
               <span className="text-xs font-semibold">Reset</span>
@@ -196,7 +196,7 @@ const LEGEND_LABELS: Record<string, string> = {
 const GraphLegend: React.FC<{ entries: GraphLegendEntry[] }> = ({ entries }) => (
   <div className="flex shrink-0 items-center gap-3 overflow-x-auto">
     {entries.map((entry) => (
-      <span key={entry.type} className="flex items-center gap-1.5 text-xs text-[#4b5563]">
+      <span key={entry.type} className="flex items-center gap-1.5 text-xs text-gray-600">
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
         <span className="truncate">{LEGEND_LABELS[entry.type] ?? entry.type}</span>
       </span>
@@ -207,11 +207,11 @@ const GraphLegend: React.FC<{ entries: GraphLegendEntry[] }> = ({ entries }) => 
 const GraphStateMessage: React.FC<{ label: string; showHistoryLink?: boolean }> = ({ label, showHistoryLink = false }) => (
   <div className="flex h-full items-center justify-center px-4 text-center">
     <div>
-      <div className="text-sm font-semibold text-[#4b5563]">{label}</div>
+      <div className="text-sm font-semibold text-gray-600">{label}</div>
       {showHistoryLink ? (
         <Link
           to="/history"
-          className="mt-3 inline-flex h-8 items-center rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-bold text-[#fd8504] transition hover:border-[#fd8504] hover:bg-[#fff3e6] focus:outline-none focus:ring-2 focus:ring-[#00e676]/45"
+          className="mt-3 inline-flex h-8 items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-brand transition hover:border-brand hover:bg-brand-soft focus:outline-none focus:ring-2 focus:ring-accent/45"
         >
           View query history
         </Link>

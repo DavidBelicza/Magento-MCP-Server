@@ -90,16 +90,16 @@ const IndexingSection: React.FC = () => {
             onClick={() => run('/api/graph/index/reset-and-reindex', 'reset and reindex')}
           />
         </div>
-        {message ? <p className="mt-3 text-xs text-[#6b7280]">{message}</p> : null}
+        {message ? <p className="mt-3 text-xs text-gray-500">{message}</p> : null}
 
-        <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-[#e5e7eb] bg-white px-4 py-2.5">
-          <span className="text-sm text-[#4b5563]">File watcher (auto-reindex on change)</span>
+        <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-4 py-2.5">
+          <span className="text-sm text-gray-600">File watcher (auto-reindex on change)</span>
           <input
             type="checkbox"
             checked={watcherEnabled ?? false}
             disabled={watcherEnabled === null}
             onChange={(event) => toggleWatcher(event.target.checked)}
-            className="h-4 w-4 cursor-pointer accent-[#00a85a]"
+            className="h-4 w-4 cursor-pointer accent-accent-hover"
           />
         </label>
       </div>
@@ -169,11 +169,11 @@ const ConfigSection: React.FC = () => {
       <SectionHeader title="Analyzer Configuration" />
       <div className="mt-5 grid gap-4">
         <label className="grid gap-1.5">
-          <span className="text-sm text-[#4b5563]">PHP syntax version for the parser</span>
+          <span className="text-sm text-gray-600">PHP syntax version for the parser</span>
           <select
             value={phpVersion}
             onChange={(event) => setPhpVersion(event.target.value)}
-            className="h-9 cursor-pointer rounded-lg border border-[#e5e7eb] bg-white px-3 text-sm text-[#111827] focus:border-[#cbd5e1] focus:outline-none"
+            className="h-9 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-slate-300 focus:outline-none"
           >
             {(config?.phpVersionOptions ?? ['8.4']).map((option) => (
               <option key={option} value={option}>
@@ -181,24 +181,24 @@ const ConfigSection: React.FC = () => {
               </option>
             ))}
           </select>
-          <span className="text-xs text-[#9ca3af]">
+          <span className="text-xs text-gray-400">
             The language grammar the AST parser targets — not the PHP runtime the analyzer runs on.
           </span>
         </label>
 
         <label className="grid gap-1.5">
-          <span className="text-sm text-[#4b5563]">Project root (composer.lock location)</span>
+          <span className="text-sm text-gray-600">Project root (composer.lock location)</span>
           <input
             value={projectRoot}
             onChange={(event) => setProjectRoot(event.target.value)}
             placeholder="empty = mount root"
-            className="h-9 rounded-lg border border-[#e5e7eb] bg-white px-3 text-sm text-[#111827] focus:border-[#cbd5e1] focus:outline-none"
+            className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-slate-300 focus:outline-none"
           />
-          <span className="text-xs text-[#9ca3af]">Where composer.lock is read, relative to the mount.</span>
+          <span className="text-xs text-gray-400">Where composer.lock is read, relative to the mount.</span>
         </label>
 
         <div className="grid gap-1.5">
-          <span className="text-sm text-[#4b5563]">Source directories to scan</span>
+          <span className="text-sm text-gray-600">Source directories to scan</span>
           <div className="grid gap-2">
             {sourceSubpaths.map((entry, index) => (
               <div key={index} className="flex items-center gap-2">
@@ -206,7 +206,7 @@ const ConfigSection: React.FC = () => {
                   value={entry}
                   onChange={(event) => updateSubpath(index, event.target.value)}
                   placeholder="e.g. vendor, app/code"
-                  className="h-9 flex-1 rounded-lg border border-[#e5e7eb] bg-white px-3 text-sm text-[#111827] focus:border-[#cbd5e1] focus:outline-none"
+                  className="h-9 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-slate-300 focus:outline-none"
                 />
                 <ActionButton label="Remove" onClick={() => removeSubpath(index)} />
               </div>
@@ -215,24 +215,24 @@ const ConfigSection: React.FC = () => {
           <div>
             <ActionButton label="Add directory" onClick={() => setSourceSubpaths((current) => [...current, ''])} />
           </div>
-          <span className="text-xs text-[#9ca3af]">
+          <span className="text-xs text-gray-400">
             Each is scanned in its own analyzer pass. Leave empty to scan the whole mount.
           </span>
         </div>
 
         <label className="grid gap-1.5">
-          <span className="text-sm text-[#4b5563]">Mounted directory (read-only)</span>
-          <div className="flex h-9 items-center rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 text-sm text-[#6b7280]">
+          <span className="text-sm text-gray-600">Mounted directory (read-only)</span>
+          <div className="flex h-9 items-center rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-500">
             {config?.mountPath ?? '—'}
           </div>
-          <span className="text-xs text-[#9ca3af]">
+          <span className="text-xs text-gray-400">
             The host mount is set in Docker Compose; changing it needs a service restart.
           </span>
         </label>
 
         <div className="flex items-center gap-3">
           <ActionButton label={saving ? 'Saving…' : 'Save'} disabled={saving} onClick={save} />
-          {message ? <span className="text-xs text-[#6b7280]">{message}</span> : null}
+          {message ? <span className="text-xs text-gray-500">{message}</span> : null}
         </div>
       </div>
     </Panel>
@@ -264,26 +264,26 @@ const McpSection: React.FC = () => {
     <Panel className="p-5 xl:col-span-2">
       <SectionHeader title="Activate the MCP Server" />
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <div className="grid gap-3 text-sm text-[#4b5563]">
+        <div className="grid gap-3 text-sm text-gray-600">
           <p>Point your agent at the Streamable HTTP endpoint below, then add the JSON to your MCP client config.</p>
           <Row label="Transport">Streamable HTTP</Row>
           <Row label="Endpoint">http://localhost:8080/mcp</Row>
           <Row label="Tools">get_status, graph_search, get_graph_schema</Row>
 
-          <label className="mt-1 grid gap-1 text-xs font-semibold text-[#4b5563]">
+          <label className="mt-1 grid gap-1 text-xs font-semibold text-gray-600">
             API token
             <input
               type="text"
               value={token}
               onChange={(event) => setToken(event.target.value)}
               placeholder="API token"
-              className="h-9 rounded-lg border border-[#e5e7eb] bg-white px-3 text-sm font-normal text-[#111827] focus:border-[#cbd5e1] focus:outline-none"
+              className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm font-normal text-gray-900 focus:border-slate-300 focus:outline-none"
             />
           </label>
           <div className="flex items-center gap-3">
             <ActionButton label="Save token & reload" onClick={saveToken} />
           </div>
-          <p className="text-xs text-[#6b7280]">
+          <p className="text-xs text-gray-500">
             The token must match with the token in your <code>.env</code> file in the project root. If you update the
             token in the <code>.env</code> file, you need to restart the server.
           </p>
@@ -292,12 +292,12 @@ const McpSection: React.FC = () => {
             href={readmeUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-sm font-bold text-[#fd8504] transition hover:text-[#d97004]"
+            className="text-sm font-bold text-brand transition hover:text-brand-hover"
           >
             Open the README on GitHub →
           </a>
         </div>
-        <pre className="overflow-auto rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] p-4 text-xs leading-6 text-[#111827]">
+        <pre className="overflow-auto rounded-lg border border-gray-200 bg-gray-100 p-4 text-xs leading-6 text-gray-900">
 {snippet}
         </pre>
       </div>
@@ -307,9 +307,9 @@ const McpSection: React.FC = () => {
 
 const Row: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => {
   return (
-    <div className="flex min-h-11 items-center justify-between gap-4 rounded-lg border border-[#e5e7eb] bg-white px-4">
-      <span className="text-sm text-[#4b5563]">{label}</span>
-      <span className="truncate text-sm font-semibold text-[#111827]">{children}</span>
+    <div className="flex min-h-11 items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-4">
+      <span className="text-sm text-gray-600">{label}</span>
+      <span className="truncate text-sm font-semibold text-gray-900">{children}</span>
     </div>
   )
 }
@@ -324,7 +324,7 @@ const ActionButton: React.FC<{ label: string; disabled?: boolean; onClick: () =>
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="h-8 cursor-pointer rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#111827] transition hover:border-[#cbd5e1] hover:bg-[#e5e7eb] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="h-8 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-900 transition hover:border-slate-300 hover:bg-gray-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       {label}
     </button>

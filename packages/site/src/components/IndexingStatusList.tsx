@@ -7,7 +7,7 @@ export const IndexingStatusList: React.FC<{
 }> = ({ items, locked }) => {
   if (items.length === 0) {
     return (
-      <p className="text-sm text-[#6b7280]">
+      <p className="text-sm text-gray-500">
         {locked ? 'A full index is locked and starting…' : 'No indexing in progress.'}
       </p>
     )
@@ -19,13 +19,13 @@ export const IndexingStatusList: React.FC<{
     <ul className="grid gap-2">
       {sorted.map((item, index) => {
         const active = item.state === 'active'
-        const dotColor = active ? 'bg-[#00e676]' : 'bg-[#fd8504]'
-        const badgeTone = active ? 'bg-[#d8ffe8] text-[#00a85a]' : 'bg-[#fff3e6] text-[#fd8504]'
+        const dotColor = active ? 'bg-accent' : 'bg-brand'
+        const badgeTone = active ? 'bg-accent-soft text-accent-hover' : 'bg-brand-soft text-brand'
 
         return (
           <li
             key={`${item.queue}-${item.name}-${index}`}
-            className="flex items-center justify-between gap-4 rounded-lg border border-[#e5e7eb] bg-white px-4 py-2.5"
+            className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-4 py-2.5"
           >
             <div className="flex min-w-0 items-center gap-2.5">
               <span className="relative flex h-2.5 w-2.5 shrink-0">
@@ -33,7 +33,7 @@ export const IndexingStatusList: React.FC<{
                 <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dotColor}`} />
               </span>
               <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-[#111827]">{item.queue ?? 'job'}</div>
+                <div className="truncate text-sm font-semibold text-gray-900">{item.queue ?? 'job'}</div>
                 <ProgressDetail progress={item.progress} fallback={item.name} active={active} />
               </div>
             </div>
@@ -53,7 +53,7 @@ const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: stri
   active
 }) => {
   if (!progress || typeof progress !== 'object') {
-    return <div className="truncate text-xs text-[#6b7280]">{fallback}</div>
+    return <div className="truncate text-xs text-gray-500">{fallback}</div>
   }
 
   const line = describeProgress(progress) ?? fallback
@@ -63,9 +63,9 @@ const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: stri
 
   return (
     <div className="min-w-0">
-      {line ? <div className="truncate text-xs text-[#6b7280]">{line}</div> : null}
+      {line ? <div className="truncate text-xs text-gray-500">{line}</div> : null}
       {hasCounts ? (
-        <div className="mt-0.5 text-xs text-[#111827]">
+        <div className="mt-0.5 text-xs text-gray-900">
           <CountUp value={progress.nodes ?? 0} /> nodes · <CountUp value={progress.edges ?? 0} /> edges
         </div>
       ) : null}
@@ -73,13 +73,13 @@ const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: stri
         <div className="mt-1 flex flex-wrap gap-1">
           {directories.map((directory, index) => {
             const status = index + 1 < current ? 'done' : index + 1 === current ? 'active' : 'waiting'
-            const activeTone = active ? 'bg-[#d8ffe8] text-[#00a85a]' : 'bg-[#fff3e6] text-[#fd8504]'
+            const activeTone = active ? 'bg-accent-soft text-accent-hover' : 'bg-brand-soft text-brand'
             const tone =
               status === 'done'
-                ? 'bg-[#e5e7eb] text-[#6b7280]'
+                ? 'bg-gray-200 text-gray-500'
                 : status === 'active'
                   ? activeTone
-                  : 'border border-[#e5e7eb] text-[#9ca3af]'
+                  : 'border border-gray-200 text-gray-400'
 
             return (
               <span key={`${directory}-${index}`} className={`rounded px-1.5 py-0.5 text-[10px] ${tone}`}>

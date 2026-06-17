@@ -32,14 +32,14 @@ const AgentSection: React.FC = () => {
       <div className="mt-5 grid gap-3">
         <Row label="Status">
           <span className="inline-flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${connected ? 'bg-[#00e676]' : 'bg-[#fd8504]'}`} />
+            <span className={`h-2 w-2 rounded-full ${connected ? 'bg-accent' : 'bg-brand'}`} />
             {connected ? 'Connected' : 'Idle'}
           </span>
         </Row>
         <Row label="Last interaction">{agent?.lastSeenAt ? formatRelative(agent.lastSeenAt) : 'No activity yet'}</Row>
         <Row label="At">{agent?.lastSeenAt ? new Date(agent.lastSeenAt).toLocaleString() : '—'}</Row>
       </div>
-      <p className="mt-3 text-xs text-[#6b7280]">
+      <p className="mt-3 text-xs text-gray-500">
         Connected means an agent called the MCP server within the last 120 seconds.
       </p>
     </Panel>
@@ -51,15 +51,15 @@ const WatcherSection: React.FC = () => {
 
   const { label, tone } = (() => {
     if (!status) {
-      return { label: 'Unknown', tone: 'bg-[#9ca3af]' }
+      return { label: 'Unknown', tone: 'bg-gray-400' }
     }
     if (!status.watcherEnabled) {
-      return { label: 'Disabled', tone: 'bg-[#9ca3af]' }
+      return { label: 'Disabled', tone: 'bg-gray-400' }
     }
     if (status.indexing.locked) {
-      return { label: 'Paused (full reindex)', tone: 'bg-[#fd8504]' }
+      return { label: 'Paused (full reindex)', tone: 'bg-brand' }
     }
-    return { label: 'Enabled', tone: 'bg-[#00e676]' }
+    return { label: 'Enabled', tone: 'bg-accent' }
   })()
 
   return (
@@ -73,7 +73,7 @@ const WatcherSection: React.FC = () => {
           </span>
         </Row>
       </div>
-      <p className="mt-3 text-xs text-[#6b7280]">
+      <p className="mt-3 text-xs text-gray-500">
         Auto-reindexes changed files. Pauses while a full reindex runs. Toggle it on the Settings page.
       </p>
     </Panel>
@@ -118,7 +118,7 @@ const GraphSection: React.FC = () => {
           type="button"
           onClick={load}
           disabled={loading}
-          className="h-8 shrink-0 cursor-pointer rounded-lg border border-[#e5e7eb] bg-white px-3 text-xs font-semibold text-[#111827] transition hover:border-[#cbd5e1] hover:bg-[#e5e7eb] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-8 shrink-0 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-900 transition hover:border-slate-300 hover:bg-gray-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? 'Refreshing…' : 'Refresh'}
         </button>
@@ -138,9 +138,9 @@ const GraphSection: React.FC = () => {
 
 const Row: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => {
   return (
-    <div className="flex min-h-11 items-center justify-between gap-4 rounded-lg border border-[#e5e7eb] bg-white px-4">
-      <span className="text-sm text-[#4b5563]">{label}</span>
-      <span className="truncate text-sm font-semibold text-[#111827]">{children}</span>
+    <div className="flex min-h-11 items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-4">
+      <span className="text-sm text-gray-600">{label}</span>
+      <span className="truncate text-sm font-semibold text-gray-900">{children}</span>
     </div>
   )
 }

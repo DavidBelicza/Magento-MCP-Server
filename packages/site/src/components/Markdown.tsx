@@ -51,14 +51,14 @@ function toAbsolute(url: string | undefined, base: string): string | undefined {
 
 export const Markdown: React.FC<{ content: string }> = ({ content }) => {
   return (
-    <div className="min-w-0 break-words text-sm leading-6 text-[#374151]">
+    <div className="min-w-0 break-words text-sm leading-6 text-gray-700">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeShellHighlight]}
         components={{
-          h1: ({ children }) => <h1 className="mt-6 mb-3 text-2xl font-bold text-[#111827] first:mt-0">{children}</h1>,
-          h2: ({ children }) => <h2 className="mt-6 mb-3 text-xl font-bold text-[#111827]">{children}</h2>,
-          h3: ({ children }) => <h3 className="mt-5 mb-2 text-base font-bold text-[#111827]">{children}</h3>,
+          h1: ({ children }) => <h1 className="mt-6 mb-3 text-2xl font-bold text-gray-900 first:mt-0">{children}</h1>,
+          h2: ({ children }) => <h2 className="mt-6 mb-3 text-xl font-bold text-gray-900">{children}</h2>,
+          h3: ({ children }) => <h3 className="mt-5 mb-2 text-base font-bold text-gray-900">{children}</h3>,
           p: ({ children }) => <p className="my-3">{children}</p>,
           ul: ({ children }) => <ul className="my-3 list-disc pl-6">{children}</ul>,
           ol: ({ children }) => <ol className="my-3 list-decimal pl-6">{children}</ol>,
@@ -68,7 +68,7 @@ export const Markdown: React.FC<{ content: string }> = ({ content }) => {
               href={toAbsolute(href, repoBlobBase)}
               target="_blank"
               rel="noreferrer"
-              className="font-semibold text-[#fd8504] transition hover:text-[#d97004]"
+              className="font-semibold text-brand transition hover:text-brand-hover"
             >
               {children}
             </a>
@@ -77,20 +77,20 @@ export const Markdown: React.FC<{ content: string }> = ({ content }) => {
             <img
               src={toAbsolute(typeof src === 'string' ? src : undefined, repoRawBase)}
               alt={alt}
-              className="my-4 max-w-full rounded-lg border border-[#e5e7eb]"
+              className="my-4 max-w-full rounded-lg border border-gray-200"
             />
           ),
           blockquote: ({ children }) => (
-            <blockquote className="my-3 border-l-4 border-[#e5e7eb] pl-4 text-[#6b7280]">{children}</blockquote>
+            <blockquote className="my-3 border-l-4 border-gray-200 pl-4 text-gray-500">{children}</blockquote>
           ),
           code: ({ className, children }) =>
             className?.includes('language-') ? (
               <code className={className}>{children}</code>
             ) : (
-              <code className="rounded bg-[#f3f4f6] px-1.5 py-0.5 text-[13px] text-[#111827]">{children}</code>
+              <code className="rounded bg-gray-100 px-1.5 py-0.5 text-[13px] text-gray-900">{children}</code>
             ),
           pre: ({ children }) => (
-            <pre className="my-4 overflow-auto rounded-lg border border-[#e5e7eb] bg-[#f9fafb] p-4 text-[13px] leading-6">
+            <pre className="my-4 overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-4 text-[13px] leading-6">
               {children}
             </pre>
           ),
@@ -99,9 +99,9 @@ export const Markdown: React.FC<{ content: string }> = ({ content }) => {
               <table className="w-full border-collapse text-left text-sm">{children}</table>
             </div>
           ),
-          th: ({ children }) => <th className="border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 font-semibold">{children}</th>,
-          td: ({ children }) => <td className="border border-[#e5e7eb] px-3 py-2">{children}</td>,
-          hr: () => <hr className="my-6 border-[#e5e7eb]" />
+          th: ({ children }) => <th className="border border-gray-200 bg-gray-50 px-3 py-2 font-semibold">{children}</th>,
+          td: ({ children }) => <td className="border border-gray-200 px-3 py-2">{children}</td>,
+          hr: () => <hr className="my-6 border-gray-200" />
         }}
       >
         {content}

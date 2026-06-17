@@ -33,10 +33,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         {!isCollapsed && (
           <div className="min-w-0">
-            <div className="-ml-px truncate text-3xl font-black tracking-tighter leading-[1.2] text-[#111827]">
+            <div className="-ml-px truncate text-3xl font-black tracking-tighter leading-[1.2] text-gray-900">
               Magentic
             </div>
-            <div className="truncate text-xs leading-[1] text-[#4b5563]">MCP Server for Agentic AI</div>
+            <div className="truncate text-xs leading-[1] text-gray-600">MCP Server for Agentic AI</div>
           </div>
         )}
       </div>
@@ -58,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           href="https://davidbel.com?magentic=1"
           target="_blank"
           rel="noreferrer"
-          className="mt-4 block shrink-0 truncate text-center text-[9px] font-black tracking-wide text-[#9ca3af] transition-colors hover:text-[#111827]"
+          className="mt-4 block shrink-0 truncate text-center text-[9px] font-black tracking-wide text-gray-400 transition-colors hover:text-gray-900"
         >
           Built by David Belicza
         </a>
@@ -66,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <button
         type="button"
-        className="mt-3 flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#e5e7eb] bg-white text-xs text-[#111827] transition hover:border-[#cbd5e1] hover:bg-[#e5e7eb] focus:outline-none"
+        className="mt-3 flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white text-xs text-gray-900 transition hover:border-slate-300 hover:bg-gray-200 focus:outline-none"
         onClick={onToggle}
         aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -95,8 +95,8 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ item, isActive, isCollapsed, 
         'group flex h-9 cursor-pointer items-center gap-2.5 rounded-lg border px-[18px] text-left transition focus:outline-none',
         isCollapsed ? 'justify-center' : 'justify-start',
         isActive
-          ? 'border-[#cbd5e1] bg-[#e5e7eb] text-[#111827]'
-          : 'border-transparent text-[#111827] hover:border-[#cbd5e1] hover:bg-[#e5e7eb]',
+          ? 'border-slate-300 bg-gray-200 text-gray-900'
+          : 'border-transparent text-gray-900 hover:border-slate-300 hover:bg-gray-200',
       ].join(' ')}
       onClick={onClick}
       aria-label={item.label}

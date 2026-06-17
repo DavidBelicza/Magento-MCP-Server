@@ -42,12 +42,12 @@ export const TokenGate: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-3xl border border-white/40 bg-white/70 p-6 shadow-xl backdrop-blur-md">
-        <h2 className="text-lg font-black tracking-wide text-[#111827]">API token required</h2>
-        <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+        <h2 className="text-lg font-black tracking-wide text-gray-900">API token required</h2>
+        <p className="mt-2 text-sm leading-6 text-gray-600">
           Magentic is protected by an API token that you find in your <code>.env</code> file in the project root. If you
           changed your default token then restart the server first.
         </p>
-        <p className="mt-2 text-sm font-bold leading-6 text-[#111827]">Enter the token to use Magentic.</p>
+        <p className="mt-2 text-sm font-bold leading-6 text-gray-900">Enter the token to use Magentic.</p>
         <input
           type="text"
           value={token}
@@ -62,14 +62,14 @@ export const TokenGate: React.FC = () => {
             }
           }}
           placeholder="API token"
-          className="mt-4 h-10 w-full rounded-lg border border-[#e5e7eb] bg-white px-3 text-sm text-[#111827] focus:border-[#cbd5e1] focus:outline-none"
+          className="mt-4 h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-slate-300 focus:outline-none"
         />
-        {error && <p className="mt-2 text-sm font-semibold text-[#fd8504]">{error}</p>}
+        {error && <p className="mt-2 text-sm font-semibold text-brand">{error}</p>}
         <button
           type="button"
           disabled={token.trim() === '' || checking}
           onClick={() => void save()}
-          className="mt-4 h-10 w-full cursor-pointer rounded-lg bg-[#00e676] text-sm font-semibold text-[#111827] transition hover:bg-[#00c853] disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-4 h-10 w-full cursor-pointer rounded-lg bg-accent text-sm font-semibold text-gray-900 transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           {checking ? 'Checking…' : 'Save & reload'}
         </button>
