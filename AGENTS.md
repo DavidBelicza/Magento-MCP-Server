@@ -18,12 +18,13 @@ Magentic is a Docker-based, self-hosted MCP server for agentic AI workflows. It 
 - `docs/test_system_sanity.md`: runtime and integration sanity checks.
 - `docs/README-performance.md`: PHP analyzer file-scanning performance notes.
 - `docs/architecture_mcp.md`: the `packages/mcp` service — a thin MCP adapter exposing `get_status`, `graph_search`, and `get_graph_schema` over Streamable HTTP at `/mcp`.
+- `docs/architecture_auth.md`: access-control design — a single static token (`MAGENTIC_API_TOKEN`, default `example-token`) checked in nginx (envsubst-rendered `map`) on every `/api` and `/mcp` request.
 
 ## Docker Services
 
 The Compose project is named `magentic`. Main services:
 
-- `magentic_frontend`: public entrypoint on `localhost:8080`; Nginx in production, Vite in dev override.
+- `magentic_frontend`: public entrypoint on `localhost:8080`; Nginx in both production and dev (dev rebuilds the SPA with `vite build --watch` instead of running the Vite dev server, so nginx — and its auth gate — is always in the path).
 - `magentic_backend`: private Fastify API service; routes live in `packages/core/src/server.ts`.
 - `magentic_worker`: private BullMQ worker; entrypoint is `packages/core/src/worker.ts`.
 - `magentic_analyzer_php`: private PHP analyzer runtime.
@@ -32,7 +33,7 @@ The Compose project is named `magentic`. Main services:
 - `magentic_postgres`: persistent application storage and schema history.
 - `magentic_graphdb`: Neo4j graph database, exposed for local browser/debug access.
 
-Dev Compose overrides are in `docker-compose.dev.yml`. Backend/worker/site/PHP analyzer source mounts allow most source edits without rebuilding. Rebuild only when package metadata or Dockerfiles change. In dev mode, `magentic_analyzer_php` runs Composer install on startup so `packages/php-analyzer/vendor` is available locally but ignored by Git.
+Dev Compose overrides are in `docker-compose.dev.yml`. Backend/worker/site/PHP analyzer source mounts allow most source edits without rebuilding the image. The backend/worker run `tsx` watch; the site runs `vite build --watch` and is served by nginx (refresh the browser to pick up a rebuild — no HMR). Rebuild the image only when package metadata or Dockerfiles change. In dev mode, `magentic_analyzer_php` runs Composer install on startup so `packages/php-analyzer/vendor` is available locally but ignored by Git.
 
 ## Common Commands
 
@@ -90,7 +91,7 @@ Important site paths:
 - `src/features/graph/`: React Force Graph 2D graph visualization.
 - `src/views/`: route views.
 
-The frontend uses same-origin `/api/*` calls. In dev, Vite proxies `/api` to `magentic_backend:3000`.
+The frontend uses same-origin `/api/*` calls through a central `apiFetch` helper (`src/lib/api.ts`) that attaches the bearer token. Nginx proxies `/api` to `magentic_backend:3000` and `/mcp` to `magentic_mcp:3000` in both dev and prod.
 
 ## PHP Analyzer Layout
 

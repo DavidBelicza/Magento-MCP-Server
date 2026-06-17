@@ -9,6 +9,8 @@ services:
     build:
       context: .
       dockerfile: services/frontend/Dockerfile
+    environment:
+      MAGENTIC_API_TOKEN: "${MAGENTIC_API_TOKEN:-example-token}"
     depends_on:
       magentic_backend:
         condition: service_healthy

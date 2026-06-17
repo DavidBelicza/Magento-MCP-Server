@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { apiFetch } from '../lib/api'
 import { Link, useSearchParams } from 'react-router-dom'
 import { GraphVisualization, buildGraphStyle } from '../features/graph'
 import type { GraphVisualizationData, GraphVisualizationHandle, GraphLegendEntry } from '../features/graph'
@@ -58,7 +59,7 @@ export const GraphView: React.FC = () => {
       setError(null)
 
       try {
-        const response = await fetch('/api/graph/get-query-history')
+        const response = await apiFetch('/api/graph/get-query-history')
         const body = (await response.json()) as QueryHistoryListResponse
 
         if (!isMounted) {
@@ -109,7 +110,7 @@ export const GraphView: React.FC = () => {
       setError(null)
 
       try {
-        const response = await fetch(`/api/graph/get-query-history/${encodeURIComponent(queryHistoryId ?? '')}`)
+        const response = await apiFetch(`/api/graph/get-query-history/${encodeURIComponent(queryHistoryId ?? '')}`)
         const body = (await response.json()) as QueryHistoryGraphResponse
 
         if (!isMounted) {

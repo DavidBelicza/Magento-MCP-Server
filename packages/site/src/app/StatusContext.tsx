@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { apiFetch } from '../lib/api'
 
 export type JobProgress = {
   phase?: string
@@ -37,7 +38,7 @@ export const StatusProvider: React.FC<React.PropsWithChildren> = ({ children }) 
     let active = true
 
     const poll = () => {
-      fetch('/api/status')
+      apiFetch('/api/status')
         .then((response) => {
           if (!response.ok) {
             throw new Error(`status ${response.status}`)

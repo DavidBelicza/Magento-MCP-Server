@@ -91,22 +91,34 @@ Replace `8080` with your `FRONTEND_HTTP_PORT` if you changed it. It exposes thre
 
 CLI and desktop agents send no `Origin` header and connect out of the box. Browser-based clients must use an origin in `MCP_ALLOWED_ORIGINS` (defaults to localhost/127.0.0.1 on `FRONTEND_HTTP_PORT`).
 
+### Authentication
+
+Every request to `/api` (except `/api/health`) and `/mcp` must carry `Authorization: Bearer <token>`, matched against `MAGENTIC_API_TOKEN`. It defaults to `example-token`; **change it before exposing the port** (generate one with `openssl rand -hex 32`), and prefer TLS in front when the stack is reachable off-host.
+
+- **Agents**: add the bearer header in your MCP client config (examples below).
+- **Browser UI**: open **Settings → Activate the MCP Server**, paste the token into the **API token** field (stored in your browser only), and save.
+
+See [`docs/architecture_auth.md`](docs/architecture_auth.md) for the full design.
+
 ### Claude Code
 
 Command line:
 
 ```bash
 claude mcp add --transport http magentic http://localhost:8080/mcp
+# with a token set on the server, add the header:
+claude mcp add --transport http magentic http://localhost:8080/mcp --header "Authorization: Bearer <token>"
 ```
 
-Config file (`.mcp.json` in the project root, or user scope in `~/.claude.json`):
+Config file (`.mcp.json` in the project root, or user scope in `~/.claude.json`). Add the `headers` block only if the server has a token set:
 
 ```json
 {
   "mcpServers": {
     "magentic": {
       "type": "http",
-      "url": "http://localhost:8080/mcp"
+      "url": "http://localhost:8080/mcp",
+      "headers": { "Authorization": "Bearer <token>" }
     }
   }
 }

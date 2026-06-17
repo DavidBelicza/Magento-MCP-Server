@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { apiFetch } from '../lib/api'
 import { Link } from 'react-router-dom'
 
 type QueryHistoryItem = {
@@ -30,7 +31,7 @@ export const QueryHistoryView: React.FC = () => {
 
     async function loadQueryHistory() {
       try {
-        const response = await fetch('/api/graph/get-query-history')
+        const response = await apiFetch('/api/graph/get-query-history')
         const body = (await response.json()) as QueryHistoryResponse
 
         if (!isMounted) {

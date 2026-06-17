@@ -6,7 +6,7 @@
 
 MCP Streamable HTTP at a single endpoint, `POST /mcp`. Stateless JSON mode (no sessions): the SDK transport runs with `sessionIdGenerator: undefined` and `enableJsonResponse: true`. `GET`/`DELETE /mcp` return `405`. The `Origin` header is validated — a present, unrecognized origin gets `403`; a missing origin is allowed so CLI clients work.
 
-Public path: client → `http://localhost:8080/mcp` → nginx (`magentic_frontend`) → `magentic_mcp:3000`. The Fastify host runs with `ignoreTrailingSlash`, so `/mcp` and `/mcp/` both work. The allowed-origin list (`MCP_ALLOWED_ORIGINS`) defaults to localhost/127.0.0.1 on `FRONTEND_HTTP_PORT`, so changing the published port is enough; override it only to serve from another host/domain. See `README.md` ("Connecting an MCP Client") for Claude Code, Codex, and Antigravity setup.
+Public path: client → `http://localhost:8080/mcp` → nginx (`magentic_frontend`) → `magentic_mcp:3000`. The Fastify host runs with `ignoreTrailingSlash`, so `/mcp` and `/mcp/` both work. The allowed-origin list (`MCP_ALLOWED_ORIGINS`) defaults to localhost/127.0.0.1 on `FRONTEND_HTTP_PORT`, so changing the published port is enough; override it only to serve from another host/domain. See `README.md` ("Connecting an MCP Client") for Claude Code, Codex, and Antigravity setup. nginx gates `/mcp` (and `/api`) against `MAGENTIC_API_TOKEN`, so clients must also send `Authorization: Bearer <token>`; see `docs/architecture_auth.md`.
 
 ## Tools
 

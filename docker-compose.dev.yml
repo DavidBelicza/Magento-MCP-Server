@@ -14,7 +14,8 @@ services:
       context: .
       dockerfile: services/frontend/Dockerfile
       target: dev
-    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ./packages/site/src:/app/src
       - ./packages/site/public:/app/public

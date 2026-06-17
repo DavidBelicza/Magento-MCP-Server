@@ -1,5 +1,7 @@
 export const baseUrl = process.env.MAGENTIC_E2E_BASE_URL ?? "http://localhost:8080";
 
+export const apiToken = process.env.MAGENTIC_E2E_TOKEN ?? "example-token";
+
 type JsonRecord = Record<string, unknown>;
 
 export type ApiResponse = {
@@ -12,6 +14,10 @@ export async function apiRequest(path: string, init?: RequestInit): Promise<ApiR
 
   if (init?.body !== undefined) {
     headers["Content-Type"] = "application/json";
+  }
+
+  if (apiToken && headers.Authorization === undefined) {
+    headers.Authorization = `Bearer ${apiToken}`;
   }
 
   const response = await fetch(`${baseUrl}${path}`, { ...init, headers });
@@ -108,9 +114,18 @@ export type McpResult = {
 };
 
 export async function mcpCall(method: string, params?: JsonRecord): Promise<McpResult> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream"
+  };
+
+  if (apiToken) {
+    headers.Authorization = `Bearer ${apiToken}`;
+  }
+
   const response = await fetch(`${baseUrl}/mcp`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+    headers,
     body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params })
   });
 

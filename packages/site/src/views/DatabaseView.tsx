@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { apiFetch } from '../lib/api'
 import { Panel, SectionHeader } from '../components/Panel'
 import { IndexingStatusList } from '../components/IndexingStatusList'
 import { useStatus } from '../app/StatusContext'
@@ -98,7 +99,7 @@ const GraphSection: React.FC = () => {
 
   const load = useCallback(() => {
     setLoading(true)
-    fetch('/api/graph/stats')
+    apiFetch('/api/graph/stats')
       .then((response) => response.json())
       .then((data) => setStats(data.ok ? data : null))
       .catch(() => setStats(null))

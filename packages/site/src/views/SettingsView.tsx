@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Panel, SectionHeader } from '../components/Panel'
 import { IndexingStatusList } from '../components/IndexingStatusList'
 import { useStatus } from '../app/StatusContext'
+import { apiFetch, getApiToken, setApiToken } from '../lib/api'
 
 const readmeUrl = 'https://github.com/DavidBelicza/Magentic/blob/main/README.md'
 
@@ -54,7 +55,7 @@ const IndexingSection: React.FC = () => {
 
   const toggleWatcher = (enabled: boolean) => {
     setWatcherOverride(enabled)
-    void fetch('/api/config', {
+    void apiFetch('/api/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ watcherEnabled: enabled })
@@ -68,7 +69,7 @@ const IndexingSection: React.FC = () => {
 
     setBusy(true)
     setMessage(null)
-    fetch(endpoint, { method: 'POST' })
+    apiFetch(endpoint, { method: 'POST' })
       .then((response) => response.json())
       .then((data) => setMessage(data.ok ? `${label} started.` : data.error ?? `${label} failed.`))
       .catch(() => setMessage(`${label} failed.`))
@@ -121,7 +122,7 @@ const ConfigSection: React.FC = () => {
   }
 
   useEffect(() => {
-    fetch('/api/config')
+    apiFetch('/api/config')
       .then((response) => response.json())
       .then((data: ConfigResponse) => {
         setConfig(data)
@@ -141,7 +142,7 @@ const ConfigSection: React.FC = () => {
   const save = () => {
     setSaving(true)
     setMessage(null)
-    fetch('/api/config', {
+    apiFetch('/api/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -239,6 +240,26 @@ const ConfigSection: React.FC = () => {
 }
 
 const McpSection: React.FC = () => {
+  const [token, setToken] = useState(() => getApiToken())
+
+  const saveToken = () => {
+    setApiToken(token.trim())
+    window.location.reload()
+  }
+
+  const headersBlock = token.trim()
+    ? `,
+      "headers": { "Authorization": "Bearer ${token.trim()}" }`
+    : ''
+
+  const snippet = `{
+  "mcpServers": {
+    "magentic": {
+      "url": "http://localhost:8080/mcp"${headersBlock}
+    }
+  }
+}`
+
   return (
     <Panel className="p-5 xl:col-span-2">
       <SectionHeader title="Activate the MCP Server" />
@@ -248,6 +269,25 @@ const McpSection: React.FC = () => {
           <Row label="Transport">Streamable HTTP</Row>
           <Row label="Endpoint">http://localhost:8080/mcp</Row>
           <Row label="Tools">get_status, graph_search, get_graph_schema</Row>
+
+          <label className="mt-1 grid gap-1 text-xs font-semibold text-[#4b5563]">
+            API token
+            <input
+              type="text"
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
+              placeholder="API token"
+              className="h-9 rounded-lg border border-[#e5e7eb] bg-white px-3 text-sm font-normal text-[#111827] focus:border-[#cbd5e1] focus:outline-none"
+            />
+          </label>
+          <div className="flex items-center gap-3">
+            <ActionButton label="Save token & reload" onClick={saveToken} />
+          </div>
+          <p className="text-xs text-[#6b7280]">
+            The token must match with the token in your <code>.env</code> file in the project root. If you update the
+            token in the <code>.env</code> file, you need to restart the server.
+          </p>
+
           <a
             href={readmeUrl}
             target="_blank"
@@ -258,13 +298,7 @@ const McpSection: React.FC = () => {
           </a>
         </div>
         <pre className="overflow-auto rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] p-4 text-xs leading-6 text-[#111827]">
-{`{
-  "mcpServers": {
-    "magentic": {
-      "url": "http://localhost:8080/mcp"
-    }
-  }
-}`}
+{snippet}
         </pre>
       </div>
     </Panel>
