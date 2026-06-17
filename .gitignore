@@ -19,3 +19,8 @@ npm-debug.log*
 .phpunit.cache/
 .phpstan.cache/
 .php-cs-fixer.cache
+
+# e2e fixture stack: throwaway config dir is local-only, but the synthetic
+# fixture's vendor tree is intentionally committed (it is not a real install).
+/e2e/.test-data/
+!/e2e/fixtures/sample-project/vendor/

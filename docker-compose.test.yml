@@ -1,0 +1,42 @@
+# Overrides for an isolated e2e fixture stack. Mounts the synthetic sample
+# fixture as the analyzed source, uses a throwaway config dir, and remaps the
+# public ports so it can run alongside the dev stack.
+#
+#   docker compose -p magentictest -f docker-compose.yml -f docker-compose.test.yml up -d
+#   MAGENTIC_E2E_FIXTURE=1 MAGENTIC_E2E_BASE_URL=http://localhost:8090 npm run test:e2e
+#   docker compose -p magentictest -f docker-compose.yml -f docker-compose.test.yml down -v
+#
+# (or use the npm scripts: e2e:stack:up / test:e2e:fixture / e2e:stack:down)
+
+services:
+  magentic_frontend:
+    ports: !override
+      - "8090:80"
+
+  magentic_backend:
+    volumes:
+      - ./e2e/fixtures/sample-project:/mnt/analyzed-source:ro
+      - ./e2e/.test-data:/app/data
+
+  magentic_worker:
+    volumes:
+      - ./e2e/fixtures/sample-project:/mnt/analyzed-source:ro
+
+  magentic_mcp:
+    environment:
+      MCP_PUBLIC_BASE_URL: "http://localhost:8090"
+      MCP_ALLOWED_ORIGINS: "http://localhost:8090,http://127.0.0.1:8090"
+
+  magentic_watcher:
+    volumes:
+      - ./e2e/fixtures/sample-project:/mnt/analyzed-source:ro
+      - ./e2e/.test-data:/app/data:ro
+
+  magentic_analyzer_php:
+    volumes:
+      - ./e2e/fixtures/sample-project:/mnt/analyzed-source:ro
+
+  magentic_graphdb:
+    ports: !override
+      - "7475:7474"
+      - "7688:7687"

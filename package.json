@@ -18,7 +18,11 @@
     "dev:mcp": "npm run dev --workspace @magentic/mcp",
     "test": "vitest run",
     "test:unit": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "vitest run --config e2e/vitest.config.ts",
+    "test:e2e:fixture": "MAGENTIC_E2E_FIXTURE=1 MAGENTIC_E2E_BASE_URL=http://localhost:8090 vitest run --config e2e/vitest.config.ts",
+    "e2e:stack:up": "docker compose -p magentictest -f docker-compose.yml -f docker-compose.test.yml up -d",
+    "e2e:stack:down": "docker compose -p magentictest -f docker-compose.yml -f docker-compose.test.yml down -v"
   },
   "devDependencies": {
     "vitest": "^3.0.5"

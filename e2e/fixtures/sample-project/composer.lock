@@ -1,0 +1,44 @@
+{
+  "_readme": [
+    "Synthetic fixture for Magentic e2e tests. Not a real Composer install.",
+    "Fictional vendor/packages used to assert package/source/link indexing deterministically."
+  ],
+  "packages": [
+    {
+      "name": "acme/widget",
+      "version": "1.0.0",
+      "type": "library",
+      "description": "Fixture package used by Magentic end-to-end tests.",
+      "license": ["MIT"],
+      "authors": [
+        {
+          "name": "Magentic Test",
+          "email": "test@example.com",
+          "role": "Developer"
+        }
+      ],
+      "require": {
+        "php": "~8.4.0",
+        "acme/core": "*"
+      },
+      "autoload": {
+        "psr-4": {
+          "Acme\\Widget\\": ""
+        }
+      }
+    },
+    {
+      "name": "acme/core",
+      "version": "2.0.0",
+      "type": "library",
+      "description": "Fixture stand-in for a base library package.",
+      "license": ["MIT"],
+      "autoload": {
+        "psr-4": {
+          "Acme\\Core\\": ""
+        }
+      }
+    }
+  ],
+  "packages-dev": []
+}
