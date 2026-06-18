@@ -1,11 +1,14 @@
 const TOKEN_KEY = 'magentic_api_token'
 
+export const DEFAULT_API_TOKEN = 'example-token'
+
 export function getApiToken(): string {
   try {
-    return localStorage.getItem(TOKEN_KEY) ?? ''
+    const stored = localStorage.getItem(TOKEN_KEY) ?? ''
+    return stored.length > 0 ? stored : DEFAULT_API_TOKEN
   } catch (error) {
     console.warn('Could not read the API token from localStorage', error)
-    return ''
+    return DEFAULT_API_TOKEN
   }
 }
 

@@ -45,6 +45,10 @@ function getMountPath(): string {
   return process.env.MAGENTIC_ANALYZED_SOURCE_PATH ?? "/mnt/analyzed-source";
 }
 
+function getSourceHostPath(): string {
+  return process.env.MAGENTIC_ANALYZED_SOURCE_HOST_PATH ?? "";
+}
+
 function getComposerRoot(): string {
   const root = getAppSettings().projectRoot;
 
@@ -74,8 +78,8 @@ registerIndexDeltaRoute(app, { redis });
 registerIndexReindexRoute(app, { indexFlowProducer, redis, getComposerRoot, getSourceDirectories, getPhpVersion });
 registerIndexResetAndReindexRoute(app, { indexFlowProducer, redis, getComposerRoot, getSourceDirectories, getPhpVersion });
 registerIndexStatusRoute(app, { indexStatus, redis });
-registerStatusRoute(app, { indexStatus, redis });
-registerGetConfigRoute(app, { getMountPath });
+registerStatusRoute(app, { indexStatus, redis, postgres });
+registerGetConfigRoute(app, { getMountPath, getSourceHostPath });
 registerUpdateConfigRoute(app);
 registerGraphStatsRoute(app, { neo4jDriver });
 registerUsagePingRoute(app, { redis });

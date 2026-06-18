@@ -16,6 +16,7 @@ type AppSettings = {
 type ConfigResponse = {
   settings: AppSettings
   mountPath: string
+  hostPath: string
   phpVersionOptions: string[]
 }
 
@@ -67,13 +68,21 @@ const IndexingSection: React.FC = () => {
       return
     }
 
+    const startMessage = 'Indexing will start if a source is found…'
+
     setBusy(true)
-    setMessage(null)
+    setMessage(startMessage)
     apiFetch(endpoint, { method: 'POST' })
       .then((response) => response.json())
-      .then((data) => setMessage(data.ok ? `${label} started.` : data.error ?? `${label} failed.`))
+      .then((data) => {
+        if (!data.ok) {
+          setMessage(data.error ?? `${label} failed.`)
+        }
+      })
       .catch(() => setMessage(`${label} failed.`))
       .finally(() => setBusy(false))
+
+    window.setTimeout(() => setMessage((current) => (current === startMessage ? null : current)), 2000)
   }
 
   return (
@@ -221,12 +230,13 @@ const ConfigSection: React.FC = () => {
         </div>
 
         <label className="grid gap-1.5">
-          <span className="text-sm text-gray-600">Mounted directory (read-only)</span>
+          <span className="text-sm text-gray-600">Analyzed source directory (read-only)</span>
           <div className="flex h-9 items-center rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-500">
-            {config?.mountPath ?? '—'}
+            {config?.hostPath ? config.hostPath : '—'}
           </div>
           <span className="text-xs text-gray-400">
-            The host mount is set in Docker Compose; changing it needs a service restart.
+            The host path mounted for analysis. Set MAGENTIC_ANALYZED_SOURCE_HOST_PATH in your .env; changing it needs a
+            service restart.
           </span>
         </label>
 

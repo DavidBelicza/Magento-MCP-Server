@@ -9,6 +9,8 @@ export const TopBar: React.FC<{ activeLabel: string }> = ({ activeLabel }) => {
   const openSettings = () => navigate(viewRoutes.settings)
 
   const indexing = status?.indexing.inProgress ? true : status?.indexing.locked ?? false
+  const indexed = status?.indexed ?? false
+  const indexingValue = indexing ? 'Indexing' : indexed ? 'Indexed' : 'No data'
   const agentConnected = status?.agent.connected ?? false
 
   return (
@@ -25,9 +27,9 @@ export const TopBar: React.FC<{ activeLabel: string }> = ({ activeLabel }) => {
           onClick={openSettings}
         />
         <StatusPill
-          label="Indexing"
-          value={indexing ? 'Indexing' : 'Indexed'}
-          tone={indexing ? 'amber' : 'emerald'}
+          label="Index"
+          value={indexingValue}
+          tone={indexed ? 'emerald' : 'amber'}
           onClick={openSettings}
         />
       </div>

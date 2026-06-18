@@ -23,6 +23,7 @@ export type IndexJob = {
 
 export type StatusData = {
   indexing: { inProgress: number; locked: boolean; items: IndexJob[] }
+  indexed: boolean
   agent: { connected: boolean; lastSeenAt: number | null }
   watcherEnabled: boolean
 }

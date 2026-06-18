@@ -3,6 +3,7 @@ import { getAppSettings, phpVersionOptions } from "../../modules/app-config.js";
 
 type Dependencies = {
   getMountPath: () => string;
+  getSourceHostPath: () => string;
 };
 
 export function registerGetConfigRoute(app: FastifyInstance, deps: Dependencies): void {
@@ -13,6 +14,7 @@ export function registerGetConfigRoute(app: FastifyInstance, deps: Dependencies)
       ok: true,
       settings,
       mountPath: deps.getMountPath(),
+      hostPath: deps.getSourceHostPath(),
       phpVersionOptions
     });
   });

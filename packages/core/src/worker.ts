@@ -1,5 +1,6 @@
 import { createNeo4jDriver, createPostgresPool, createRedisConnection } from "./connections.js";
 import { releaseFullIndexLock } from "./modules/index-lock.js";
+import { recordIndexRun } from "./modules/index-run-state.js";
 import { installSchemas } from "./schema/install-schemas.js";
 import { createDeleteGraphWorker } from "./worker/delete-graph-worker.js";
 import { createIndexLinksWorker } from "./worker/index-links-worker.js";
@@ -31,6 +32,17 @@ indexPackagesWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
 indexSourceWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
 indexLinksWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
 deleteGraphWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
+
+function recordRun(): void {
+  void recordIndexRun(postgres, neo4jDriver).catch((error) => {
+    logger.error({ event: 'record_index_run_failed', err: error }, 'Failed to record index run state');
+  });
+}
+
+indexPackagesWorker.on("completed", recordRun);
+indexSourceWorker.on("completed", recordRun);
+indexLinksWorker.on("completed", recordRun);
+deleteGraphWorker.on("completed", recordRun);
 
 logger.info({ event: 'worker_started' }, 'Magentic Worker is running');
 

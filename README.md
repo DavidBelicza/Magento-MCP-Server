@@ -1,290 +1,157 @@
-# Magentic
 
-## MCP Server for Agentic AI
+<p align="center">
+  <img src=".github/logo.png" alt="Magentic logo" width="140" height="140">
+</p>
 
-## Documentation
+<h1 align="center">Magentic - Magento MCP Server</h1>
 
-- `docs/architecture_project.md`: holistic project and service architecture.
-- `docs/architecture_world_mapping.md`: source-code indexing and graph/world-mapping architecture.
-- `packages/mcp/resource/graph-schema.json`: slim graph schema served to agents by the MCP server (node kinds, relationships, edge properties, type-mapping rules). The worked example adjacency graph lives in `docs/architecture_world_mapping.md`.
-- `docs/test_system_sanity.md`: runtime and integration sanity checks.
+<p align="center">
+Magentic is a self-hosted <strong>standard MCP (Model Context Protocol) server</strong>.<br/>
+Magentic maps the Magento codebase into a graph that any <strong>AI agent can explore for grounded symbolic reasoning</strong>.
+</p>
 
-## Installation
+## How it works
 
-### Prerequisites
+Magentic uses **symbolic reasoning to prevent the model from hallucinating**.
+There are four participants in the algorithm: the AI Agent, the Magentic MCP, the Magentic Graph Database, and the Magento source. It works with any standard AI agent solution that implements MCP, such as *Anthropic Claude, OpenAI Codex, Google Antigravity*, and others.
 
-- Docker environment, such as OrbStack or Docker Desktop
-- npm, for local workspace commands outside Docker
+- Magentic watches your source for file changes and runs a partial update or a full reindex.
+- It understands the PHP abstract syntax tree and pushes it into the graph database.
+- Your AI agent talks to the Magentic MCP, and Magentic searches the graph for it.
 
-### First Start
+```mermaid
+flowchart TD
+    Source[Magento source]
+    Magentic[Magentic MCP]
+    Graph[(Graph Database)]
+    Agent[AI Agent]
 
-Install local workspace dependencies:
+    Source -->|watches changes, reads PHP AST| Magentic
+    Magentic -->|writes nodes and edges| Graph
+    Agent <-->|asks and receives| Magentic
+    Magentic -->|searches| Graph
 
-```bash
-npm install
+    classDef brand fill:#fd8504,stroke:#d97004,color:#ffffff;
+    class Source,Magentic,Graph,Agent brand;
 ```
 
-Build the local packages:
+## Setup
+
+### 1. Prerequisites
+
+- **MacOS**: [OrbStack](https://orbstack.dev/) (recommended) or [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- **Windows**: [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine installed in WSL2 with the Compose plugin
+- **Linux**: [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine with the Compose plugin
+
+### 2. Download
+
+Clone it with git:
 
 ```bash
-npm run build
+cd to-your-project-directory
+git clone https://github.com/DavidBelicza/Magentic.git .
 ```
 
-Create the local Magento source-code path that Magentic will analyze:
+Or download it as a zip from the [releases page](https://github.com/DavidBelicza/Magentic/releases), unzip it, and open the folder in a terminal.
+
+### 3. Install
+
+Copy the content of `.env.example` into a new `.env` file:
 
 ```bash
-mkdir -p ./www/path/to/magento/source-code
+cp .env.example .env
 ```
 
-Build the Docker images:
+Open the `.env` file and set `MAGENTIC_ANALYZED_SOURCE_HOST_PATH` to the absolute path of the codebase you want to analyze.
 
-```bash
-docker compose build
-```
+If port `8081` is already in use on your machine, change `FRONTEND_HTTP_PORT`.
 
-Start the Docker environment:
+The first run builds everything and can take a few minutes (this command needs to be executed later too if you change the `.env` file):
 
 ```bash
 docker compose up -d
 ```
 
-Start the Docker environment in development mode:
+### 4. Configure
+
+The graph is empty until you index your source.
+
+1. Open `http://localhost:8081`.
+2. Go to **Settings**.
+3. Under **Indexing Pipeline**, click **Reset & reindex**.
+
+Indexing time depends on your machine and the size of the codebase. It can take from about a minute on a capable machine to around half an hour on a slow one. You can keep using the app while it runs, and the status updates when it finishes.
+
+### 5. Connect your AI agent
+
+The MCP endpoint is `http://localhost:8081/mcp` (replace `8081` if you changed the port). The examples use the default token `example-token`. If you set your own `MAGENTIC_API_TOKEN`, use that value instead.
+
+#### Anthropic Claude Code
+
+From your Magento project folder, run:
 
 ```bash
-npm run docker:dev
+claude mcp add --scope project --transport http magentic http://localhost:8081/mcp \
+  --header "Authorization: Bearer example-token"
 ```
 
-Rebuild before starting development mode:
+This creates a `.mcp.json` in your Magento project. Run `/mcp` to confirm it is connected.
 
-```bash
-npm run docker:dev:build
-```
+*Alternatively, you can ask your AI agent to set it up for you, then restart the AI agent.*
 
-Open the frontend:
+#### OpenAI Codex
 
-```text
-http://localhost:8080
-```
-
-Open Neo4j Browser:
-
-```text
-http://localhost:7474
-```
-
-Default Neo4j credentials:
-
-```text
-username: neo4j
-password: dev-password
-```
-
-## Connecting an MCP Client
-
-The stack exposes an MCP server over Streamable HTTP through the frontend proxy:
-
-```text
-http://localhost:8080/mcp
-```
-
-Replace `8080` with your `FRONTEND_HTTP_PORT` if you changed it. It exposes three tools: `get_status`, `graph_search`, and `get_graph_schema`. All three clients below connect to this URL directly — no `mcp-remote` or stdio bridge is needed.
-
-CLI and desktop agents send no `Origin` header and connect out of the box. Browser-based clients must use an origin in `MCP_ALLOWED_ORIGINS` (defaults to localhost/127.0.0.1 on `FRONTEND_HTTP_PORT`).
-
-### Authentication
-
-Every request to `/api` (except `/api/health`) and `/mcp` must carry `Authorization: Bearer <token>`, matched against `MAGENTIC_API_TOKEN`. It defaults to `example-token`; **change it before exposing the port** (generate one with `openssl rand -hex 32`), and prefer TLS in front when the stack is reachable off-host.
-
-- **Agents**: add the bearer header in your MCP client config (examples below).
-- **Browser UI**: open **Settings → Activate the MCP Server**, paste the token into the **API token** field (stored in your browser only), and save.
-
-See [`docs/architecture_auth.md`](docs/architecture_auth.md) for the full design.
-
-### Claude Code
-
-Command line:
-
-```bash
-claude mcp add --transport http magentic http://localhost:8080/mcp
-# with a token set on the server, add the header:
-claude mcp add --transport http magentic http://localhost:8080/mcp --header "Authorization: Bearer <token>"
-```
-
-Config file (`.mcp.json` in the project root, or user scope in `~/.claude.json`). Add the `headers` block only if the server has a token set:
-
-```json
-{
-  "mcpServers": {
-    "magentic": {
-      "type": "http",
-      "url": "http://localhost:8080/mcp",
-      "headers": { "Authorization": "Bearer <token>" }
-    }
-  }
-}
-```
-
-Run `/mcp` inside Claude Code to check the connection and list the tools.
-
-### Codex
-
-Command line:
-
-```bash
-codex mcp add magentic --url http://localhost:8080/mcp
-```
-
-User interface: in the Codex IDE extension, open the gear menu, choose **MCP settings → Open config.toml**, and add:
+Create `.codex/config.toml` in your Magento project:
 
 ```toml
 [mcp_servers.magentic]
-url = "http://localhost:8080/mcp"
+url = "http://localhost:8081/mcp"
+bearer_token_env_var = "MAGENTIC_API_TOKEN"
 ```
 
-The CLI and IDE extension share the same `~/.codex/config.toml`, so either method registers the server once.
+Codex reads the token from an environment variable. Set it, then restart Codex:
 
-### Google Antigravity
+```bash
+export MAGENTIC_API_TOKEN=example-token
+```
 
-Antigravity is configured through its UI (no MCP CLI). Open **Settings → Customizations → Open MCP Config** to edit `mcp_config.json`, then add the server. Antigravity uses `serverUrl` (not `url`) for HTTP servers:
+*Alternatively, you can ask your AI agent to set it up for you, then restart the AI agent.*
+
+#### Google Antigravity
+
+Open **Settings → MCP Config** and add:
 
 ```json
 {
   "mcpServers": {
     "magentic": {
-      "serverUrl": "http://localhost:8080/mcp"
+      "serverUrl": "http://localhost:8081/mcp",
+      "headers": {
+        "Authorization": "Bearer example-token"
+      }
     }
   }
 }
 ```
 
-### Telemetry / Logging (Optional)
+*Alternatively, you can ask your AI agent to set it up for you, then restart the AI agent.*
 
-Magentic includes a pre-configured PLG (Promtail, Loki, Grafana) stack for centralized logging and telemetry. By default, these services are completely disabled to save local resources.
+### Remove Magentic
 
-To boot the environment with the logger stack enabled:
-```bash
-docker compose --profile telemetry up -d
-```
-
-Once running, access the Grafana UI:
-```text
-http://localhost:3001
-username: admin
-password: admin
-```
-
-#### How to view logs manually in Grafana
-
-Grafana 11 includes a new "Logs" app, but to query raw LogQL streams without extra configuration, you should use the standard **Explore** tab:
-
-1. Look at the left sidebar and click the **Explore** icon (it looks like a small **compass** 🧭).
-2. At the top left of the Explore page, ensure **Loki** is selected from the data source dropdown.
-3. Switch to the **Code** view (if it is currently in Builder mode).
-4. Enter a LogQL query to fetch logs. For example, to see worker logs:
-   `{compose_service="magentic_worker"}`
-5. Click the blue **Run query** button in the top right corner.
-
-You can entirely mute log generation in the PHP and Node.js applications by setting `ENABLE_TELEMETRY=false` in the `.env` file.
-
-The default analyzed source mount is:
-
-```text
-./www/path/to/magento/source-code -> /mnt/analyzed-source
-```
-
-The mount is read-only inside the containers and host-side file changes are visible inside `magentic_backend`, `magentic_worker`, and `magentic_analyzer_php`.
-
-The PHP analyzer application source lives in:
-
-```text
-packages/php-analyzer
-```
-
-In development mode, Composer dependencies are installed automatically into `packages/php-analyzer/vendor` when `magentic_analyzer_php` starts. The local `vendor` directory is ignored by Git and Docker build context.
-
-### Useful Commands
-
-Check running services:
+Run this **from the project folder** to stop everything and delete the containers, the graph data, and the images:
 
 ```bash
-docker compose ps
+docker compose down -v --rmi all
 ```
 
-Check the backend through the frontend Nginx proxy:
+Your analyzed source code is never modified and stays where it is. To finish, delete the Magentic folder.
 
-```bash
-curl http://localhost:8080/api/health
-```
+## Documentation
 
-Run npm inside the backend container:
-
-```bash
-docker compose exec magentic_backend npm --version
-```
-
-Run npm inside the worker container:
-
-```bash
-docker compose exec magentic_worker npm --version
-```
-
-Run npm inside the frontend container:
-
-```bash
-docker compose exec magentic_frontend npm --version
-```
-
-
-Build the whole graph from scratch — deletes everything, then runs composer, source, and linking in order (the "reset and reindex" action). It returns immediately and runs in the background:
-
-```bash
-curl -X POST http://localhost:8080/api/graph/index/reset-and-reindex -d '{}'
-```
-
-Rebuild without deleting first:
-
-```bash
-curl -X POST http://localhost:8080/api/graph/index/reindex -d '{}'
-```
-
-Watch what is currently running (and whether a full operation holds the lock):
-
-```bash
-curl -s http://localhost:8080/api/graph/index/status
-```
-
-Run a single pipeline directly. Source indexing accepts an optional list of directories (whole source when omitted); the matching `DELETE` removes indexed source under those paths:
-
-```bash
-curl -X POST http://localhost:8080/api/graph/index/source \
-  -H "Content-Type: application/json" \
-  -d '{"directories": ["vendor/magento/module-catalog"]}'
-
-curl -X POST http://localhost:8080/api/graph/index/packages -d '{}'
-curl -X POST http://localhost:8080/api/graph/index/links -d '{}'
-```
-
-Apply an incremental change for a set of paths (the file-watcher entry point), which routes each path to the right pipeline:
-
-```bash
-curl -X POST http://localhost:8080/api/graph/index/delta \
-  -H "Content-Type: application/json" \
-  -d '{"operation": "upsert", "paths": ["vendor/magento/module-catalog"]}'
-```
-
-See `docs/architecture_project.md` (Graph Indexing API) for the full endpoint reference and orchestration rules.
-
-To manually test the internal PHP Analyzer HTTP endpoint (`/analyze`) directly via the Docker network:
-
-```bash
-docker run --rm --network magentic_default curlimages/curl \
-  -X POST http://magentic_analyzer_php/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"path": "vendor/magento/module-catalog"}'
-```
-
-Stop the Docker environment:
-
-```bash
-docker compose down
-```
+- [`docs/architecture_project.md`](docs/architecture_project.md) covers the overall project and service architecture.
+- [`docs/architecture_world_mapping.md`](docs/architecture_world_mapping.md) covers how source is indexed into the graph.
+- [`docs/architecture_mcp.md`](docs/architecture_mcp.md) covers the MCP service and its tools.
+- [`docs/architecture_auth.md`](docs/architecture_auth.md) covers the access-control design.
+- [`docs/test_system_sanity.md`](docs/test_system_sanity.md) covers runtime and integration checks.
+- [`docs/README-performance.md`](docs/README-performance.md) covers analyzer performance notes.
+- [`AGENTS.md`](AGENTS.md) is the contributor and development guide.
