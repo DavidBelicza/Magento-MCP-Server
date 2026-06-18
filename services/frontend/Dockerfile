@@ -30,6 +30,15 @@ FROM node:24-alpine
 
 RUN apk add --no-cache nginx gettext
 
+LABEL org.opencontainers.image.title="Magentic Frontend" \
+      org.opencontainers.image.description="Web UI and gateway for Magentic." \
+      org.opencontainers.image.authors="David Belicza <david@belicza.com>" \
+      org.opencontainers.image.vendor="Magentic" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.url="https://github.com/DavidBelicza/Magento-MCP-Server" \
+      org.opencontainers.image.source="https://github.com/DavidBelicza/Magento-MCP-Server" \
+      org.opencontainers.image.documentation="https://github.com/DavidBelicza/Magento-MCP-Server#readme"
+
 COPY services/frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY services/frontend/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

@@ -49,10 +49,10 @@ Clone it with git:
 
 ```bash
 cd to-your-project-directory
-git clone https://github.com/DavidBelicza/Magentic.git .
+git clone https://github.com/DavidBelicza/Magento-MCP-Server.git .
 ```
 
-Or download it as a zip from the [releases page](https://github.com/DavidBelicza/Magentic/releases), unzip it, and open the folder in a terminal.
+Or download it as a zip from the [releases page](https://github.com/DavidBelicza/Magento-MCP-Server/releases), unzip it, and open the folder in a terminal.
 
 ### 3. Install
 
