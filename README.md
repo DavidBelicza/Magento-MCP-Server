@@ -66,10 +66,10 @@ Open the `.env` file and set `MAGENTIC_ANALYZED_SOURCE_HOST_PATH` to the absolut
 
 If port `8081` is already in use on your machine, change `FRONTEND_HTTP_PORT`.
 
-The first run builds everything and can take a few minutes (this command needs to be executed later too if you change the `.env` file):
+The first run downloads the prebuilt images and starts everything, which can take a few minutes (run this command again later if you change the `.env` file):
 
 ```bash
-docker compose up -d
+docker compose up -d --pull always
 ```
 
 ### 4. Configure
@@ -140,14 +140,14 @@ Open **Settings → MCP Config** and add:
 
 #### Update Magentic
 
-After pulling a new version, rebuild and recreate the containers from the project folder:
+Pull the latest project files and images, then recreate the containers from the project folder:
 
 ```bash
 git pull
-docker compose up -d --build
+docker compose up -d --pull always
 ```
 
-This refreshes the images and restarts the stack with the new code. Your indexed graph and other data remain untouched.
+This downloads the newest images and restarts the stack. Your indexed graph and other data remain untouched.
 
 #### Remove Magentic
 
@@ -156,6 +156,37 @@ Run this **from the project folder** to stop everything and delete the container
 ```bash
 docker compose down -v --rmi all
 ```
+
+## For developers
+
+These steps are only needed if you want to modify the source code of Magentic; they are not needed to use this project.
+
+The default setup pulls prebuilt images from the GitHub Container Registry. If you want to change the code, build the images from source or run the stack in development mode with live reload.
+
+Build the images locally instead of pulling them:
+
+```bash
+docker compose up -d --build
+```
+
+Run the development stack with source mounts and live rebuilds (the backend and worker watch with `tsx`; the site rebuilds with `vite build --watch` and is served by nginx, so refresh the browser to pick up changes):
+
+```bash
+npm run docker:dev
+```
+
+Use `npm run docker:dev:build` instead when a Dockerfile or package metadata changes.
+
+Install the workspace dependencies to run the checks locally:
+
+```bash
+npm install
+npm run lint
+npm run typecheck
+npm test
+```
+
+See [`AGENTS.md`](AGENTS.md) for the full architecture and contributor guide.
 
 ## Documentation
 
