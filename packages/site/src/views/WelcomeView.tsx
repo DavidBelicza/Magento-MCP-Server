@@ -62,8 +62,8 @@ export const WelcomeView: React.FC = () => {
           <div className="mt-5 space-y-3">
             <LinkRow
               title="GitHub repository"
-              meta="github.com/DavidBelicza/Magentic"
-              href="https://github.com/DavidBelicza/Magentic"
+              meta="github.com/DavidBelicza/Magento-MCP-Server"
+              href="https://github.com/DavidBelicza/Magento-MCP-Server"
             />
           </div>
         </Panel>

@@ -38,8 +38,8 @@ function rehypeShellHighlight() {
   }
 }
 
-const repoBlobBase = 'https://github.com/DavidBelicza/Magentic/blob/main/'
-const repoRawBase = 'https://raw.githubusercontent.com/DavidBelicza/Magentic/main/'
+const repoBlobBase = 'https://github.com/DavidBelicza/Magento-MCP-Server/blob/main/'
+const repoRawBase = 'https://raw.githubusercontent.com/DavidBelicza/Magento-MCP-Server/main/'
 
 function toAbsolute(url: string | undefined, base: string): string | undefined {
   if (!url || /^(https?:|mailto:|#|data:)/i.test(url)) {

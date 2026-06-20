@@ -4,7 +4,7 @@ import { IndexingStatusList } from '../components/IndexingStatusList'
 import { useStatus } from '../app/StatusContext'
 import { apiFetch, getApiToken, setApiToken } from '../lib/api'
 
-const readmeUrl = 'https://github.com/DavidBelicza/Magentic/blob/main/README.md'
+const readmeUrl = 'https://github.com/DavidBelicza/Magento-MCP-Server/blob/main/README.md'
 
 type AppSettings = {
   phpVersion: string
