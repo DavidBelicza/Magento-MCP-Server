@@ -30,7 +30,7 @@ jobs:
           - image: magentic_analyzer_php
             dockerfile: services/analyzer-php/Dockerfile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: docker/setup-qemu-action@v3
 
