@@ -9,6 +9,7 @@
     "prebuild": "node scripts/sync-readme.mjs",
     "build": "tsc -p tsconfig.json && vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prebuild:watch": "node scripts/sync-readme.mjs",
     "build:watch": "vite build --watch",
     "dev": "vite --host 0.0.0.0",
     "preview": "vite preview --host 0.0.0.0"

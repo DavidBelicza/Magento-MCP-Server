@@ -136,15 +136,26 @@ Open **Settings → MCP Config** and add:
 
 *Alternatively, you can ask your AI agent to set it up for you, then restart the AI agent.*
 
-### Remove Magentic
+### Troubleshooting
+
+#### Update Magentic
+
+After pulling a new version, rebuild and recreate the containers from the project folder:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+This refreshes the images and restarts the stack with the new code. Your indexed graph and other data remain untouched.
+
+#### Remove Magentic
 
 Run this **from the project folder** to stop everything and delete the containers, the graph data, and the images:
 
 ```bash
 docker compose down -v --rmi all
 ```
-
-Your analyzed source code is never modified and stays where it is. To finish, delete the Magentic folder.
 
 ## Documentation
 

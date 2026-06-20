@@ -65,7 +65,6 @@ export const WelcomeView: React.FC = () => {
               meta="github.com/DavidBelicza/Magentic"
               href="https://github.com/DavidBelicza/Magentic"
             />
-            <LinkRow title="Official page" meta="davidbel.com/magentic" href="https://davidbel.com/magentic" />
           </div>
         </Panel>
       </section>
