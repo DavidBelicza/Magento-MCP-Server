@@ -295,5 +295,71 @@ lets that be an independent, per-file decision without touching the pipeline.
 11. Step 3 (events.xml): `OBSERVES` + `Symbol:XML:Event`, schema `009_*.cypher`,
     shared `record-builder.ts`, generic per-file-type `steps` progress + frontend
     rendering, MCP schema update.
-12. Later: `webapi-xml`, `acl-xml`, `adminhtml-xml`, `config-xml` handlers (additive).
+12. Step 4 (crontab): `crontab.xml` + `cron_groups.xml` — see "Remaining file types".
+13. Step 5 (webapi): `webapi.xml` + `extension_attributes.xml` (+ acl resource
+    refs) — see "Remaining file types".
+14. Final (deferred): `system.xml` — see "Remaining file types".
 ```
+
+## Remaining file types (scope decisions)
+
+The criterion for indexing an XML file is **symbol connectivity**: it must
+reference classes/methods so it adds edges into the existing `:Symbol` graph and
+enables useful queries. By that measure:
+
+- **Out of scope (no plan to index):** all of tier 2 (`queue_*.xml`,
+  `communication.xml`, `indexer.xml`, `mview.xml`, `widget.xml`) and all of tier 3
+  (layout XML, ui_component XML, adminhtml `menu.xml`, `module.xml`, `config.xml`,
+  `db_schema.xml`). **ACL is out of scope entirely** — `acl.xml` is not indexed and
+  webapi `<resources>`/`<resource ref>` refs are not captured.
+
+### Step 4 (next) — crontab (`crontab.xml` + `cron_groups.xml`)
+
+Two related files, both root `<config>`, both global (not area-scoped).
+
+- `crontab.xml`: `<group id><job name instance method><schedule>` → the valuable
+  edge is the job's **class + method**. Model the job as the entry-point node
+  (e.g. `Symbol:XML:CronJob`, id = job `name`) with a `RUNS` edge to the
+  class/method, carrying `schedule` and `group`.
+- `cron_groups.xml`: `<group id>` with scalar settings only
+  (`schedule_generate_every`, `schedule_lifetime`, …) — **no class references**.
+  It just enriches the cron group; link jobs to their group by `group id`. The
+  group node carries the settings; the symbol value lives entirely in
+  `crontab.xml`.
+
+### Step 5 — webapi (`webapi.xml` + `extension_attributes.xml`)
+
+These belong together: webapi gives the entry points, extension_attributes
+completes the response DTOs, and the request/response **schema is already in the
+graph** via the linked method's `PARAM_TYPE`/`RETURNS_TYPE` edges.
+
+- `webapi.xml`: **root element is `<routes>`** (not `<config>` — the handler must
+  read `routes.route`). `<route url method><service class method/></route>` →
+  a route node (`Symbol:XML:Route`, with `url` + HTTP `method`) with a
+  `SERVED_BY` edge to the service `:Method`. `<resources>` (ACL) is ignored.
+- `extension_attributes.xml`: root `<config>`.
+  `<extension_attributes for=I><attribute code type>` → a `HAS_ATTRIBUTE`-style
+  edge adding a field to data interface `I`. `type` has the **same scalar-vs-class
+  split as di injection**: a class/interface type (often `…Interface[]`) becomes
+  an edge to that type (array suffix → `is_array`); a scalar type (`int[]`,
+  `string`) has no symbol to link, so it is skipped as an edge (decide at
+  implementation whether to keep it as attribute metadata for schema
+  completeness).
+- **Schema reconstruction:** the full REST schema is a recursive traversal —
+  route → service method → `RETURNS_TYPE` DTO → its getter `HAS_METHOD` →
+  each getter's `RETURNS_TYPE` (recursively) + extension attributes. No types are
+  re-stored; webapi rides on the source graph. Magento expresses the contract in
+  docblocks, which we already store as `source: "docblock"` type edges (plus
+  native types). Getter→field-name (`getSku` → `sku`) is a query-time convention,
+  like plugin method resolution. Emitting formatted OpenAPI/JSON-schema is
+  app-side and out of scope; the **structure** is fully queryable from the graph.
+
+### Final (deferred) — `system.xml`
+
+`system.xml` (admin config fields → `backend_model`/`source_model`/`frontend_model`
+classes, keyed by config path) is the **last step to evaluate**. The goal there
+is to **search among possible configurations in plain English**, which is a
+different retrieval problem than graph traversal and likely needs a **vector
+database** (semantic search over config paths/labels/comments) rather than, or
+alongside, the Neo4j graph. Defer until the graph work is complete and the
+vector-search direction is decided.

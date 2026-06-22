@@ -14,4 +14,11 @@ export type XmlHandler = (
 
 export type ParsedXml = Record<string, unknown>;
 
-export const magentoXmlRelationshipTypes = ["PREFERENCE_FOR", "PLUGIN_FOR", "INJECTS", "EXTENDS", "OBSERVES"];
+export const magentoXmlRelationshipTypes = [
+  "PREFERENCE_FOR",
+  "PLUGIN_FOR",
+  "INJECTS",
+  "EXTENDS",
+  "OBSERVES",
+  "SCHEDULED_IN"
+];

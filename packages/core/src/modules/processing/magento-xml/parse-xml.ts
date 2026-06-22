@@ -9,7 +9,9 @@ const forcedArrayTags = new Set([
   "argument",
   "item",
   "event",
-  "observer"
+  "observer",
+  "group",
+  "job"
 ]);
 
 const parser = new XMLParser({

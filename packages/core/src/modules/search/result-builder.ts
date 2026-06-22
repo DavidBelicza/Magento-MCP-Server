@@ -92,6 +92,15 @@ const nodeBuilders: NodeBuilder[] = [
     })
   },
   {
+    canBuild: (node) => node.kind === "cronGroup" || node.labels.includes("CronGroup"),
+    build: (node) => ({
+      id: node.id,
+      type: "cron-group",
+      labels: node.labels,
+      properties: node.properties
+    })
+  },
+  {
     canBuild: (node) => node.labels.includes("Symbol"),
     build: (node) => ({
       id: node.id,

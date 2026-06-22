@@ -8,14 +8,19 @@ export type MagentoArea =
   | "graphql"
   | "setup";
 
-export type ConfigXmlBasename = "di.xml" | "events.xml";
+export type ConfigXmlBasename = "di.xml" | "events.xml" | "crontab.xml" | "cron_groups.xml";
 
 export type ConfigXmlClassification = {
   basename: ConfigXmlBasename;
   area: MagentoArea;
 };
 
-export const orderedConfigXmlBasenames: ConfigXmlBasename[] = ["di.xml", "events.xml"];
+export const orderedConfigXmlBasenames: ConfigXmlBasename[] = [
+  "di.xml",
+  "events.xml",
+  "crontab.xml",
+  "cron_groups.xml"
+];
 
 const configXmlBasenames = new Set<string>(orderedConfigXmlBasenames);
 
