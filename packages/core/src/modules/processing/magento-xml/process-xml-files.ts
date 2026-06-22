@@ -1,9 +1,10 @@
-import { readFile } from "node:fs/promises";
 import { posix } from "node:path";
 import type { GraphNodeRecord, GraphRelationshipRecord } from "../../graph/types.js";
 import { classifyConfigXml } from "./discovery.js";
+import { nodeFileSystem, type FileSystemPort } from "./file-system.js";
 import { parseXml } from "./parse-xml.js";
 import { getXmlHandler } from "./registry.js";
+import type { MagentoXmlRecords } from "./types.js";
 
 export type ProcessedXml = {
   nodes: GraphNodeRecord[];
@@ -11,37 +12,30 @@ export type ProcessedXml = {
   files: string[];
 };
 
-export async function processXmlFiles(mountPath: string, relativePaths: string[]): Promise<ProcessedXml> {
+type ProcessedFile = {
+  file: string;
+  records: MagentoXmlRecords;
+};
+
+export async function processXmlFiles(
+  mountPath: string,
+  relativePaths: string[],
+  fileSystem: FileSystemPort = nodeFileSystem
+): Promise<ProcessedXml> {
   const nodesById = new Map<string, GraphNodeRecord>();
   const relationshipsByIdentity = new Map<string, GraphRelationshipRecord>();
   const files: string[] = [];
 
   for (const relativePath of relativePaths) {
-    const classification = classifyConfigXml(relativePath);
+    const processed = await processFile(fileSystem, mountPath, relativePath);
 
-    if (!classification) {
+    if (!processed) {
       continue;
     }
 
-    const content = await readContent(posix.join(mountPath, relativePath));
-
-    if (content === null) {
-      continue;
-    }
-
-    files.push(relativePath);
-    const handler = getXmlHandler(classification.basename);
-    const records = handler(relativePath, classification.area, parseXml(content));
-
-    for (const node of records.nodes) {
-      if (!nodesById.has(node.id)) {
-        nodesById.set(node.id, node);
-      }
-    }
-
-    for (const relationship of records.relationships) {
-      relationshipsByIdentity.set(relationship.identity, relationship);
-    }
+    files.push(processed.file);
+    mergeNodes(nodesById, processed.records.nodes);
+    mergeRelationships(relationshipsByIdentity, processed.records.relationships);
   }
 
   return {
@@ -51,9 +45,51 @@ export async function processXmlFiles(mountPath: string, relativePaths: string[]
   };
 }
 
-async function readContent(path: string): Promise<string | null> {
+async function processFile(
+  fileSystem: FileSystemPort,
+  mountPath: string,
+  relativePath: string
+): Promise<ProcessedFile | null> {
+  const classification = classifyConfigXml(relativePath);
+
+  if (!classification) {
+    return null;
+  }
+
+  const content = await readContent(fileSystem, posix.join(mountPath, relativePath));
+
+  if (content === null) {
+    return null;
+  }
+
+  const handler = getXmlHandler(classification.basename);
+
+  return {
+    file: relativePath,
+    records: handler(relativePath, classification.area, parseXml(content))
+  };
+}
+
+function mergeNodes(nodesById: Map<string, GraphNodeRecord>, nodes: GraphNodeRecord[]): void {
+  for (const node of nodes) {
+    if (!nodesById.has(node.id)) {
+      nodesById.set(node.id, node);
+    }
+  }
+}
+
+function mergeRelationships(
+  relationshipsByIdentity: Map<string, GraphRelationshipRecord>,
+  relationships: GraphRelationshipRecord[]
+): void {
+  for (const relationship of relationships) {
+    relationshipsByIdentity.set(relationship.identity, relationship);
+  }
+}
+
+async function readContent(fileSystem: FileSystemPort, path: string): Promise<string | null> {
   try {
-    return await readFile(path, "utf8");
+    return await fileSystem.readFile(path);
   } catch {
     return null;
   }

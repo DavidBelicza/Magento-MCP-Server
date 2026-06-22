@@ -83,6 +83,8 @@ type DeltaRouting = {
   skipped: string[];
 };
 
+type DeltaCategory = "composer" | "xml" | "source" | "skip";
+
 function routeDeltaPaths(paths: string[]): DeltaRouting {
   const sourcePaths: string[] = [];
   const xmlPaths: string[] = [];
@@ -90,20 +92,32 @@ function routeDeltaPaths(paths: string[]): DeltaRouting {
   let composerChanged = false;
 
   for (const path of paths) {
-    if (isComposerLock(path)) {
+    const category = categorizeDeltaPath(path);
+
+    if (category === "composer") {
       composerChanged = true;
-    } else if (path.endsWith(".xml")) {
-      if (isConfigXml(path)) {
-        xmlPaths.push(path);
-      } else {
-        skipped.push(path);
-      }
-    } else {
+    } else if (category === "xml") {
+      xmlPaths.push(path);
+    } else if (category === "source") {
       sourcePaths.push(path);
+    } else {
+      skipped.push(path);
     }
   }
 
   return { sourcePaths, xmlPaths, composerChanged, skipped };
+}
+
+function categorizeDeltaPath(path: string): DeltaCategory {
+  if (isComposerLock(path)) {
+    return "composer";
+  }
+
+  if (path.endsWith(".xml")) {
+    return isConfigXml(path) ? "xml" : "skip";
+  }
+
+  return "source";
 }
 
 function isComposerLock(path: string): boolean {
