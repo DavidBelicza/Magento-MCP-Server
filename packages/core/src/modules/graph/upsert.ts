@@ -7,6 +7,7 @@ export type WriteGraphUpsertOptions = {
   relationshipTypes: string[];
   clearOutboundFromNodeIds?: string[];
   clearNodeLabel?: string;
+  clearRelationshipTypes?: string[];
   batchSize?: number;
   onProgress?: (progress: GraphWriteProgress) => Promise<void>;
   getClearingPhase?: () => string;
@@ -38,12 +39,22 @@ export async function writeGraphUpsert(
     onProgress: options.onProgress
   };
 
-  validateGraphTokens([...labels, ...relationshipTypes, ...(options.clearNodeLabel ? [options.clearNodeLabel] : [])]);
+  validateGraphTokens([
+    ...labels,
+    ...relationshipTypes,
+    ...(options.clearNodeLabel ? [options.clearNodeLabel] : []),
+    ...(options.clearRelationshipTypes ?? [])
+  ]);
 
   if (options.clearOutboundFromNodeIds && options.clearOutboundFromNodeIds.length > 0) {
     await reportProgress(progress, options.getClearingPhase?.() ?? "clearing-graph");
     await session.executeWrite(async (tx) => {
-      await clearOutboundRelationships(tx, options.clearOutboundFromNodeIds!, options.clearNodeLabel);
+      await clearOutboundRelationships(
+        tx,
+        options.clearOutboundFromNodeIds!,
+        options.clearNodeLabel,
+        options.clearRelationshipTypes
+      );
     });
   }
 
@@ -66,13 +77,19 @@ export async function writeGraphUpsert(
   };
 }
 
-async function clearOutboundRelationships(tx: ManagedTransaction, nodeIds: string[], nodeLabel?: string): Promise<void> {
+async function clearOutboundRelationships(
+  tx: ManagedTransaction,
+  nodeIds: string[],
+  nodeLabel?: string,
+  relationshipTypes?: string[]
+): Promise<void> {
   const nodePattern = nodeLabel ? `(node:${nodeLabel} {id: id})` : "(node {id: id})";
+  const typePattern = relationshipTypes && relationshipTypes.length > 0 ? `:${relationshipTypes.join("|")}` : "";
 
   for (const batch of chunk(nodeIds, 200)) {
     await tx.run(
       `UNWIND $nodeIds AS id
-       MATCH ${nodePattern}-[relationship]->()
+       MATCH ${nodePattern}-[relationship${typePattern}]->()
        DELETE relationship`,
       { nodeIds: batch }
     );

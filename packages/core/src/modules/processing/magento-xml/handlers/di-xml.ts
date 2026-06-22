@@ -1,104 +1,189 @@
 import { createHash } from "node:crypto";
-import type { GraphNodeRecord, GraphRelationshipRecord } from "../../../graph/types.js";
+import type { GraphFieldValue, GraphNodeRecord, GraphRelationshipRecord } from "../../../graph/types.js";
 import { asArray, normalizeFqn } from "../parse-xml.js";
 import type { MagentoArea } from "../discovery.js";
-import type { MagentoXmlRecords, ParsedXml, XmlHandler } from "../types.js";
+import type { ParsedXml, XmlHandler } from "../types.js";
 
-type EdgeSpec = {
-  type: string;
-  fromId: string;
+const virtualTypeLabel = "Symbol:XML:VirtualType";
+const anchorLabel = "Symbol:PHP";
+
+type Collector = {
+  nodesById: Map<string, GraphNodeRecord>;
+  edgesByIdentity: Map<string, GraphRelationshipRecord>;
+  area: MagentoArea;
+  sourceFile: string;
+};
+
+type Injection = {
   toId: string;
+  name: string;
+  isArray: boolean;
+  slot: string;
 };
 
 export const handleDiXml: XmlHandler = (relativePath, area, parsed) => {
   const config = (parsed.config ?? {}) as ParsedXml;
-  const specs = [...preferenceSpecs(config), ...pluginSpecs(config)];
+  const collector: Collector = {
+    nodesById: new Map(),
+    edgesByIdentity: new Map(),
+    area,
+    sourceFile: relativePath
+  };
 
-  return buildRecords(specs, area, relativePath);
+  for (const preference of asArray(config.preference as ParsedXml | ParsedXml[] | undefined)) {
+    collectPreference(collector, preference);
+  }
+
+  for (const type of asArray(config.type as ParsedXml | ParsedXml[] | undefined)) {
+    collectType(collector, type);
+  }
+
+  for (const virtualType of asArray(config.virtualType as ParsedXml | ParsedXml[] | undefined)) {
+    collectVirtualType(collector, virtualType);
+  }
+
+  return {
+    nodes: [...collector.nodesById.values()],
+    relationships: [...collector.edgesByIdentity.values()]
+  };
 };
 
-function preferenceSpecs(config: ParsedXml): EdgeSpec[] {
-  return asArray(config.preference as ParsedXml | ParsedXml[] | undefined)
-    .map(toPreferenceSpec)
-    .filter(isEdgeSpec);
-}
-
-function toPreferenceSpec(preference: ParsedXml): EdgeSpec | null {
+function collectPreference(collector: Collector, preference: ParsedXml): void {
   const fromId = normalizeFqn(preference["@_for"]);
   const toId = normalizeFqn(preference["@_type"]);
 
   if (fromId === "" || toId === "") {
-    return null;
+    return;
   }
 
-  return { type: "PREFERENCE_FOR", fromId, toId };
+  anchor(collector, fromId);
+  anchor(collector, toId);
+  addEdge(collector, "PREFERENCE_FOR", fromId, toId, "");
 }
 
-function pluginSpecs(config: ParsedXml): EdgeSpec[] {
-  return asArray(config.type as ParsedXml | ParsedXml[] | undefined)
-    .flatMap(typePluginSpecs)
-    .filter(isEdgeSpec);
-}
+function collectType(collector: Collector, type: ParsedXml): void {
+  const typeName = normalizeFqn(type["@_name"]);
 
-function typePluginSpecs(type: ParsedXml): (EdgeSpec | null)[] {
-  const toId = normalizeFqn(type["@_name"]);
-
-  if (toId === "") {
-    return [];
+  if (typeName === "") {
+    return;
   }
 
-  return asArray(type.plugin as ParsedXml | ParsedXml[] | undefined).map((plugin) => toPluginSpec(plugin, toId));
+  collectPlugins(collector, type, typeName);
+  collectInjections(collector, type, typeName);
 }
 
-function toPluginSpec(plugin: ParsedXml, toId: string): EdgeSpec | null {
-  const fromId = normalizeFqn(plugin["@_type"]);
+function collectPlugins(collector: Collector, type: ParsedXml, targetId: string): void {
+  for (const plugin of asArray(type.plugin as ParsedXml | ParsedXml[] | undefined)) {
+    const pluginClass = normalizeFqn(plugin["@_type"]);
 
-  if (fromId === "") {
-    return null;
-  }
+    if (pluginClass === "") {
+      continue;
+    }
 
-  return { type: "PLUGIN_FOR", fromId, toId };
-}
-
-function isEdgeSpec(spec: EdgeSpec | null): spec is EdgeSpec {
-  return spec !== null;
-}
-
-function buildRecords(specs: EdgeSpec[], area: MagentoArea, sourceFile: string): MagentoXmlRecords {
-  const nodesById = new Map<string, GraphNodeRecord>();
-  const relationshipsByIdentity = new Map<string, GraphRelationshipRecord>();
-
-  for (const spec of specs) {
-    addAnchor(nodesById, spec.fromId);
-    addAnchor(nodesById, spec.toId);
-    const edge = toEdge(spec, area, sourceFile);
-    relationshipsByIdentity.set(edge.identity, edge);
-  }
-
-  return {
-    nodes: [...nodesById.values()],
-    relationships: [...relationshipsByIdentity.values()]
-  };
-}
-
-function addAnchor(nodesById: Map<string, GraphNodeRecord>, id: string): void {
-  if (!nodesById.has(id)) {
-    nodesById.set(id, { label: "Symbol:PHP", id, fields: { fqcn: id } });
+    anchor(collector, pluginClass);
+    anchor(collector, targetId);
+    addEdge(collector, "PLUGIN_FOR", pluginClass, targetId, "");
   }
 }
 
-function toEdge(spec: EdgeSpec, area: MagentoArea, sourceFile: string): GraphRelationshipRecord {
+function collectVirtualType(collector: Collector, virtualType: ParsedXml): void {
+  const id = normalizeFqn(virtualType["@_name"]);
+  const base = normalizeFqn(virtualType["@_type"]);
+
+  if (id === "") {
+    return;
+  }
+
+  collector.nodesById.set(id, {
+    label: virtualTypeLabel,
+    id,
+    fields: { name: id, kind: "virtualType", sourceFile: collector.sourceFile }
+  });
+
+  if (base !== "") {
+    anchor(collector, base);
+    addEdge(collector, "EXTENDS", id, base, "");
+  }
+
+  collectInjections(collector, virtualType, id);
+}
+
+function collectInjections(collector: Collector, owner: ParsedXml, fromId: string): void {
+  const args = owner.arguments as ParsedXml | undefined;
+
+  for (const injection of injectionsOf(args)) {
+    anchor(collector, fromId);
+    anchor(collector, injection.toId);
+    addEdge(collector, "INJECTS", fromId, injection.toId, injection.slot, {
+      name: injection.name,
+      is_array: injection.isArray
+    });
+  }
+}
+
+function injectionsOf(args: ParsedXml | undefined): Injection[] {
+  return asArray(args?.argument as ParsedXml | ParsedXml[] | undefined).flatMap(argumentInjections);
+}
+
+function argumentInjections(argument: ParsedXml): Injection[] {
+  const name = stringValue(argument["@_name"]);
+
+  return valueInjections(argument, name, name, false);
+}
+
+function valueInjections(node: ParsedXml, name: string, slot: string, isArray: boolean): Injection[] {
+  const xsiType = stringValue(node["@_xsi:type"]);
+
+  if (xsiType === "object") {
+    const toId = normalizeFqn(node["#text"]);
+
+    return toId === "" ? [] : [{ toId, name, isArray, slot }];
+  }
+
+  if (xsiType === "array") {
+    return asArray(node.item as ParsedXml | ParsedXml[] | undefined).flatMap((item, index) =>
+      valueInjections(item, name, `${slot}#${itemKey(item, index)}`, true)
+    );
+  }
+
+  return [];
+}
+
+function itemKey(item: ParsedXml, index: number): string {
+  const key = stringValue(item["@_name"]);
+
+  return key === "" ? String(index) : key;
+}
+
+function anchor(collector: Collector, id: string): void {
+  if (!collector.nodesById.has(id)) {
+    collector.nodesById.set(id, { label: anchorLabel, id, fields: { fqcn: id } });
+  }
+}
+
+function addEdge(
+  collector: Collector,
+  type: string,
+  fromId: string,
+  toId: string,
+  discriminator: string,
+  extraFields: Record<string, GraphFieldValue> = {}
+): void {
   const identity = createHash("sha256")
-    .update(`${spec.fromId}:${spec.type}:${spec.toId}:${area}:${sourceFile}`)
+    .update(`${fromId}:${type}:${toId}:${discriminator}:${collector.area}:${collector.sourceFile}`)
     .digest("hex");
 
-  return {
-    type: spec.type,
+  collector.edgesByIdentity.set(identity, {
+    type,
     identity,
     fromLabel: "Symbol",
-    fromId: spec.fromId,
+    fromId,
     toLabel: "Symbol",
-    toId: spec.toId,
-    fields: { area, sourceFile }
-  };
+    toId,
+    fields: { area: collector.area, sourceFile: collector.sourceFile, ...extraFields }
+  });
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }

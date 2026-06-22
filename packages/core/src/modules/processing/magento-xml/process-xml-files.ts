@@ -72,10 +72,16 @@ async function processFile(
 
 function mergeNodes(nodesById: Map<string, GraphNodeRecord>, nodes: GraphNodeRecord[]): void {
   for (const node of nodes) {
-    if (!nodesById.has(node.id)) {
+    const existing = nodesById.get(node.id);
+
+    if (!existing || isAnchorNode(existing)) {
       nodesById.set(node.id, node);
     }
   }
+}
+
+function isAnchorNode(node: GraphNodeRecord): boolean {
+  return node.label === "Symbol:PHP";
 }
 
 function mergeRelationships(

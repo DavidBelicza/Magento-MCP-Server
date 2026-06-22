@@ -8,6 +8,8 @@ export type SaveSourceBatchCounts = {
   relationships: number;
 };
 
+const sourceRelationshipTypes = ["EXTENDS", "IMPLEMENTS", "USES", "HAS_METHOD", "PARAM_TYPE", "RETURNS_TYPE"];
+
 export async function saveSourceBatch(
   session: Session,
   batch: FileFacts[],
@@ -29,6 +31,7 @@ export async function saveSourceBatch(
     relationshipTypes,
     clearOutboundFromNodeIds,
     clearNodeLabel: "Symbol",
+    clearRelationshipTypes: sourceRelationshipTypes,
     batchSize
   });
 

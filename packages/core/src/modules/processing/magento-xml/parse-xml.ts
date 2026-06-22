@@ -1,7 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import type { ParsedXml } from "./types.js";
 
-const forcedArrayTags = new Set(["preference", "type", "plugin", "virtualType"]);
+const forcedArrayTags = new Set(["preference", "type", "plugin", "virtualType", "argument", "item"]);
 
 const parser = new XMLParser({
   ignoreAttributes: false,
