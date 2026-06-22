@@ -13,6 +13,35 @@ already the `:Symbol` node key, so this adds *edges between existing nodes* (wit
 `defined: false` anchors where a referenced class is not yet declared) rather
 than a new node space.
 
+## Label-model refactor (next implementation step)
+
+> The architecture docs (`docs/architecture_world_mapping.md`) now describe the
+> **target** label model below. The **code and `packages/mcp/resource/graph-schema.json`
+> still use the old `Symbol:PHP:Class` scheme** — this refactor brings them in
+> line. Steps 1–4 above were implemented against the old scheme; this pass
+> relabels everything in one go, then the remaining steps follow the new model.
+
+Drop the shared `:Symbol` base and provenance label. Two node families:
+
+- **Code symbols (FQN-keyed):** `PHPClass` (class, interface, trait, enum,
+  virtualType, and undeclared anchors) and `PHPMethod` (methods). Identity is
+  `PHPClass.id`; the kind is carried as a **secondary label** (`:PHPClass:Interface`,
+  `:PHPClass:VirtualType`, …, painted on, no constraint) for fast filtering **and**
+  as a `kind` property for aggregation/return. One identity label because a
+  reference cannot know the precise kind, so all class-like types share `PHPClass`
+  (no neutral base needed).
+- **Config entities (name-keyed):** `Event`, `CronGroup` (and existing `Package`,
+  `Author`) each get their **own label + own `<Label>.id` constraint**, with clean
+  ids. This is what fixes the `default` Event/CronGroup collision.
+
+Touches: `map-records`, all `magento-xml` handlers + `record-builder` (emit the
+new labels; per-edge endpoint labels), Neo4j constraints (drop `Symbol.id`; add
+`PHPClass.id`/`PHPMethod.id`/`Event.id`/`CronGroup.id` via new files + a `DROP …
+IF EXISTS` for the old one, because applied schema files can't be edited),
+`result-builder`/viz (drop the virtual-type colour), `graph-schema.json`, and a
+reset-and-reindex. Edge identity constraints are unchanged (they key on the
+relationship type, not node labels).
+
 ## Design decisions (settled)
 
 - **Node, not PHP.** XML is declarative config with no AST need. It belongs with
@@ -296,10 +325,10 @@ lets that be an independent, per-file decision without touching the pipeline.
     shared `record-builder.ts`, generic per-file-type `steps` progress + frontend
     rendering, MCP schema update.
 12. Step 4 (crontab): `crontab.xml` + `cron_groups.xml` — see "Remaining file types".
-13. Step 5 (webapi): `webapi.xml` + `extension_attributes.xml` (+ acl resource
-    refs) — see "Remaining file types".
-14. Final (deferred): `system.xml` — see "Remaining file types".
-```
+13. Step 5 (webapi): `webapi.xml` + `extension_attributes.xml` — see "Remaining file types".
+14. Step 6 (list view): a tabular **List view** as a separate main-menu item beside
+    the graph view — see "List view (UI)".
+15. Final (deferred): `system.xml` — see "Remaining file types".
 
 ## Remaining file types (scope decisions)
 
@@ -335,8 +364,9 @@ graph** via the linked method's `PARAM_TYPE`/`RETURNS_TYPE` edges.
 
 - `webapi.xml`: **root element is `<routes>`** (not `<config>` — the handler must
   read `routes.route`). `<route url method><service class method/></route>` →
-  a route node (`Symbol:XML:Route`, with `url` + HTTP `method`) with a
-  `SERVED_BY` edge to the service `:Method`. `<resources>` (ACL) is ignored.
+  a `Route` node (config entity: own label + own `Route.id`, id = `<HTTP method>
+  <url>`, with `url`/`method` properties) and a `SERVED_BY` edge to the service
+  `PHPMethod`. `<resources>` (ACL) is ignored.
 - `extension_attributes.xml`: root `<config>`.
   `<extension_attributes for=I><attribute code type>` → a `HAS_ATTRIBUTE`-style
   edge adding a field to data interface `I`. `type` has the **same scalar-vs-class
@@ -353,6 +383,21 @@ graph** via the linked method's `PARAM_TYPE`/`RETURNS_TYPE` edges.
   native types). Getter→field-name (`getSku` → `sku`) is a query-time convention,
   like plugin method resolution. Emitting formatted OpenAPI/JSON-schema is
   app-side and out of scope; the **structure** is fully queryable from the graph.
+
+### Step 6 — List view (UI)
+
+A tabular **List view** as a **separate main-menu item**, beside the existing
+graph view — scheduled **after** the webapi step and **before** `system.xml`.
+
+- It is the deliberate home for queries that return **rows/columns** rather than
+  graph entities (e.g. "all cron jobs and their classes", a flattened REST-API
+  surface). The graph view stays graph-only (it draws node/relationship
+  entities); the list view renders the tabular result of a read-only Cypher
+  query. This supersedes the earlier ad-hoc table that was reverted — it gets its
+  own route, menu item, and query history treatment instead of overloading the
+  graph page.
+- Backend already returns `columns`/`rows` from `POST /api/graph/search`; the
+  list view consumes those directly.
 
 ### Final (deferred) — `system.xml`
 
