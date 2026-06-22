@@ -70,9 +70,10 @@ function buildWatchTargets(config: WatcherConfig): string[] {
       : [mountPath];
 
   const phpGlobs = roots.map((root) => posix.join(root, "**/*.php"));
+  const xmlGlobs = roots.map((root) => posix.join(root, "**/*.xml"));
   const composerLock = posix.join(mountPath, config.projectRoot, "composer.lock");
 
-  return [...phpGlobs, composerLock];
+  return [...phpGlobs, ...xmlGlobs, composerLock];
 }
 
 function toRelative(path: string): string {

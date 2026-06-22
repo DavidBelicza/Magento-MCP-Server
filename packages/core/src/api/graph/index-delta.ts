@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { Redis } from "ioredis";
 import { isFullIndexLocked } from "../../modules/index-lock.js";
+import { isConfigXml } from "../../modules/processing/magento-xml/discovery.js";
 
 type Dependencies = {
   redis: Redis;
@@ -47,7 +48,13 @@ export function registerIndexDeltaRoute(app: FastifyInstance, deps: Dependencies
       dispatched.packages = await proxy(app, "POST", "/api/graph/index/packages", {});
     }
 
-    if (operation === "upsert" && Object.keys(dispatched).length > 0) {
+    if (routed.xmlPaths.length > 0) {
+      dispatched.xml = await proxy(app, operation === "delete" ? "DELETE" : "POST", "/api/graph/index/xml", {
+        directories: routed.xmlPaths
+      });
+    }
+
+    if (operation === "upsert" && (routed.sourcePaths.length > 0 || routed.composerChanged)) {
       dispatched.links = await proxy(app, "POST", "/api/graph/index/links", {});
     }
 
@@ -71,12 +78,14 @@ export function registerIndexDeltaRoute(app: FastifyInstance, deps: Dependencies
 
 type DeltaRouting = {
   sourcePaths: string[];
+  xmlPaths: string[];
   composerChanged: boolean;
   skipped: string[];
 };
 
 function routeDeltaPaths(paths: string[]): DeltaRouting {
   const sourcePaths: string[] = [];
+  const xmlPaths: string[] = [];
   const skipped: string[] = [];
   let composerChanged = false;
 
@@ -84,13 +93,17 @@ function routeDeltaPaths(paths: string[]): DeltaRouting {
     if (isComposerLock(path)) {
       composerChanged = true;
     } else if (path.endsWith(".xml")) {
-      skipped.push(path);
+      if (isConfigXml(path)) {
+        xmlPaths.push(path);
+      } else {
+        skipped.push(path);
+      }
     } else {
       sourcePaths.push(path);
     }
   }
 
-  return { sourcePaths, composerChanged, skipped };
+  return { sourcePaths, xmlPaths, composerChanged, skipped };
 }
 
 function isComposerLock(path: string): boolean {

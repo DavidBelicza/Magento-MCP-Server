@@ -40,7 +40,7 @@ modules/processing/magento-xml/
   discovery.ts          # glob patterns + isConfigXml() predicate + area classifier + Area enum
   registry.ts           # basename -> handler map
   handlers/
-    di-xml.ts           # di.xml      -> PREFERENCE_FOR, PLUGIN_FOR, DI argument edges
+    di-xml.ts           # di.xml      -> PREFERENCE_FOR, PLUGIN_FOR (step 1); arguments + virtualType (step 2)
     events-xml.ts       # events.xml  -> observer edges          (later)
     config-xml.ts       # config.xml  -> (evaluate graph value)  (later)
     adminhtml-xml.ts    # adminhtml.xml                          (later)
@@ -75,11 +75,28 @@ maps basename → handler. Adding a new XML kind later is purely additive: add a
 handler, register it, add its basename + glob to `discovery.ts`, add an edge
 constraint. No queue/worker/flow/watcher change beyond the shared whitelist.
 
-`di.xml` (first handler) emits, with `defined: false` anchors for unknown FQNs:
+#### `di.xml` — Step 1 (this iteration)
+
+Emits, with `defined: false` anchors for unknown FQNs:
 
 - `<preference for=I type=C>` → `(I)-[:PREFERENCE_FOR { area, sourceFile }]->(C)`
-- `<type name=T><plugin .../></type>` → plugin → target edge with `area`
-- `<type>`/`virtualType` constructor `<argument>` object refs → DI wiring edges
+- `<type name=T><plugin type=P/></type>` → `(P)-[:PLUGIN_FOR { area, sourceFile }]->(T)`
+
+Plugin → method interception is **not stored**: which target method a plugin
+intercepts is derivable at query time from `PLUGIN_FOR` + `HAS_METHOD` + the
+`before`/`after`/`around` method-name convention (strip prefix, lower-case first
+letter, match a public target method by name). Same approach as interface method
+resolution — no override edge.
+
+#### `di.xml` — Step 2 (later, do not start this iteration)
+
+- **DI argument injection (composition):** `<type>`/`virtualType` `<argument>`
+  values. Handle `xsi:type="object"` and `xsi:type="array"` items (one edge per
+  injected class); skip scalar `xsi:type`s.
+- **virtualType as a node:** `<virtualType name=V type=RealClass>` creates a
+  virtual-class node `V` with `(V)-[:EXTENDS]->(RealClass)`. `V` is not a PHP
+  symbol (no file); it is a reference target for preferences/plugins/arguments,
+  resolved via label-painting like the `:Symbol` kind labels.
 
 ## Thin layers
 

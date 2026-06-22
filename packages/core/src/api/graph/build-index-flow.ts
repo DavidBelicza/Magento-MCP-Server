@@ -3,9 +3,11 @@ import { deleteGraphJobName, deleteGraphQueueName } from "../../queue/delete-gra
 import { indexLinksJobName, indexLinksQueueName } from "../../queue/index-links.js";
 import { indexPackagesJobName, indexPackagesQueueName } from "../../queue/index-packages.js";
 import { indexSourceJobName, indexSourceQueueName } from "../../queue/index-source.js";
+import { indexXmlJobName, indexXmlQueueName } from "../../queue/index-xml.js";
 
 export function buildIndexFlow(
   composerRoot: string,
+  mountPath: string,
   sourceDirectories: string[],
   withDelete: boolean,
   phpVersion?: string
@@ -29,24 +31,38 @@ export function buildIndexFlow(
     data: { symbolId: null, requestedAt, fullIndexFlow: true },
     children: [
       {
-        name: indexSourceJobName,
-        queueName: indexSourceQueueName,
+        name: indexXmlJobName,
+        queueName: indexXmlQueueName,
         data: {
-          analyzedSourcePath: composerRoot,
+          analyzedSourcePath: mountPath,
           directories: sourceDirectories,
           operation: "index",
-          phpVersion,
           requestedAt,
           fullIndexFlow: true
         },
         opts: failParent,
         children: [
           {
-            name: indexPackagesJobName,
-            queueName: indexPackagesQueueName,
-            data: { analyzedSourcePath: composerRoot, requestedAt, fullIndexFlow: true },
+            name: indexSourceJobName,
+            queueName: indexSourceQueueName,
+            data: {
+              analyzedSourcePath: composerRoot,
+              directories: sourceDirectories,
+              operation: "index",
+              phpVersion,
+              requestedAt,
+              fullIndexFlow: true
+            },
             opts: failParent,
-            children: deleteChildren
+            children: [
+              {
+                name: indexPackagesJobName,
+                queueName: indexPackagesQueueName,
+                data: { analyzedSourcePath: composerRoot, requestedAt, fullIndexFlow: true },
+                opts: failParent,
+                children: deleteChildren
+              }
+            ]
           }
         ]
       }

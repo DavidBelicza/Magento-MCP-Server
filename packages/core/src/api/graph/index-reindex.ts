@@ -8,12 +8,13 @@ type Dependencies = {
   indexFlowProducer: FlowProducer;
   redis: Redis;
   getComposerRoot: () => string;
+  getMountPath: () => string;
   getSourceDirectories: () => string[];
   getPhpVersion: () => string;
 };
 
 export function registerIndexReindexRoute(app: FastifyInstance, deps: Dependencies): void {
-  const { indexFlowProducer, redis, getComposerRoot, getSourceDirectories, getPhpVersion } = deps;
+  const { indexFlowProducer, redis, getComposerRoot, getMountPath, getSourceDirectories, getPhpVersion } = deps;
 
   app.post("/api/graph/index/reindex", async (_request, reply) => {
     if (!(await acquireFullIndexLock(redis))) {
@@ -24,7 +25,7 @@ export function registerIndexReindexRoute(app: FastifyInstance, deps: Dependenci
     }
 
     const flow = await indexFlowProducer.add(
-      buildIndexFlow(getComposerRoot(), getSourceDirectories(), false, getPhpVersion())
+      buildIndexFlow(getComposerRoot(), getMountPath(), getSourceDirectories(), false, getPhpVersion())
     );
 
     return reply.status(202).send({
