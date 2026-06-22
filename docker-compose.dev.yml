@@ -19,7 +19,7 @@ services:
     volumes:
       - ./packages/site/src:/app/src
       - ./packages/site/public:/app/public
-      - ./README.md:/app/README.md
+      - ./README.md:/README.md:ro
       - ./packages/site/index.html:/app/index.html
       - ./packages/site/vite.config.ts:/app/vite.config.ts
       - ./packages/site/postcss.config.js:/app/postcss.config.js

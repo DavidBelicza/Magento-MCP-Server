@@ -13,6 +13,11 @@ if (!existsSync(source)) {
   process.exit(0);
 }
 
+if (resolve(source) === resolve(dest)) {
+  console.log("README.md source and destination are the same file; skipping to avoid editing the original.");
+  process.exit(0);
+}
+
 const raw = readFileSync(source, "utf8");
 
 const headingIndex = raw.search(/^## /m);
