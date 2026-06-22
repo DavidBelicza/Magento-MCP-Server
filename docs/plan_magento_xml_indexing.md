@@ -90,13 +90,84 @@ resolution — no override edge.
 
 #### `di.xml` — Step 2 (later, do not start this iteration)
 
-- **DI argument injection (composition):** `<type>`/`virtualType` `<argument>`
-  values. Handle `xsi:type="object"` and `xsi:type="array"` items (one edge per
-  injected class); skip scalar `xsi:type`s.
-- **virtualType as a node:** `<virtualType name=V type=RealClass>` creates a
-  virtual-class node `V` with `(V)-[:EXTENDS]->(RealClass)`. `V` is not a PHP
-  symbol (no file); it is a reference target for preferences/plugins/arguments,
-  resolved via label-painting like the `:Symbol` kind labels.
+Step 2 adds DI composition (constructor argument wiring) and virtualTypes. It is
+contained almost entirely to `handlers/di-xml.ts` plus a schema constant, one new
+constraint, and the MCP schema — no queue/worker/route/flow/watcher changes. It
+also requires one cross-cutting fix to the source pipeline (see "Source-clear
+scoping" below).
+
+**Label scheme.** Stored labels follow `Symbol : <provenance> : <kind>`, where
+provenance is the source format (`PHP` for parsed source, `XML` for di.xml
+config). So:
+
+- real class → `Symbol:PHP:Class` (unchanged)
+- virtualType → `Symbol:XML:VirtualType`
+
+Sharing the `Symbol` base keeps every `Symbol → Symbol` edge working with no
+change to the graph-write layer.
+
+**Minimal stored properties.** Keep node/edge properties small (string size
+affects write throughput). No descriptive/comment properties are ever stored.
+
+- virtualType node: `name`, `kind: "virtualType"`, `sourceFile`.
+- `INJECTS` edge: `name`, `position`, `is_array`, `area`, `sourceFile`.
+
+**virtualType as a node.** `<virtualType name=V type=Real>` creates a node `V`
+(id = `V` verbatim, kind in the label) with `(V)-[:EXTENDS]->(Real)` — the same
+`EXTENDS` a real subclass uses, so inheritance traversal spans both. virtualTypes
+are referenced **by name** in the same positions a class FQN appears (`type=`
+attributes, `<argument xsi:type="object">` text), with no marker that the name is
+virtual. So a reference may appear before/in a different file from its
+declaration: MERGE by id and **paint** the `XML`/`VirtualType` labels when the
+declaration is seen, exactly like the source pipeline paints `:Symbol` kind
+labels. A name first seen as a bare `Symbol:PHP` anchor and later revealed as a
+virtualType keeps the stale `PHP` label (harmless; not scrubbed for now).
+
+**DI argument injection (`INJECTS`).** `<type>`/`<virtualType>` →
+`<arguments><argument>` becomes an `INJECTS` edge **from the configured
+class/virtualType node** to the injected class/virtualType:
+
+- `xsi:type="object"` → one edge to the referenced type.
+- `xsi:type="array"` → recurse into nested `<item xsi:type="object">` (arrays may
+  nest), one edge per object leaf, `is_array: true`.
+- scalar `xsi:type`s (`string`, `boolean`, `number`, `init_parameter`, `const`,
+  `null`) → no edge.
+- `name`/position fold into the edge identity so two args of the same type stay
+  distinct (mirrors `PARAM_TYPE`).
+
+`INJECTS` is a **distinct** edge type, deliberately **not** reused for the
+constructor's declared params. `PARAM_TYPE` (on the `__construct` method node) is
+the complete declared list (often interfaces); `INJECTS` (on the class node) is
+the di override subset (concrete classes/virtualTypes, area-specific). They are
+complementary and combine at query time — a `UNION` for the full dependency list,
+or a `name`-join for the declared-vs-configured (contract-vs-realization) view:
+
+```cypher
+MATCH (c)-[:HAS_METHOD]->(:Method {name:'__construct'})-[p:PARAM_TYPE]->(declared)
+OPTIONAL MATCH (c)-[i:INJECTS {name: p.name}]->(configured)
+RETURN c.fqcn, p.name, declared.fqcn, coalesce(configured.fqcn, configured.name)
+```
+
+Attaching `INJECTS` to the class/virtualType node (not the method node) keeps one
+uniform shape for real classes and virtualTypes (virtualTypes have no
+`__construct` node); the join above recovers param adjacency in one fixed hop.
+
+**Source-clear scoping (required, also fixes Step 1 incrementally).** The source
+pipeline's write step clears *all* outbound edges of every symbol it re-indexes
+(`upsert.ts` `clearOutboundRelationships`). That would delete xml-owned edges on
+a node the source pipeline also defines — e.g. `PREFERENCE_FOR` runs *from* an
+interface that is declared in source, so re-indexing that interface's `.php` file
+would wipe the preference edge (the watcher does not re-run xml on `.php`
+changes). Fix: scope the source clear to the edge types the source pipeline owns
+(`EXTENDS`, `IMPLEMENTS`, `USES`, `HAS_METHOD`, `PARAM_TYPE`, `RETURNS_TYPE`) so
+xml-owned edges survive. This decouples the pipelines and is why `INJECTS` must
+stay distinct from `PARAM_TYPE` (sharing it would still be caught by the clear).
+
+**Files touched by Step 2:** `handlers/di-xml.ts` (arguments walk + virtualType
++ label painting), `types.ts` (add `INJECTS` to `magentoXmlRelationshipTypes`),
+`schema/neo4j/008_*.cypher` (`INJECTS` identity constraint), `upsert.ts` /
+source `save`/`map` (scope the clear to owned edge types),
+`packages/mcp/resource/graph-schema.json` (`INJECTS` edge, `VirtualType` node).
 
 ## Thin layers
 
@@ -189,5 +260,7 @@ lets that be an independent, per-file decision without touching the pipeline.
 7. Delta route: replace the `.xml` skip with `isConfigXml` routing.
 8. Watcher: add a broad `**/*.xml` glob (no core import; the delta route filters).
 9. Update `packages/mcp/resource/graph-schema.json`.
-10. Later: `events-xml`, `adminhtml-xml`, `config-xml` handlers (additive).
+10. Step 2 (di.xml): `INJECTS` + virtualType (`Symbol:XML:VirtualType`), schema
+    `008_*.cypher`, source-clear scoping fix, MCP schema update.
+11. Later: `events-xml`, `adminhtml-xml`, `config-xml` handlers (additive).
 ```
