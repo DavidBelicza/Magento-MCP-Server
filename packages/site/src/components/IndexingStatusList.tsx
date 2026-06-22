@@ -58,7 +58,7 @@ const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: stri
 
   const line = describeProgress(progress) ?? fallback
   const hasCounts = typeof progress.nodes === 'number' || typeof progress.edges === 'number'
-  const directories = progress.directories
+  const steps = progress.steps ?? progress.directories
   const current = typeof progress.current === 'number' ? progress.current : 0
 
   return (
@@ -69,9 +69,9 @@ const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: stri
           <CountUp value={progress.nodes ?? 0} /> nodes · <CountUp value={progress.edges ?? 0} /> edges
         </div>
       ) : null}
-      {Array.isArray(directories) && directories.length > 1 ? (
+      {Array.isArray(steps) && steps.length > 1 ? (
         <div className="mt-1 flex flex-wrap gap-1">
-          {directories.map((directory, index) => {
+          {steps.map((step, index) => {
             const status = index + 1 < current ? 'done' : index + 1 === current ? 'active' : 'waiting'
             const activeTone = active ? 'bg-accent-soft text-accent-hover' : 'bg-brand-soft text-brand'
             const tone =
@@ -82,8 +82,8 @@ const ProgressDetail: React.FC<{ progress: IndexJob['progress']; fallback?: stri
                   : 'border border-gray-200 text-gray-400'
 
             return (
-              <span key={`${directory}-${index}`} className={`rounded px-1.5 py-0.5 text-[10px] ${tone}`}>
-                {directory}
+              <span key={`${step}-${index}`} className={`rounded px-1.5 py-0.5 text-[10px] ${tone}`}>
+                {step}
               </span>
             )
           })}

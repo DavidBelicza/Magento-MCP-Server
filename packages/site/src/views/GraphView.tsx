@@ -189,6 +189,8 @@ export const GraphView: React.FC = () => {
 const LEGEND_LABELS: Record<string, string> = {
   type: 'Type',
   method: 'Method',
+  event: 'Event',
+  'virtual-type': 'Virtual type',
   'composer-package': 'Package',
   'composer-author': 'Author',
 }

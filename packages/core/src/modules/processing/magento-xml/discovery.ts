@@ -8,14 +8,16 @@ export type MagentoArea =
   | "graphql"
   | "setup";
 
-export type ConfigXmlBasename = "di.xml";
+export type ConfigXmlBasename = "di.xml" | "events.xml";
 
 export type ConfigXmlClassification = {
   basename: ConfigXmlBasename;
   area: MagentoArea;
 };
 
-const configXmlBasenames = new Set<string>(["di.xml"]);
+export const orderedConfigXmlBasenames: ConfigXmlBasename[] = ["di.xml", "events.xml"];
+
+const configXmlBasenames = new Set<string>(orderedConfigXmlBasenames);
 
 const areaDirectories = new Set<string>([
   "frontend",

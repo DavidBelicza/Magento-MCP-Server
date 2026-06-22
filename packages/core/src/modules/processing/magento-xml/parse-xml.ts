@@ -1,7 +1,16 @@
 import { XMLParser } from "fast-xml-parser";
 import type { ParsedXml } from "./types.js";
 
-const forcedArrayTags = new Set(["preference", "type", "plugin", "virtualType", "argument", "item"]);
+const forcedArrayTags = new Set([
+  "preference",
+  "type",
+  "plugin",
+  "virtualType",
+  "argument",
+  "item",
+  "event",
+  "observer"
+]);
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -23,4 +32,8 @@ export function asArray<T>(value: T | T[] | undefined): T[] {
 
 export function normalizeFqn(value: unknown): string {
   return typeof value === "string" ? value.trim().replace(/^\\+/, "") : "";
+}
+
+export function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }

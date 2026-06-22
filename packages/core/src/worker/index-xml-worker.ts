@@ -1,6 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import type { Driver } from "neo4j-driver";
 import { createRedisConnectionOptions } from "../connections.js";
+import { classifyConfigXml, orderedConfigXmlBasenames } from "../modules/processing/magento-xml/discovery.js";
 import { findConfigXmlFiles } from "../modules/processing/magento-xml/find-xml-files.js";
 import { processXmlFiles } from "../modules/processing/magento-xml/process-xml-files.js";
 import { deleteMagentoXmlByPaths, saveMagentoXmlGraph } from "../modules/processing/magento-xml/save-graph.js";
@@ -44,21 +45,44 @@ async function handleJob(job: Job<IndexXmlJob>, driver: Driver, batchSize: numbe
   await job.updateProgress({ phase: "accepted", percent: 0 });
 
   const relativePaths = await findConfigXmlFiles(mountPath, entries);
+  const filesByType = groupByBasename(relativePaths);
+  const steps = orderedConfigXmlBasenames.filter((basename) => filesByType.has(basename));
+  const total = steps.length;
+  let nodes = 0;
+  let edges = 0;
 
-  await job.updateProgress({ phase: "processing", files: relativePaths.length });
+  for (let index = 0; index < total; index += 1) {
+    const basename = steps[index];
 
-  const processed = await processXmlFiles(mountPath, relativePaths);
-  const summary = await saveMagentoXmlGraph(driver, processed.nodes, processed.relationships, processed.files, batchSize);
+    await job.updateProgress({ phase: "processing", step: basename, steps, current: index + 1, total, nodes, edges });
 
-  await job.updateProgress({
-    phase: "completed",
-    percent: 100,
-    files: processed.files.length,
-    nodes: summary.nodeCount,
-    edges: summary.relationshipCount
-  });
+    const processed = await processXmlFiles(mountPath, filesByType.get(basename) ?? []);
+    const summary = await saveMagentoXmlGraph(driver, processed.nodes, processed.relationships, processed.files, batchSize);
+    nodes += summary.nodeCount;
+    edges += summary.relationshipCount;
+  }
+
+  await job.updateProgress({ phase: "completed", percent: 100, steps, total, nodes, edges });
 
   return accepted(job);
+}
+
+function groupByBasename(relativePaths: string[]): Map<string, string[]> {
+  const groups = new Map<string, string[]>();
+
+  for (const relativePath of relativePaths) {
+    const classification = classifyConfigXml(relativePath);
+
+    if (!classification) {
+      continue;
+    }
+
+    const group = groups.get(classification.basename) ?? [];
+    group.push(relativePath);
+    groups.set(classification.basename, group);
+  }
+
+  return groups;
 }
 
 async function handleDeleteJob(job: Job<IndexXmlJob>, driver: Driver): Promise<IndexXmlResult> {

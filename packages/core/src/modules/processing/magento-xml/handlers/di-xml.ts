@@ -1,18 +1,8 @@
-import { createHash } from "node:crypto";
-import type { GraphFieldValue, GraphNodeRecord, GraphRelationshipRecord } from "../../../graph/types.js";
-import { asArray, normalizeFqn } from "../parse-xml.js";
-import type { MagentoArea } from "../discovery.js";
+import { asArray, normalizeFqn, stringValue } from "../parse-xml.js";
+import { createRecordBuilder, type RecordBuilder } from "../record-builder.js";
 import type { ParsedXml, XmlHandler } from "../types.js";
 
 const virtualTypeLabel = "Symbol:XML:VirtualType";
-const anchorLabel = "Symbol:PHP";
-
-type Collector = {
-  nodesById: Map<string, GraphNodeRecord>;
-  edgesByIdentity: Map<string, GraphRelationshipRecord>;
-  area: MagentoArea;
-  sourceFile: string;
-};
 
 type Injection = {
   toId: string;
@@ -23,32 +13,24 @@ type Injection = {
 
 export const handleDiXml: XmlHandler = (relativePath, area, parsed) => {
   const config = (parsed.config ?? {}) as ParsedXml;
-  const collector: Collector = {
-    nodesById: new Map(),
-    edgesByIdentity: new Map(),
-    area,
-    sourceFile: relativePath
-  };
+  const builder = createRecordBuilder(area, relativePath);
 
   for (const preference of asArray(config.preference as ParsedXml | ParsedXml[] | undefined)) {
-    collectPreference(collector, preference);
+    collectPreference(builder, preference);
   }
 
   for (const type of asArray(config.type as ParsedXml | ParsedXml[] | undefined)) {
-    collectType(collector, type);
+    collectType(builder, type);
   }
 
   for (const virtualType of asArray(config.virtualType as ParsedXml | ParsedXml[] | undefined)) {
-    collectVirtualType(collector, virtualType);
+    collectVirtualType(builder, virtualType, relativePath);
   }
 
-  return {
-    nodes: [...collector.nodesById.values()],
-    relationships: [...collector.edgesByIdentity.values()]
-  };
+  return builder.build();
 };
 
-function collectPreference(collector: Collector, preference: ParsedXml): void {
+function collectPreference(builder: RecordBuilder, preference: ParsedXml): void {
   const fromId = normalizeFqn(preference["@_for"]);
   const toId = normalizeFqn(preference["@_type"]);
 
@@ -56,23 +38,23 @@ function collectPreference(collector: Collector, preference: ParsedXml): void {
     return;
   }
 
-  anchor(collector, fromId);
-  anchor(collector, toId);
-  addEdge(collector, "PREFERENCE_FOR", fromId, toId, "");
+  builder.anchor(fromId);
+  builder.anchor(toId);
+  builder.addEdge("PREFERENCE_FOR", fromId, toId, "");
 }
 
-function collectType(collector: Collector, type: ParsedXml): void {
+function collectType(builder: RecordBuilder, type: ParsedXml): void {
   const typeName = normalizeFqn(type["@_name"]);
 
   if (typeName === "") {
     return;
   }
 
-  collectPlugins(collector, type, typeName);
-  collectInjections(collector, type, typeName);
+  collectPlugins(builder, type, typeName);
+  collectInjections(builder, type, typeName);
 }
 
-function collectPlugins(collector: Collector, type: ParsedXml, targetId: string): void {
+function collectPlugins(builder: RecordBuilder, type: ParsedXml, targetId: string): void {
   for (const plugin of asArray(type.plugin as ParsedXml | ParsedXml[] | undefined)) {
     const pluginClass = normalizeFqn(plugin["@_type"]);
 
@@ -80,13 +62,13 @@ function collectPlugins(collector: Collector, type: ParsedXml, targetId: string)
       continue;
     }
 
-    anchor(collector, pluginClass);
-    anchor(collector, targetId);
-    addEdge(collector, "PLUGIN_FOR", pluginClass, targetId, "");
+    builder.anchor(pluginClass);
+    builder.anchor(targetId);
+    builder.addEdge("PLUGIN_FOR", pluginClass, targetId, "");
   }
 }
 
-function collectVirtualType(collector: Collector, virtualType: ParsedXml): void {
+function collectVirtualType(builder: RecordBuilder, virtualType: ParsedXml, sourceFile: string): void {
   const id = normalizeFqn(virtualType["@_name"]);
   const base = normalizeFqn(virtualType["@_type"]);
 
@@ -94,27 +76,27 @@ function collectVirtualType(collector: Collector, virtualType: ParsedXml): void 
     return;
   }
 
-  collector.nodesById.set(id, {
+  builder.addNode({
     label: virtualTypeLabel,
     id,
-    fields: { name: id, kind: "virtualType", sourceFile: collector.sourceFile }
+    fields: { name: id, kind: "virtualType", sourceFile }
   });
 
   if (base !== "") {
-    anchor(collector, base);
-    addEdge(collector, "EXTENDS", id, base, "");
+    builder.anchor(base);
+    builder.addEdge("EXTENDS", id, base, "");
   }
 
-  collectInjections(collector, virtualType, id);
+  collectInjections(builder, virtualType, id);
 }
 
-function collectInjections(collector: Collector, owner: ParsedXml, fromId: string): void {
+function collectInjections(builder: RecordBuilder, owner: ParsedXml, fromId: string): void {
   const args = owner.arguments as ParsedXml | undefined;
 
   for (const injection of injectionsOf(args)) {
-    anchor(collector, fromId);
-    anchor(collector, injection.toId);
-    addEdge(collector, "INJECTS", fromId, injection.toId, injection.slot, {
+    builder.anchor(fromId);
+    builder.anchor(injection.toId);
+    builder.addEdge("INJECTS", fromId, injection.toId, injection.slot, {
       name: injection.name,
       is_array: injection.isArray
     });
@@ -153,37 +135,4 @@ function itemKey(item: ParsedXml, index: number): string {
   const key = stringValue(item["@_name"]);
 
   return key === "" ? String(index) : key;
-}
-
-function anchor(collector: Collector, id: string): void {
-  if (!collector.nodesById.has(id)) {
-    collector.nodesById.set(id, { label: anchorLabel, id, fields: { fqcn: id } });
-  }
-}
-
-function addEdge(
-  collector: Collector,
-  type: string,
-  fromId: string,
-  toId: string,
-  discriminator: string,
-  extraFields: Record<string, GraphFieldValue> = {}
-): void {
-  const identity = createHash("sha256")
-    .update(`${fromId}:${type}:${toId}:${discriminator}:${collector.area}:${collector.sourceFile}`)
-    .digest("hex");
-
-  collector.edgesByIdentity.set(identity, {
-    type,
-    identity,
-    fromLabel: "Symbol",
-    fromId,
-    toLabel: "Symbol",
-    toId,
-    fields: { area: collector.area, sourceFile: collector.sourceFile, ...extraFields }
-  });
-}
-
-function stringValue(value: unknown): string {
-  return typeof value === "string" ? value : "";
 }

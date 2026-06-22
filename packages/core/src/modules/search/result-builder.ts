@@ -74,6 +74,24 @@ const nodeBuilders: NodeBuilder[] = [
     })
   },
   {
+    canBuild: (node) => node.kind === "event" || node.labels.includes("Event"),
+    build: (node) => ({
+      id: node.id,
+      type: "event",
+      labels: node.labels,
+      properties: node.properties
+    })
+  },
+  {
+    canBuild: (node) => node.kind === "virtualType" || node.labels.includes("VirtualType"),
+    build: (node) => ({
+      id: node.id,
+      type: "virtual-type",
+      labels: node.labels,
+      properties: node.properties
+    })
+  },
+  {
     canBuild: (node) => node.labels.includes("Symbol"),
     build: (node) => ({
       id: node.id,

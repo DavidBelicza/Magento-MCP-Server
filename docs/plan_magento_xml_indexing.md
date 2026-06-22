@@ -169,6 +169,36 @@ stay distinct from `PARAM_TYPE` (sharing it would still be caught by the clear).
 source `save`/`map` (scope the clear to owned edge types),
 `packages/mcp/resource/graph-schema.json` (`INJECTS` edge, `VirtualType` node).
 
+#### `events.xml` — Step 3 (done)
+
+Observers as a new handler, fully additive (handler + registry + `events.xml`
+basename + `OBSERVES` constraint + MCP schema). Area-aware via the existing
+classifier (`etc/events.xml` global, `etc/<area>/events.xml` per area).
+
+- **Event node:** `<event name=E>` creates `Symbol:XML:Event` (id = `E`, the
+  lowercase_underscore event name; `{ name, kind: "event" }`). Provenance `XML`,
+  like virtualTypes. Events are never declared (fired implicitly in PHP), so the
+  node is created on reference, no `sourceFile`.
+- **`OBSERVES` edge:** `<observer instance=C>` → `(C)-[:OBSERVES { observerName,
+  disabled, area, sourceFile }]->(:Event)`. Direction mirrors `PLUGIN_FOR`
+  (behavior-extender → hook). `observerName` folds into the edge identity so two
+  observers on the same event (and per-area overrides) stay distinct.
+- **No method.** Magento 2 observers always implement `ObserverInterface::execute`;
+  there is no per-event method attribute, so none is stored.
+- **`disabled`.** `<observer disabled="true">` switches off an inherited observer
+  — kept as an edge property.
+
+#### Pipeline sub-steps (generic)
+
+The `index-xml` worker processes **per file-type** (di.xml, events.xml, …) and
+reports a generic `steps` array with `current`/`total` in job progress, the same
+way the source pipeline reports its sub-directories. The frontend
+(`IndexingStatusList`) renders whatever array it receives (`progress.steps ??
+progress.directories`) — no hardcoded step names — so new file-type handlers
+appear automatically. The step order comes from `orderedConfigXmlBasenames` in
+`discovery.ts`. Shared node/edge construction lives in `record-builder.ts`, used
+by every handler.
+
 ## Thin layers
 
 ### Queue — `packages/core/src/queue/index-xml.ts`
@@ -262,5 +292,8 @@ lets that be an independent, per-file decision without touching the pipeline.
 9. Update `packages/mcp/resource/graph-schema.json`.
 10. Step 2 (di.xml): `INJECTS` + virtualType (`Symbol:XML:VirtualType`), schema
     `008_*.cypher`, source-clear scoping fix, MCP schema update.
-11. Later: `events-xml`, `adminhtml-xml`, `config-xml` handlers (additive).
+11. Step 3 (events.xml): `OBSERVES` + `Symbol:XML:Event`, schema `009_*.cypher`,
+    shared `record-builder.ts`, generic per-file-type `steps` progress + frontend
+    rendering, MCP schema update.
+12. Later: `webapi-xml`, `acl-xml`, `adminhtml-xml`, `config-xml` handlers (additive).
 ```

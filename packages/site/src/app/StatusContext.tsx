@@ -5,6 +5,8 @@ export type JobProgress = {
   phase?: string
   directory?: string
   directories?: string[]
+  step?: string
+  steps?: string[]
   current?: number
   total?: number
   processed?: number
