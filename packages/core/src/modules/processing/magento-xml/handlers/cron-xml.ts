@@ -3,7 +3,8 @@ import { asArray, normalizeFqn, stringValue } from "../parse-xml.js";
 import { createRecordBuilder, type RecordBuilder } from "../record-builder.js";
 import type { ParsedXml, XmlHandler } from "../types.js";
 
-const cronGroupLabel = "Symbol:XML:CronGroup";
+const phpMethodLabel = "PHPMethod";
+const cronGroupLabel = "CronGroup";
 
 export const handleCrontabXml: XmlHandler = (relativePath, area, parsed) => {
   const config = (parsed.config ?? {}) as ParsedXml;
@@ -53,8 +54,11 @@ function collectJob(builder: RecordBuilder, job: ParsedXml, groupId: string): vo
   const jobName = stringValue(job["@_name"]);
   const schedule = stringValue(job.schedule);
 
-  builder.anchor(methodId);
-  builder.addEdge("SCHEDULED_IN", methodId, groupId, jobName, { jobName, schedule });
+  builder.anchor(methodId, phpMethodLabel);
+  builder.addEdge("SCHEDULED_IN", methodId, phpMethodLabel, groupId, cronGroupLabel, jobName, {
+    jobName,
+    schedule
+  });
 }
 
 function collectGroupSettings(builder: RecordBuilder, group: ParsedXml): void {

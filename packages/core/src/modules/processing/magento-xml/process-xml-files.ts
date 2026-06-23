@@ -81,7 +81,7 @@ function mergeNodes(nodesById: Map<string, GraphNodeRecord>, nodes: GraphNodeRec
 }
 
 function isAnchorNode(node: GraphNodeRecord): boolean {
-  return node.label === "Symbol:PHP";
+  return node.label === "PHPClass" || node.label === "PHPMethod";
 }
 
 function mergeRelationships(

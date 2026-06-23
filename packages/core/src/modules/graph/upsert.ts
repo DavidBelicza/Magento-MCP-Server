@@ -2,11 +2,15 @@ import type { ManagedTransaction, Session } from "neo4j-driver";
 import { mapGraphFieldsToStoredProperties } from "./properties.js";
 import type { GraphNodeRecord, GraphRelationshipRecord, GraphWriteProgress, GraphWriteSummary } from "./types.js";
 
+export type ClearOutboundGroup = {
+  label: string;
+  ids: string[];
+};
+
 export type WriteGraphUpsertOptions = {
   labels: string[];
   relationshipTypes: string[];
-  clearOutboundFromNodeIds?: string[];
-  clearNodeLabel?: string;
+  clearOutbound?: ClearOutboundGroup[];
   clearRelationshipTypes?: string[];
   batchSize?: number;
   onProgress?: (progress: GraphWriteProgress) => Promise<void>;
@@ -42,20 +46,20 @@ export async function writeGraphUpsert(
   validateGraphTokens([
     ...labels,
     ...relationshipTypes,
-    ...(options.clearNodeLabel ? [options.clearNodeLabel] : []),
+    ...(options.clearOutbound ?? []).map((group) => group.label),
     ...(options.clearRelationshipTypes ?? [])
   ]);
 
-  if (options.clearOutboundFromNodeIds && options.clearOutboundFromNodeIds.length > 0) {
+  const clearGroups = (options.clearOutbound ?? []).filter((group) => group.ids.length > 0);
+
+  if (clearGroups.length > 0) {
     await reportProgress(progress, options.getClearingPhase?.() ?? "clearing-graph");
-    await session.executeWrite(async (tx) => {
-      await clearOutboundRelationships(
-        tx,
-        options.clearOutboundFromNodeIds!,
-        options.clearNodeLabel,
-        options.clearRelationshipTypes
-      );
-    });
+
+    for (const group of clearGroups) {
+      await session.executeWrite(async (tx) => {
+        await clearOutboundRelationships(tx, group.label, group.ids, options.clearRelationshipTypes);
+      });
+    }
   }
 
   for (const label of labels) {
@@ -79,11 +83,11 @@ export async function writeGraphUpsert(
 
 async function clearOutboundRelationships(
   tx: ManagedTransaction,
+  nodeLabel: string,
   nodeIds: string[],
-  nodeLabel?: string,
   relationshipTypes?: string[]
 ): Promise<void> {
-  const nodePattern = nodeLabel ? `(node:${nodeLabel} {id: id})` : "(node {id: id})";
+  const nodePattern = `(node:${nodeLabel} {id: id})`;
   const typePattern = relationshipTypes && relationshipTypes.length > 0 ? `:${relationshipTypes.join("|")}` : "";
 
   for (const batch of chunk(nodeIds, 200)) {

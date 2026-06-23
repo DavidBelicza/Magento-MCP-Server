@@ -29,7 +29,7 @@ async function clearExistingLinks(session: Session, scope: SymbolLinkScope): Pro
   if (scope) {
     await session.executeWrite((tx) =>
       tx.run(
-        `MATCH (:Symbol { id: $symbolId })-[link:DECLARED_IN_PACKAGE]->()
+        `MATCH (:PHPClass { id: $symbolId })-[link:DECLARED_IN_PACKAGE]->()
          DELETE link`,
         { symbolId: scope.symbolId }
       )
@@ -58,7 +58,7 @@ function buildLinksQuery(scope: SymbolLinkScope): string {
     MATCH (packageNode:Package)
     WHERE size(coalesce(packageNode.psr4Namespaces, [])) > 0
     UNWIND packageNode.psr4Namespaces AS namespace
-    MATCH (symbol:Symbol)
+    MATCH (symbol:PHPClass)
     WHERE symbol.kind IN $kinds AND symbol.file IS NOT NULL AND symbol.id STARTS WITH namespace ${symbolFilter}
     WITH symbol, max(size(namespace)) AS longest, collect({ owner: packageNode, length: size(namespace) }) AS candidates
     UNWIND [candidate IN candidates WHERE candidate.length = longest] AS best
@@ -72,7 +72,7 @@ function buildLinksQuery(scope: SymbolLinkScope): string {
 async function countLinks(session: Session, scope: SymbolLinkScope): Promise<number> {
   const result = scope
     ? await session.run(
-        `MATCH (:Symbol { id: $symbolId })-[link:DECLARED_IN_PACKAGE]->()
+        `MATCH (:PHPClass { id: $symbolId })-[link:DECLARED_IN_PACKAGE]->()
          RETURN count(link) AS linkedCount`,
         { symbolId: scope.symbolId }
       )

@@ -190,7 +190,6 @@ const LEGEND_LABELS: Record<string, string> = {
   type: 'Type',
   method: 'Method',
   event: 'Event',
-  'virtual-type': 'Virtual type',
   'cron-group': 'Cron group',
   'composer-package': 'Package',
   'composer-author': 'Author',

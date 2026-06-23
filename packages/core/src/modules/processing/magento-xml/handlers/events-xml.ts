@@ -2,7 +2,8 @@ import { asArray, normalizeFqn, stringValue } from "../parse-xml.js";
 import { createRecordBuilder, type RecordBuilder } from "../record-builder.js";
 import type { ParsedXml, XmlHandler } from "../types.js";
 
-const eventLabel = "Symbol:XML:Event";
+const phpClassLabel = "PHPClass";
+const eventLabel = "Event";
 
 export const handleEventsXml: XmlHandler = (relativePath, area, parsed) => {
   const config = (parsed.config ?? {}) as ParsedXml;
@@ -43,6 +44,9 @@ function collectObserver(builder: RecordBuilder, observer: ParsedXml, eventName:
   const observerName = stringValue(observer["@_name"]);
   const disabled = stringValue(observer["@_disabled"]) === "true";
 
-  builder.anchor(instance);
-  builder.addEdge("OBSERVES", instance, eventName, observerName, { observerName, disabled });
+  builder.anchor(instance, phpClassLabel);
+  builder.addEdge("OBSERVES", instance, phpClassLabel, eventName, eventLabel, observerName, {
+    observerName,
+    disabled
+  });
 }

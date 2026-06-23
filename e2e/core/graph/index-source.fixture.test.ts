@@ -59,7 +59,7 @@ describe.skipIf(!runFixture)("e2e: source + links indexing (sample fixture)", ()
   it("links all three declared symbols to the package", async () => {
     expect(
       await searchScalar(
-        "MATCH (s:Symbol)-[:DECLARED_IN_PACKAGE]->(:Package {name: 'acme/widget'}) RETURN count(s) AS c"
+        "MATCH (s:PHPClass)-[:DECLARED_IN_PACKAGE]->(:Package {name: 'acme/widget'}) RETURN count(s) AS c"
       )
     ).toBe(3);
   });

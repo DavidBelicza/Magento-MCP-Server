@@ -65,7 +65,7 @@ const nodeBuilders: NodeBuilder[] = [
     })
   },
   {
-    canBuild: (node) => node.kind === "method" || node.labels.includes("Method"),
+    canBuild: (node) => node.labels.includes("PHPMethod"),
     build: (node) => ({
       id: node.id,
       type: "method",
@@ -74,7 +74,7 @@ const nodeBuilders: NodeBuilder[] = [
     })
   },
   {
-    canBuild: (node) => node.kind === "event" || node.labels.includes("Event"),
+    canBuild: (node) => node.labels.includes("Event"),
     build: (node) => ({
       id: node.id,
       type: "event",
@@ -83,16 +83,7 @@ const nodeBuilders: NodeBuilder[] = [
     })
   },
   {
-    canBuild: (node) => node.kind === "virtualType" || node.labels.includes("VirtualType"),
-    build: (node) => ({
-      id: node.id,
-      type: "virtual-type",
-      labels: node.labels,
-      properties: node.properties
-    })
-  },
-  {
-    canBuild: (node) => node.kind === "cronGroup" || node.labels.includes("CronGroup"),
+    canBuild: (node) => node.labels.includes("CronGroup"),
     build: (node) => ({
       id: node.id,
       type: "cron-group",
@@ -101,7 +92,7 @@ const nodeBuilders: NodeBuilder[] = [
     })
   },
   {
-    canBuild: (node) => node.labels.includes("Symbol"),
+    canBuild: (node) => node.labels.includes("PHPClass"),
     build: (node) => ({
       id: node.id,
       type: "type",

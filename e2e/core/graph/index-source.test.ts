@@ -68,7 +68,7 @@ describe.skipIf(!runRealModule)(`e2e: source + links indexing (${packageName})`,
 
   it("links the module's declared symbols to its package after index/links", async () => {
     const declared = await searchScalar(
-      `MATCH (s:Symbol)-[:DECLARED_IN_PACKAGE]->(p:Package {name: '${packageName}'}) RETURN count(s) AS c`
+      `MATCH (s:PHPClass)-[:DECLARED_IN_PACKAGE]->(p:Package {name: '${packageName}'}) RETURN count(s) AS c`
     );
 
     expect(declared).toBeGreaterThan(0);

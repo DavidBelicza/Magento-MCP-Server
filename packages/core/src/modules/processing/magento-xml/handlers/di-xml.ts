@@ -2,7 +2,8 @@ import { asArray, normalizeFqn, stringValue } from "../parse-xml.js";
 import { createRecordBuilder, type RecordBuilder } from "../record-builder.js";
 import type { ParsedXml, XmlHandler } from "../types.js";
 
-const virtualTypeLabel = "Symbol:XML:VirtualType";
+const phpClassLabel = "PHPClass";
+const virtualTypeLabel = "PHPClass:VirtualType";
 
 type Injection = {
   toId: string;
@@ -38,9 +39,9 @@ function collectPreference(builder: RecordBuilder, preference: ParsedXml): void 
     return;
   }
 
-  builder.anchor(fromId);
-  builder.anchor(toId);
-  builder.addEdge("PREFERENCE_FOR", fromId, toId, "");
+  builder.anchor(fromId, phpClassLabel);
+  builder.anchor(toId, phpClassLabel);
+  builder.addEdge("PREFERENCE_FOR", fromId, phpClassLabel, toId, phpClassLabel, "");
 }
 
 function collectType(builder: RecordBuilder, type: ParsedXml): void {
@@ -62,9 +63,9 @@ function collectPlugins(builder: RecordBuilder, type: ParsedXml, targetId: strin
       continue;
     }
 
-    builder.anchor(pluginClass);
-    builder.anchor(targetId);
-    builder.addEdge("PLUGIN_FOR", pluginClass, targetId, "");
+    builder.anchor(pluginClass, phpClassLabel);
+    builder.anchor(targetId, phpClassLabel);
+    builder.addEdge("PLUGIN_FOR", pluginClass, phpClassLabel, targetId, phpClassLabel, "");
   }
 }
 
@@ -79,12 +80,12 @@ function collectVirtualType(builder: RecordBuilder, virtualType: ParsedXml, sour
   builder.addNode({
     label: virtualTypeLabel,
     id,
-    fields: { name: id, kind: "virtualType", sourceFile }
+    fields: { fqcn: id, kind: "virtualType", sourceFile }
   });
 
   if (base !== "") {
-    builder.anchor(base);
-    builder.addEdge("EXTENDS", id, base, "");
+    builder.anchor(base, phpClassLabel);
+    builder.addEdge("EXTENDS", id, phpClassLabel, base, phpClassLabel, "");
   }
 
   collectInjections(builder, virtualType, id);
@@ -94,9 +95,9 @@ function collectInjections(builder: RecordBuilder, owner: ParsedXml, fromId: str
   const args = owner.arguments as ParsedXml | undefined;
 
   for (const injection of injectionsOf(args)) {
-    builder.anchor(fromId);
-    builder.anchor(injection.toId);
-    builder.addEdge("INJECTS", fromId, injection.toId, injection.slot, {
+    builder.anchor(fromId, phpClassLabel);
+    builder.anchor(injection.toId, phpClassLabel);
+    builder.addEdge("INJECTS", fromId, phpClassLabel, injection.toId, phpClassLabel, injection.slot, {
       name: injection.name,
       is_array: injection.isArray
     });
