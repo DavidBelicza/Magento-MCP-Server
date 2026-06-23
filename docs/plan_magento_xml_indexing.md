@@ -39,27 +39,54 @@ classes), plus the config-entity nodes `Event` and `CronGroup`.
 
 ### Step 5 — webapi (`webapi.xml` + `extension_attributes.xml`)
 
-These belong together: webapi gives the entry points, extension_attributes
-completes the response DTOs, and the request/response **schema is already in the
-graph** via the linked method's `PARAM_TYPE`/`RETURNS_TYPE` edges.
+Two handlers in `magento-xml`. Both files are **global-only** (`etc/webapi.xml`,
+`etc/extension_attributes.xml`) — so these edges carry **no `area`**, only
+`sourceFile`. Adds two node kinds (`WebapiRoute`, `ExtensionAttribute`) and three
+edges (`SERVED_BY`, `HAS_EXTENSION_ATTRIBUTE`, `OF_TYPE`).
 
-- `webapi.xml`: **root element is `<routes>`** (handler reads `routes.route`).
-  `<route url method><service class method/></route>` → a `Route` node (config
-  entity: own label + own `Route.id`, id = `<HTTP method> <url>`, `url`/`method`
-  properties) with a `SERVED_BY` edge to the service `PHPMethod`. `<resources>`
-  (ACL) is ignored.
-- `extension_attributes.xml`: root `<config>`.
-  `<extension_attributes for=I><attribute code type>` → a `HAS_ATTRIBUTE`-style
-  edge to the attribute type. Same scalar-vs-class split as di injection: a
-  class/interface type (often `…Interface[]` → `is_array`) becomes an edge; a
-  scalar type (`int[]`, `string`) is skipped (decide whether to keep as attribute
-  metadata).
-- **Schema reconstruction:** the full REST schema is a recursive traversal —
-  route → service method → `RETURNS_TYPE` DTO → its getter `HAS_METHOD` → each
-  getter's `RETURNS_TYPE` (recursively) + extension attributes. Magento expresses
-  the contract in docblocks, already stored as `source: "docblock"` type edges, so
-  webapi rides on the source graph — no types are re-stored. Getter→field-name
-  (`getSku` → `sku`) is a query-time convention; formatted OpenAPI is app-side.
+**webapi.xml** (root `<routes>`; handler reads `routes.route`). A URL is the
+entity; the HTTP verbs are operations on it, each served by a different method:
+
+- `WebapiRoute` node — id = the **url** (e.g. `/V1/products/:sku`); one per URL.
+- `<route url method><service class method/></route>` →
+  `(WebapiRoute)-[:SERVED_BY { httpMethod, secure?, soapOperation? , sourceFile }]->(PHPMethod)`
+  where the method is the service `class::method`. `httpMethod` folds into the
+  edge identity, so the several verbs on one URL are distinct edges.
+- `<resources>`/`<resource ref>` (ACL) and `<data>`/`<parameter>` (param binding)
+  are ignored.
+
+**extension_attributes.xml** (root `<config>`). An extension attribute is a field
+added to a data interface; it gets its **own node** so no attribute is ever lost
+(the `for` interface is source-owned and extended by many files, so it cannot
+hold a per-file attribute list). The node mirrors a method exactly — scalar type
+as a property, class type as an edge:
+
+- `ExtensionAttribute` node — id = `<for FQN>::<code>`, properties `code`,
+  `is_array`, and `type` (scalar spelling only; empty when class-like).
+- `<extension_attributes for=I><attribute code type/>` →
+  `(I:PHPClass)-[:HAS_EXTENSION_ATTRIBUTE]->(ExtensionAttribute)`.
+- class/interface `type` → `(ExtensionAttribute)-[:OF_TYPE]->(PHPClass)` (the
+  `[]` suffix sets `is_array`); **scalar `type`** (`int`, `string[]`, …) → kept in
+  the `type` property, **no `OF_TYPE`** (same rule as a method's scalar
+  `returnType`). `<join>`/`<field>` (DB joins) are ignored.
+
+Example: `<attribute code="supplier_id" type="int"/>` on `ProductInterface` →
+`ProductInterface -[:HAS_EXTENSION_ATTRIBUTE]-> {id:"…ProductInterface::supplier_id",
+code:"supplier_id", type:"int"}` (no `OF_TYPE`). A class type instead adds
+`-[:OF_TYPE]->` the type class with `type:""`.
+
+**Schema reconstruction:** the REST contract is a traversal, no types re-stored —
+`WebapiRoute -SERVED_BY-> method -RETURNS_TYPE-> DTO`, then the DTO's getters
+(`HAS_METHOD` → `RETURNS_TYPE`, recursively) plus its `HAS_EXTENSION_ATTRIBUTE` →
+`OF_TYPE` fields. Magento declares the contract in docblocks, already stored as
+`source: "docblock"` type edges. Getter→field-name (`getSku` → `sku`) is a
+query-time convention; formatted OpenAPI is app-side.
+
+**Build footprint:** handlers `webapi-xml.ts` + `extension-attributes-xml.ts`,
+their basenames in `discovery.ts`/`registry.ts`, `SERVED_BY`/
+`HAS_EXTENSION_ATTRIBUTE`/`OF_TYPE` added to `magentoXmlRelationshipTypes`, schema
+`012` (`WebapiRoute.id`, `ExtensionAttribute.id`, and the three edge identities),
+and the MCP schema. The `record-builder` already takes per-edge endpoint labels.
 
 ### Step 6 — List view (UI)
 
