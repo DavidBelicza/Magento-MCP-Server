@@ -1,360 +1,41 @@
 # Plan: Magento XML Indexing
 
-> Status: **planned.** This document is the implementation plan for adding Magento
-> XML config (`di.xml` first; `config.xml`, `adminhtml.xml`, `events.xml` later)
-> to the graph as a fourth indexing pipeline.
+> Status: **implemented** — `di.xml` (preferences, plugins, constructor
+> injection, virtualTypes), `events.xml` (observers), and crontab
+> (`crontab.xml` + `cron_groups.xml`). **Remaining:** webapi (Step 5), List view
+> UI (Step 6), deferred `system.xml`. The graph model lives in
+> `docs/architecture_world_mapping.md`; this doc is the design rationale and the
+> roadmap for what's left.
 
 ## Goal
 
-Parse Magento's declarative XML config and enrich the existing `:Symbol` graph
-with the wiring those files describe — DI preferences and plugins first, then
-observers and area config. XML config references classes by **FQN**, which is
-already the `:Symbol` node key, so this adds *edges between existing nodes* (with
-`defined: false` anchors where a referenced class is not yet declared) rather
-than a new node space.
-
-## Label-model refactor (next implementation step)
-
-> The architecture docs (`docs/architecture_world_mapping.md`) now describe the
-> **target** label model below. The **code and `packages/mcp/resource/graph-schema.json`
-> still use the old `Symbol:PHP:Class` scheme** — this refactor brings them in
-> line. Steps 1–4 above were implemented against the old scheme; this pass
-> relabels everything in one go, then the remaining steps follow the new model.
-
-Drop the shared `:Symbol` base and provenance label. Two node families:
-
-- **Code symbols (FQN-keyed):** `PHPClass` (class, interface, trait, enum,
-  virtualType, and undeclared anchors) and `PHPMethod` (methods). Identity is
-  `PHPClass.id`; the kind is carried as a **secondary label** (`:PHPClass:Interface`,
-  `:PHPClass:VirtualType`, …, painted on, no constraint) for fast filtering **and**
-  as a `kind` property for aggregation/return. One identity label because a
-  reference cannot know the precise kind, so all class-like types share `PHPClass`
-  (no neutral base needed).
-- **Config entities (name-keyed):** `Event`, `CronGroup` (and existing `Package`,
-  `Author`) each get their **own label + own `<Label>.id` constraint**, with clean
-  ids. This is what fixes the `default` Event/CronGroup collision.
-
-Touches: `map-records`, all `magento-xml` handlers + `record-builder` (emit the
-new labels; per-edge endpoint labels), Neo4j constraints (drop `Symbol.id`; add
-`PHPClass.id`/`PHPMethod.id`/`Event.id`/`CronGroup.id` via new files + a `DROP …
-IF EXISTS` for the old one, because applied schema files can't be edited),
-`result-builder`/viz (drop the virtual-type colour), `graph-schema.json`, and a
-reset-and-reindex. Edge identity constraints are unchanged (they key on the
-relationship type, not node labels).
+Parse Magento's declarative XML config and enrich the code graph with the wiring
+those files describe (DI preferences/plugins/injections, observers, cron). XML
+references classes by **FQN** — the `PHPClass` node id — so it mostly adds *edges
+between existing nodes* (with `defined: false` anchors for not-yet-declared
+classes), plus the config-entity nodes `Event` and `CronGroup`.
 
 ## Design decisions (settled)
 
-- **Node, not PHP.** XML is declarative config with no AST need. It belongs with
-  the `composer-lock` family (parsed in Node), not the `php-analyzer` family
-  (which exists only for the PHP AST). No new service, no analyzer protocol.
-- **One pipeline for all XML kinds.** A single `index-xml` pipeline handles every
-  config-XML file, dispatching to a **per-file-type handler** by basename — the
-  same way the source pipeline handles many PHP files with one pipeline. The four
-  files differ only in parse shape; discovery, area handling, graph writes,
-  incremental delete, watcher triggering, and flow ordering are all shared.
-- **Most logic lives in `modules/processing/magento-xml/`.** The queue, worker,
-  API route, and watcher changes are thin layers that wire into this module.
-- **Per-subpath discovery.** XML is discovered under the configured
-  `sourceSubpaths` (whole mount when empty), like the source pipeline.
+- **Node, not PHP.** XML is declarative config with no AST need, so it is parsed
+  in Node alongside `composer-lock`, not via the PHP analyzer. No new service.
+- **One pipeline, handler per file type.** A single `index-xml` pipeline
+  dispatches by basename to a handler (`registry.ts`); discovery, area handling,
+  graph writes, incremental delete, watcher routing, and flow ordering are shared.
+  Most logic lives in `packages/core/src/modules/processing/magento-xml/`; queue,
+  worker, API route, and watcher are thin layers.
+- **Per-subpath discovery.** XML is found under the configured `sourceSubpaths`
+  (whole mount when empty), like the source pipeline.
 - **Area is first-class.** The same interface can have different preferences per
-  area (`adminhtml` overrides `global`), so the area is an **edge property** and
-  part of the edge identity hash.
-
-## Module layout — `packages/core/src/modules/processing/magento-xml/`
-
-This is where the work lives. Mirror the shape of `composer-lock/`.
-
-```
-modules/processing/magento-xml/
-  discovery.ts          # glob patterns + isConfigXml() predicate + area classifier + Area enum
-  registry.ts           # basename -> handler map
-  handlers/
-    di-xml.ts           # di.xml      -> PREFERENCE_FOR, PLUGIN_FOR (step 1); arguments + virtualType (step 2)
-    events-xml.ts       # events.xml  -> observer edges          (later)
-    config-xml.ts       # config.xml  -> (evaluate graph value)  (later)
-    adminhtml-xml.ts    # adminhtml.xml                          (later)
-  build-records.ts      # parsed XML + area -> { nodes, edges } (delegates to handler)
-  create-record-hash.ts # edge identity hashing (includes area + sourceFile)
-  save-graph.ts         # write + clear-by-sourceFile (incremental-safe)
-  types.ts
-```
-
-### `discovery.ts` — the shared, dependency-free helper
-
-Must stay pure (string/path only, **no neo4j/fastify**) so the watcher can import
-it. Exposes:
-
-- **Glob patterns** (fast-glob): `**/etc/di.xml` and `**/etc/*/di.xml`, extended
-  per basename as handlers are added.
-- **`isConfigXml(path)`** — basename whitelist predicate.
-- **Area classifier** — walk *up* from the file (independent of subpath depth):
-  - parent is `etc` → `global`
-  - grandparent is `etc`, parent is a known area → that area
-  - otherwise → `null` (reject; not a Magento config location)
-- **`Area` enum** — `global`, `frontend`, `adminhtml`, `crontab`, `webapi_rest`,
-  `webapi_soap`, `graphql`, `setup`. A segment not in this set is rejected.
-
-This is the single source of truth for "is this a config XML, and what area",
-imported by the worker, the delta route, and the watcher.
-
-### Handlers (strategy per file type)
-
-Each handler is `(filePath, area, parsedXml) -> { nodes, edges }`. `registry.ts`
-maps basename → handler. Adding a new XML kind later is purely additive: add a
-handler, register it, add its basename + glob to `discovery.ts`, add an edge
-constraint. No queue/worker/flow/watcher change beyond the shared whitelist.
-
-#### `di.xml` — Step 1 (this iteration)
-
-Emits, with `defined: false` anchors for unknown FQNs:
-
-- `<preference for=I type=C>` → `(I)-[:PREFERENCE_FOR { area, sourceFile }]->(C)`
-- `<type name=T><plugin type=P/></type>` → `(P)-[:PLUGIN_FOR { area, sourceFile }]->(T)`
-
-Plugin → method interception is **not stored**: which target method a plugin
-intercepts is derivable at query time from `PLUGIN_FOR` + `HAS_METHOD` + the
-`before`/`after`/`around` method-name convention (strip prefix, lower-case first
-letter, match a public target method by name). Same approach as interface method
-resolution — no override edge.
-
-#### `di.xml` — Step 2 (later, do not start this iteration)
-
-Step 2 adds DI composition (constructor argument wiring) and virtualTypes. It is
-contained almost entirely to `handlers/di-xml.ts` plus a schema constant, one new
-constraint, and the MCP schema — no queue/worker/route/flow/watcher changes. It
-also requires one cross-cutting fix to the source pipeline (see "Source-clear
-scoping" below).
-
-**Label scheme.** Stored labels follow `Symbol : <provenance> : <kind>`, where
-provenance is the source format (`PHP` for parsed source, `XML` for di.xml
-config). So:
-
-- real class → `Symbol:PHP:Class` (unchanged)
-- virtualType → `Symbol:XML:VirtualType`
-
-Sharing the `Symbol` base keeps every `Symbol → Symbol` edge working with no
-change to the graph-write layer.
-
-**Minimal stored properties.** Keep node/edge properties small (string size
-affects write throughput). No descriptive/comment properties are ever stored.
-
-- virtualType node: `name`, `kind: "virtualType"`, `sourceFile`.
-- `INJECTS` edge: `name`, `position`, `is_array`, `area`, `sourceFile`.
-
-**virtualType as a node.** `<virtualType name=V type=Real>` creates a node `V`
-(id = `V` verbatim, kind in the label) with `(V)-[:EXTENDS]->(Real)` — the same
-`EXTENDS` a real subclass uses, so inheritance traversal spans both. virtualTypes
-are referenced **by name** in the same positions a class FQN appears (`type=`
-attributes, `<argument xsi:type="object">` text), with no marker that the name is
-virtual. So a reference may appear before/in a different file from its
-declaration: MERGE by id and **paint** the `XML`/`VirtualType` labels when the
-declaration is seen, exactly like the source pipeline paints `:Symbol` kind
-labels. A name first seen as a bare `Symbol:PHP` anchor and later revealed as a
-virtualType keeps the stale `PHP` label (harmless; not scrubbed for now).
-
-**DI argument injection (`INJECTS`).** `<type>`/`<virtualType>` →
-`<arguments><argument>` becomes an `INJECTS` edge **from the configured
-class/virtualType node** to the injected class/virtualType:
-
-- `xsi:type="object"` → one edge to the referenced type.
-- `xsi:type="array"` → recurse into nested `<item xsi:type="object">` (arrays may
-  nest), one edge per object leaf, `is_array: true`.
-- scalar `xsi:type`s (`string`, `boolean`, `number`, `init_parameter`, `const`,
-  `null`) → no edge.
-- `name`/position fold into the edge identity so two args of the same type stay
-  distinct (mirrors `PARAM_TYPE`).
-
-`INJECTS` is a **distinct** edge type, deliberately **not** reused for the
-constructor's declared params. `PARAM_TYPE` (on the `__construct` method node) is
-the complete declared list (often interfaces); `INJECTS` (on the class node) is
-the di override subset (concrete classes/virtualTypes, area-specific). They are
-complementary and combine at query time — a `UNION` for the full dependency list,
-or a `name`-join for the declared-vs-configured (contract-vs-realization) view:
-
-```cypher
-MATCH (c)-[:HAS_METHOD]->(:Method {name:'__construct'})-[p:PARAM_TYPE]->(declared)
-OPTIONAL MATCH (c)-[i:INJECTS {name: p.name}]->(configured)
-RETURN c.fqcn, p.name, declared.fqcn, coalesce(configured.fqcn, configured.name)
-```
-
-Attaching `INJECTS` to the class/virtualType node (not the method node) keeps one
-uniform shape for real classes and virtualTypes (virtualTypes have no
-`__construct` node); the join above recovers param adjacency in one fixed hop.
-
-**Source-clear scoping (required, also fixes Step 1 incrementally).** The source
-pipeline's write step clears *all* outbound edges of every symbol it re-indexes
-(`upsert.ts` `clearOutboundRelationships`). That would delete xml-owned edges on
-a node the source pipeline also defines — e.g. `PREFERENCE_FOR` runs *from* an
-interface that is declared in source, so re-indexing that interface's `.php` file
-would wipe the preference edge (the watcher does not re-run xml on `.php`
-changes). Fix: scope the source clear to the edge types the source pipeline owns
-(`EXTENDS`, `IMPLEMENTS`, `USES`, `HAS_METHOD`, `PARAM_TYPE`, `RETURNS_TYPE`) so
-xml-owned edges survive. This decouples the pipelines and is why `INJECTS` must
-stay distinct from `PARAM_TYPE` (sharing it would still be caught by the clear).
-
-**Files touched by Step 2:** `handlers/di-xml.ts` (arguments walk + virtualType
-+ label painting), `types.ts` (add `INJECTS` to `magentoXmlRelationshipTypes`),
-`schema/neo4j/008_*.cypher` (`INJECTS` identity constraint), `upsert.ts` /
-source `save`/`map` (scope the clear to owned edge types),
-`packages/mcp/resource/graph-schema.json` (`INJECTS` edge, `VirtualType` node).
-
-#### `events.xml` — Step 3 (done)
-
-Observers as a new handler, fully additive (handler + registry + `events.xml`
-basename + `OBSERVES` constraint + MCP schema). Area-aware via the existing
-classifier (`etc/events.xml` global, `etc/<area>/events.xml` per area).
-
-- **Event node:** `<event name=E>` creates `Symbol:XML:Event` (id = `E`, the
-  lowercase_underscore event name; `{ name, kind: "event" }`). Provenance `XML`,
-  like virtualTypes. Events are never declared (fired implicitly in PHP), so the
-  node is created on reference, no `sourceFile`.
-- **`OBSERVES` edge:** `<observer instance=C>` → `(C)-[:OBSERVES { observerName,
-  disabled, area, sourceFile }]->(:Event)`. Direction mirrors `PLUGIN_FOR`
-  (behavior-extender → hook). `observerName` folds into the edge identity so two
-  observers on the same event (and per-area overrides) stay distinct.
-- **No method.** Magento 2 observers always implement `ObserverInterface::execute`;
-  there is no per-event method attribute, so none is stored.
-- **`disabled`.** `<observer disabled="true">` switches off an inherited observer
-  — kept as an edge property.
-
-#### Pipeline sub-steps (generic)
-
-The `index-xml` worker processes **per file-type** (di.xml, events.xml, …) and
-reports a generic `steps` array with `current`/`total` in job progress, the same
-way the source pipeline reports its sub-directories. The frontend
-(`IndexingStatusList`) renders whatever array it receives (`progress.steps ??
-progress.directories`) — no hardcoded step names — so new file-type handlers
-appear automatically. The step order comes from `orderedConfigXmlBasenames` in
-`discovery.ts`. Shared node/edge construction lives in `record-builder.ts`, used
-by every handler.
-
-## Thin layers
-
-### Queue — `packages/core/src/queue/index-xml.ts`
-
-Mirror `queue/index-source.ts`. `IndexXmlJob` carries `analyzedSourcePath`,
-`directories` (snapshotted subpaths), `operation: "index" | "delete"`,
-`requestedAt`, `fullIndexFlow?`. Queue name `index-xml`, job `index-xml-job`.
-
-### Worker — `packages/core/src/worker/index-xml-worker.ts`
-
-Thin entrypoint. Resolves each snapshotted directory against the mount, **globs
-the discovery patterns**, parses each match, dispatches via `registry`,
-accumulates records, calls `save-graph`. For `operation: "delete"`, clears edges
-whose `sourceFile` is the path or under it. No parsing logic here.
-
-### API route — `packages/core/src/api/graph/index-xml.ts`
-
-`POST /api/graph/index/xml` ({ "directories": [...] } optional) and
-`DELETE /api/graph/index/xml`. Snapshots `sourceSubpaths`/`projectRoot` into job
-data at enqueue time (the worker never reads config). Returns `202`.
-
-### Flow ordering — `packages/core/src/api/graph/build-index-flow.ts`
-
-Insert `index-xml` between source and links (xml references symbols, so it runs
-after source; links is package-side and stays last). New nested order:
-
-```
-reindex:            packages -> source -> xml -> links
-reset-and-reindex:  delete-graph -> packages -> source -> xml -> links
-```
-
-Concretely: `index-links` (parent) ← `index-xml` ← `index-source` ← ...
-
-### Delta route — `packages/core/src/api/graph/index-delta.ts`
-
-`routeDeltaPaths` currently sends every `.xml` to `skipped`
-([index-delta.ts:86](../packages/core/src/api/graph/index-delta.ts:86)). Replace
-with `isConfigXml(path)` from `discovery.ts`: matches route to the `index-xml`
-pipeline (upsert → re-parse the file; delete → clear by path), everything else
-still skipped.
-
-### Watcher — `packages/watcher/src/index.ts`
-
-`buildWatchTargets` currently globs `**/*.php` + `composer.lock`
-([index.ts:66](../packages/watcher/src/index.ts:66)). Add a broad `**/*.xml`
-glob. The watcher stays deliberately dumb: it does **not** import the discovery
-predicate from core (it never has imported core, and doing so would drag core's
-runtime deps into the watcher build). It forwards every `.xml` change to the
-delta route, which applies `isConfigXml` as the single authority and ignores the
-rest. The cost is a few extra paths per batch that the route filters out —
-cheap, debounced, and it keeps the predicate in exactly one place.
-
-### Schema — `packages/core/schema/neo4j/007_create_magento_xml_constraints.cypher`
-
-Edge `identity` uniqueness for the new edge types (`PREFERENCE_FOR`,
-`PLUGIN_FOR`, ... ), following the existing `001`–`006` pattern. Identity hash =
-`hash(from + ":" + TYPE + ":" + to + ":" + area + ":" + sourceFile)` so per-area
-edges coexist and a re-parse of one file replaces only its own edges.
-
-## Incremental delete semantics
-
-Each XML edge carries a `sourceFile` property. A re-parsed or deleted file clears
-only the edges with that `sourceFile`, so `etc/adminhtml/di.xml` never wipes
-edges from `etc/di.xml`. This is the XML analogue of the source pipeline's
-"clear outbound edges of `defined` symbols" rule.
-
-## MCP
-
-No code change. `graph_search` exposes the new edges automatically. Update
-`packages/mcp/resource/graph-schema.json` with the new edge types, edge
-properties (`area`, `sourceFile`), and area enum so agents know they exist.
-
-## Content caveat — `config.xml`
-
-`di.xml` and `events.xml` reference class FQNs and produce real `:Symbol` edges.
-`config.xml` is mostly scalar default config and may yield few/no symbol edges —
-structurally similar to the scalars/member-nodes the project deliberately
-dropped. Decide its graph value when its handler is built; the registry design
-lets that be an independent, per-file decision without touching the pipeline.
-
-## Implementation order
-
-1. `magento-xml/discovery.ts` (pure: globs, predicate, area classifier, enum).
-2. `magento-xml/` parse/build/save + the `di-xml` handler + `registry`.
-3. Queue + worker entrypoint; register the worker in `worker.ts`.
-4. API route `POST/DELETE /api/graph/index/xml`.
-5. Wire into `build-index-flow.ts` (reindex + reset-and-reindex).
-6. Schema `007_*.cypher` (edge identity constraints).
-7. Delta route: replace the `.xml` skip with `isConfigXml` routing.
-8. Watcher: add a broad `**/*.xml` glob (no core import; the delta route filters).
-9. Update `packages/mcp/resource/graph-schema.json`.
-10. Step 2 (di.xml): `INJECTS` + virtualType (`Symbol:XML:VirtualType`), schema
-    `008_*.cypher`, source-clear scoping fix, MCP schema update.
-11. Step 3 (events.xml): `OBSERVES` + `Symbol:XML:Event`, schema `009_*.cypher`,
-    shared `record-builder.ts`, generic per-file-type `steps` progress + frontend
-    rendering, MCP schema update.
-12. Step 4 (crontab): `crontab.xml` + `cron_groups.xml` — see "Remaining file types".
-13. Step 5 (webapi): `webapi.xml` + `extension_attributes.xml` — see "Remaining file types".
-14. Step 6 (list view): a tabular **List view** as a separate main-menu item beside
-    the graph view — see "List view (UI)".
-15. Final (deferred): `system.xml` — see "Remaining file types".
-
-## Remaining file types (scope decisions)
-
-The criterion for indexing an XML file is **symbol connectivity**: it must
-reference classes/methods so it adds edges into the existing `:Symbol` graph and
-enables useful queries. By that measure:
-
-- **Out of scope (no plan to index):** all of tier 2 (`queue_*.xml`,
-  `communication.xml`, `indexer.xml`, `mview.xml`, `widget.xml`) and all of tier 3
-  (layout XML, ui_component XML, adminhtml `menu.xml`, `module.xml`, `config.xml`,
-  `db_schema.xml`). **ACL is out of scope entirely** — `acl.xml` is not indexed and
-  webapi `<resources>`/`<resource ref>` refs are not captured.
-
-### Step 4 (next) — crontab (`crontab.xml` + `cron_groups.xml`)
-
-Two related files, both root `<config>`, both global (not area-scoped).
-
-- `crontab.xml`: `<group id><job name instance method><schedule>` → the valuable
-  edge is the job's **class + method**. Model the job as the entry-point node
-  (e.g. `Symbol:XML:CronJob`, id = job `name`) with a `RUNS` edge to the
-  class/method, carrying `schedule` and `group`.
-- `cron_groups.xml`: `<group id>` with scalar settings only
-  (`schedule_generate_every`, `schedule_lifetime`, …) — **no class references**.
-  It just enriches the cron group; link jobs to their group by `group id`. The
-  group node carries the settings; the symbol value lives entirely in
-  `crontab.xml`.
+  area, so `area` is an edge property and part of the edge identity hash.
+- **Discovery + area classifier** (`discovery.ts`) is the single source of truth
+  for "is this a config XML, and what area" (basename whitelist + walk up from the
+  file to the `etc/<area>` landmark). The delta route imports it; the watcher
+  stays dumb (globs all `*.xml`, the route filters).
+- **Incremental delete by `sourceFile`.** Each XML edge carries `sourceFile`; a
+  re-parsed/deleted file clears only its own edges.
+
+## Remaining work
 
 ### Step 5 — webapi (`webapi.xml` + `extension_attributes.xml`)
 
@@ -362,49 +43,48 @@ These belong together: webapi gives the entry points, extension_attributes
 completes the response DTOs, and the request/response **schema is already in the
 graph** via the linked method's `PARAM_TYPE`/`RETURNS_TYPE` edges.
 
-- `webapi.xml`: **root element is `<routes>`** (not `<config>` — the handler must
-  read `routes.route`). `<route url method><service class method/></route>` →
-  a `Route` node (config entity: own label + own `Route.id`, id = `<HTTP method>
-  <url>`, with `url`/`method` properties) and a `SERVED_BY` edge to the service
-  `PHPMethod`. `<resources>` (ACL) is ignored.
+- `webapi.xml`: **root element is `<routes>`** (handler reads `routes.route`).
+  `<route url method><service class method/></route>` → a `Route` node (config
+  entity: own label + own `Route.id`, id = `<HTTP method> <url>`, `url`/`method`
+  properties) with a `SERVED_BY` edge to the service `PHPMethod`. `<resources>`
+  (ACL) is ignored.
 - `extension_attributes.xml`: root `<config>`.
   `<extension_attributes for=I><attribute code type>` → a `HAS_ATTRIBUTE`-style
-  edge adding a field to data interface `I`. `type` has the **same scalar-vs-class
-  split as di injection**: a class/interface type (often `…Interface[]`) becomes
-  an edge to that type (array suffix → `is_array`); a scalar type (`int[]`,
-  `string`) has no symbol to link, so it is skipped as an edge (decide at
-  implementation whether to keep it as attribute metadata for schema
-  completeness).
+  edge to the attribute type. Same scalar-vs-class split as di injection: a
+  class/interface type (often `…Interface[]` → `is_array`) becomes an edge; a
+  scalar type (`int[]`, `string`) is skipped (decide whether to keep as attribute
+  metadata).
 - **Schema reconstruction:** the full REST schema is a recursive traversal —
-  route → service method → `RETURNS_TYPE` DTO → its getter `HAS_METHOD` →
-  each getter's `RETURNS_TYPE` (recursively) + extension attributes. No types are
-  re-stored; webapi rides on the source graph. Magento expresses the contract in
-  docblocks, which we already store as `source: "docblock"` type edges (plus
-  native types). Getter→field-name (`getSku` → `sku`) is a query-time convention,
-  like plugin method resolution. Emitting formatted OpenAPI/JSON-schema is
-  app-side and out of scope; the **structure** is fully queryable from the graph.
+  route → service method → `RETURNS_TYPE` DTO → its getter `HAS_METHOD` → each
+  getter's `RETURNS_TYPE` (recursively) + extension attributes. Magento expresses
+  the contract in docblocks, already stored as `source: "docblock"` type edges, so
+  webapi rides on the source graph — no types are re-stored. Getter→field-name
+  (`getSku` → `sku`) is a query-time convention; formatted OpenAPI is app-side.
 
 ### Step 6 — List view (UI)
 
-A tabular **List view** as a **separate main-menu item**, beside the existing
-graph view — scheduled **after** the webapi step and **before** `system.xml`.
-
-- It is the deliberate home for queries that return **rows/columns** rather than
-  graph entities (e.g. "all cron jobs and their classes", a flattened REST-API
-  surface). The graph view stays graph-only (it draws node/relationship
-  entities); the list view renders the tabular result of a read-only Cypher
-  query. This supersedes the earlier ad-hoc table that was reverted — it gets its
-  own route, menu item, and query history treatment instead of overloading the
-  graph page.
-- Backend already returns `columns`/`rows` from `POST /api/graph/search`; the
-  list view consumes those directly.
+A tabular **List view** as a **separate main-menu item** beside the graph view —
+after webapi, before `system.xml`. It is the deliberate home for queries that
+return **rows/columns** rather than graph entities. The graph view stays
+graph-only (it draws node/relationship entities returned by the query); the list
+view renders the tabular result of the same read-only Cypher. Backend already
+returns `columns`/`rows` from `POST /api/graph/search`.
 
 ### Final (deferred) — `system.xml`
 
 `system.xml` (admin config fields → `backend_model`/`source_model`/`frontend_model`
-classes, keyed by config path) is the **last step to evaluate**. The goal there
-is to **search among possible configurations in plain English**, which is a
-different retrieval problem than graph traversal and likely needs a **vector
-database** (semantic search over config paths/labels/comments) rather than, or
-alongside, the Neo4j graph. Defer until the graph work is complete and the
-vector-search direction is decided.
+classes, keyed by config path) is the last step to evaluate. Its goal —
+**searching configurations in plain English** — is a semantic-retrieval problem
+that likely needs a **vector database**, not graph traversal. Defer until the
+graph work is complete and the vector-search direction is decided.
+
+## Out of scope
+
+The criterion for indexing an XML file is **symbol connectivity** (it must
+reference classes/methods). Not indexed:
+
+- tier 2 (`queue_*.xml`, `communication.xml`, `indexer.xml`, `mview.xml`,
+  `widget.xml`) and tier 3 (layout, ui_component, `menu.xml`, `module.xml`,
+  `config.xml`, `db_schema.xml`).
+- **ACL entirely** — `acl.xml` is not indexed and webapi `<resource ref>` refs
+  are not captured.

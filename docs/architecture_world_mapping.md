@@ -135,9 +135,27 @@ One pipeline, one handler per config file, dispatched by filename
 | `events.xml` | `Event` node + `OBSERVES` (observer class→event) |
 | `crontab.xml` + `cron_groups.xml` | `CronGroup` node + `SCHEDULED_IN` (method→group); `cron_groups.xml` adds the group's settings |
 
-Plugin→method interception and observer/cron method bodies are **not** stored;
-the plugin's target method is derivable at query time from `PLUGIN_FOR` +
-`HAS_METHOD` and the `before`/`after`/`around` naming convention.
+Plugin→method interception is **not** stored; the plugin's target method is
+derivable at query time from `PLUGIN_FOR` + `HAS_METHOD` and the
+`before`/`after`/`around` naming convention.
+
+`SCHEDULED_IN` is emitted from a synthesized `<instance>::<method>` `PHPMethod`
+node. When the cron `instance` is a real class that declares the method, that id
+matches the real method node, so `HAS_METHOD` already links it to its class. When
+the `instance` is a **virtualType** (or the method is inherited), it is a
+referenced-only anchor with no `HAS_METHOD` — the real class is resolved at query
+time by splitting the id and following `EXTENDS`:
+
+```cypher
+MATCH (m:PHPMethod)-[:SCHEDULED_IN]->(g:CronGroup)
+MATCH (instance:PHPClass {id: split(m.id, '::')[0]})
+OPTIONAL MATCH (instance)-[:EXTENDS*0..]->(owner:PHPClass)
+              -[:HAS_METHOD]->(real:PHPMethod {name: split(m.id, '::')[1]})
+RETURN g, m, instance, owner, real
+```
+
+The model stays clean (no synthetic bridge edge); the virtualType/inheritance
+case is exactly what the `EXTENDS` edges resolve.
 
 ## Worked example (new label scheme)
 

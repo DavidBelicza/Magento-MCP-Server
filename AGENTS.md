@@ -33,7 +33,7 @@ The Compose project is named `magentic`. Main services:
 - `magentic_postgres`: persistent application storage and schema history.
 - `magentic_graphdb`: Neo4j graph database, exposed for local browser/debug access.
 
-Dev Compose overrides are in `docker-compose.dev.yml`. Backend/worker/site/PHP analyzer source mounts allow most source edits without rebuilding the image. The backend/worker run `tsx` watch; the site runs `vite build --watch` and is served by nginx (refresh the browser to pick up a rebuild — no HMR). Rebuild the image only when package metadata or Dockerfiles change. In dev mode, `magentic_analyzer_php` runs Composer install on startup so `packages/php-analyzer/vendor` is available locally but ignored by Git.
+Dev Compose overrides are in `docker-compose.dev.yml`. Backend/worker/site/PHP analyzer source mounts allow most source edits without rebuilding the image; the backend/worker also mount `packages/core/schema` so new Neo4j/PostgreSQL schema scripts are installed on restart without an image rebuild. The backend/worker run `tsx` watch; the site runs `vite build --watch` and is served by nginx (refresh the browser to pick up a rebuild — no HMR). Rebuild the image only when package metadata or Dockerfiles change. In dev mode, `magentic_analyzer_php` runs Composer install on startup so `packages/php-analyzer/vendor` is available locally but ignored by Git.
 
 ## Common Commands
 
