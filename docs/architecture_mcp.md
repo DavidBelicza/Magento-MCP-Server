@@ -11,7 +11,7 @@ Public path: client → `http://localhost:8080/mcp` → nginx (`magentic_fronten
 ## Tools
 
 - `get_status` — proxies `GET /api/graph/index/status`. Reports `locked` / `inProgress` plus a plain-language `verdict` so an agent knows whether the graph is mid-rebuild.
-- `graph_search` — proxies `POST /api/graph/search` with `{ description, cypherQuery }`. Read-only Cypher is validated by the backend; a backend `400` is returned as a repairable tool error. The tool description carries a compact schema cheat sheet.
+- `graph_search` — proxies `POST /api/graph/search` with `{ description, cypherQuery }`. Read-only Cypher is validated by the backend; a backend `400` is returned as a repairable tool error. The tool description carries a compact schema cheat sheet. The compact JSON response carries `dataVisualization` (`"visual graph"` or `"tabular"`) and a `webViewUrl` (graph canvas, or the inspection table with `&view=inspect`); for a visual graph it returns de-duplicated `nodes`/`relationships` plus `rows` whose entity cells are node ids (join back to recover per-row correlation), and for tabular results it returns `columns`/`rows` directly.
 - `get_graph_schema` — returns `resource/graph-schema.json` directly (no backend call, since the schema is static). The slim schema lists node kinds, relationship types, edge properties, and type-mapping rules; the worked example lives in `docs/architecture_world_mapping.md`.
 
 ## Usage signal

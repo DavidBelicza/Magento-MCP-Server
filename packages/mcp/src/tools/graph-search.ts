@@ -13,11 +13,47 @@ const cheatSheet = [
 
 const description = [
   "Read-only Cypher over the Magentic code graph — use it to find and explore the project's code: locate specific symbols (e.g. a class or method by name like getMinimalPrice), and answer structural or general questions about classes, methods, dependencies, composer packages, and their relationships. Always include a LIMIT.",
-  "Always also produce a visualization: run a query that RETURNs nodes/relationships/paths so a graphUrl comes back, and give that URL to the user. If they asked for a count or single value, return that too, but still run the graph query and share its graphUrl.",
-  "graphUrl is only present when the result contains graph nodes/relationships. Call get_graph_schema if labels/relationships are uncertain, get_status if freshness matters.",
+  "Response shape: `dataVisualization` is either \"visual graph\" (the query returned nodes/relationships/paths) or \"tabular\" (the query returned only scalar values). `webViewUrl` always points to the rendered result in the Magentic web UI — the graph canvas for a visual graph, the inspection table for tabular — share it with the user.",
+  "For a visual graph the response gives `nodes` and `relationships` de-duplicated (each entity appears once, with full properties) plus `rows` where every entity cell is the node's id — join a row's ids back to `nodes`/`relationships` to recover per-row correlation. For tabular results the response gives `columns` and `rows` directly.",
+  "Choosing what to RETURN controls both size and shape, like SQL SELECT: RETURN scalar properties (e.g. c.fqcn, c.file) for a lean table; RETURN whole nodes plus the relationships between them — or a path — to get a connected visual graph. Returning only nodes draws unconnected nodes; to show edges you must RETURN the relationship or a path, not just the nodes. Project only the fields you need.",
+  "Call get_graph_schema if labels/relationships are uncertain, get_status if freshness matters.",
   "Schema cheat sheet:",
   cheatSheet
 ].join(" ");
+
+type GraphSearchResultShape = {
+  columns?: string[];
+  rows?: Array<Record<string, unknown>>;
+};
+
+type StructuredResultShape = {
+  nodes?: unknown[];
+  relationships?: unknown[];
+};
+
+function collapseEntityReferences(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(collapseEntityReferences);
+  }
+
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+
+    if (typeof record.id === "string") {
+      return record.id;
+    }
+
+    const collapsed: Record<string, unknown> = {};
+
+    for (const [key, item] of Object.entries(record)) {
+      collapsed[key] = collapseEntityReferences(item);
+    }
+
+    return collapsed;
+  }
+
+  return value;
+}
 
 export function registerGraphSearch(server: McpServer, backend: BackendClient, frontendBaseUrl: string): void {
   server.registerTool(
@@ -33,21 +69,32 @@ export function registerGraphSearch(server: McpServer, backend: BackendClient, f
     async ({ cypherQuery, description: queryDescription }) => {
       try {
         const response = await backend.searchGraph({ cypherQuery, description: queryDescription });
-        const result = (response.result ?? {}) as { columns?: unknown; rows?: unknown };
-        const structured = (response.structuredResult ?? {}) as { nodes?: unknown[]; relationships?: unknown[] };
-        const hasGraph = (structured.nodes?.length ?? 0) > 0 || (structured.relationships?.length ?? 0) > 0;
+        const result = (response.result ?? {}) as GraphSearchResultShape;
+        const structured = (response.structuredResult ?? {}) as StructuredResultShape;
+        const columns = result.columns ?? [];
+        const rows = result.rows ?? [];
+        const nodes = structured.nodes ?? [];
+        const relationships = structured.relationships ?? [];
+        const hasGraph = nodes.length > 0 || relationships.length > 0;
 
-        const payload: Record<string, unknown> = {
-          columns: result.columns ?? [],
-          rows: result.rows ?? []
-        };
-
-        if (hasGraph) {
-          payload.graphUrl = `${frontendBaseUrl}/graph?queryHistoryId=${response.historyId}`;
-        }
+        const payload: Record<string, unknown> = hasGraph
+          ? {
+              dataVisualization: "visual graph",
+              webViewUrl: `${frontendBaseUrl}/graph?queryHistoryId=${response.historyId}`,
+              columns,
+              rows: rows.map(collapseEntityReferences),
+              nodes,
+              relationships
+            }
+          : {
+              dataVisualization: "tabular",
+              webViewUrl: `${frontendBaseUrl}/graph?queryHistoryId=${response.historyId}&view=inspect`,
+              columns,
+              rows
+            };
 
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }],
+          content: [{ type: "text" as const, text: JSON.stringify(payload) }],
           structuredContent: payload
         };
       } catch (error) {
