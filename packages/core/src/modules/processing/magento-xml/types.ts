@@ -20,5 +20,8 @@ export const magentoXmlRelationshipTypes = [
   "INJECTS",
   "EXTENDS",
   "OBSERVES",
-  "SCHEDULED_IN"
+  "SCHEDULED_IN",
+  "SERVED_BY",
+  "HAS_EXTENSION_ATTRIBUTE",
+  "OF_TYPE"
 ];

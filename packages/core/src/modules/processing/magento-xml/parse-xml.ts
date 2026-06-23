@@ -11,7 +11,11 @@ const forcedArrayTags = new Set([
   "event",
   "observer",
   "group",
-  "job"
+  "job",
+  "route",
+  "service",
+  "extension_attributes",
+  "attribute"
 ]);
 
 const parser = new XMLParser({

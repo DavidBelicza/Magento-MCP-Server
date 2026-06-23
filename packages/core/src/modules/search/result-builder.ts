@@ -92,6 +92,24 @@ const nodeBuilders: NodeBuilder[] = [
     })
   },
   {
+    canBuild: (node) => node.labels.includes("WebapiRoute"),
+    build: (node) => ({
+      id: node.id,
+      type: "webapi-route",
+      labels: node.labels,
+      properties: node.properties
+    })
+  },
+  {
+    canBuild: (node) => node.labels.includes("ExtensionAttribute"),
+    build: (node) => ({
+      id: node.id,
+      type: "extension-attribute",
+      labels: node.labels,
+      properties: node.properties
+    })
+  },
+  {
     canBuild: (node) => node.labels.includes("PHPClass"),
     build: (node) => ({
       id: node.id,

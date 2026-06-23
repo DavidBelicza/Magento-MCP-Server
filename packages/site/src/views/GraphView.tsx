@@ -191,6 +191,8 @@ const LEGEND_LABELS: Record<string, string> = {
   method: 'Method',
   event: 'Event',
   'cron-group': 'Cron group',
+  'webapi-route': 'Web API route',
+  'extension-attribute': 'Extension attribute',
   'composer-package': 'Package',
   'composer-author': 'Author',
 }

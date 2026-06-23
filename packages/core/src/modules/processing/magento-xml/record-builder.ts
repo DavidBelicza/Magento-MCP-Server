@@ -18,7 +18,7 @@ export type RecordBuilder = {
   build: () => MagentoXmlRecords;
 };
 
-export function createRecordBuilder(area: MagentoArea, sourceFile: string): RecordBuilder {
+export function createRecordBuilder(area: MagentoArea | null, sourceFile: string): RecordBuilder {
   const nodesById = new Map<string, GraphNodeRecord>();
   const edgesByIdentity = new Map<string, GraphRelationshipRecord>();
 
@@ -33,7 +33,7 @@ export function createRecordBuilder(area: MagentoArea, sourceFile: string): Reco
     },
     addEdge: (type, fromId, fromLabel, toId, toLabel, discriminator, extraFields = {}) => {
       const identity = createHash("sha256")
-        .update(`${fromId}:${type}:${toId}:${discriminator}:${area}:${sourceFile}`)
+        .update(`${fromId}:${type}:${toId}:${discriminator}:${area ?? ""}:${sourceFile}`)
         .digest("hex");
 
       edgesByIdentity.set(identity, {
@@ -43,7 +43,7 @@ export function createRecordBuilder(area: MagentoArea, sourceFile: string): Reco
         fromId,
         toLabel,
         toId,
-        fields: { area, sourceFile, ...extraFields }
+        fields: { ...(area ? { area } : {}), sourceFile, ...extraFields }
       });
     },
     build: () => ({
