@@ -9,12 +9,15 @@ machine-readable version served to agents lives in
 ## The graph at a glance
 
 ```
-EXTENDS / IMPLEMENTS / USES / PREFERENCE_FOR / PLUGIN_FOR / INJECTS : PHPClass  → PHPClass
-HAS_METHOD                                                          : PHPClass  → PHPMethod
-PARAM_TYPE / RETURNS_TYPE                                           : PHPMethod → PHPClass
-DECLARED_IN_PACKAGE                                                 : PHPClass  → Package
-OBSERVES                                                            : PHPClass  → Event
-SCHEDULED_IN                                                        : PHPMethod → CronGroup
+EXTENDS / IMPLEMENTS / USES / PREFERENCE_FOR / PLUGIN_FOR / INJECTS : PHPClass    → PHPClass
+HAS_METHOD                                                          : PHPClass    → PHPMethod
+PARAM_TYPE / RETURNS_TYPE                                           : PHPMethod   → PHPClass
+DECLARED_IN_PACKAGE                                                 : PHPClass    → Package
+OBSERVES                                                            : PHPClass    → Event
+SCHEDULED_IN                                                        : PHPMethod   → CronGroup
+SERVED_BY                                                           : WebapiRoute → PHPMethod
+HAS_EXTENSION_ATTRIBUTE                                             : PHPClass    → ExtensionAttribute
+OF_TYPE                                                             : ExtensionAttribute → PHPClass
 ```
 
 Composer dependency edges complete the picture:
@@ -67,6 +70,8 @@ There are two families, distinguished by **how they are identified**.
 | --- | --- | --- |
 | `Event` | a Magento event (dispatch hook) | event name (`catalog_product_save_after`) |
 | `CronGroup` | a cron group | group id (`default`) |
+| `WebapiRoute` | a REST/SOAP endpoint URL | the url (`/V1/products/:sku`) |
+| `ExtensionAttribute` | an extra API field on a data interface | `<for FQN>::<code>` |
 | `Package` | a Composer package | `package:<vendor>/<name>` |
 | `Author` | a Composer author | `author:<name>|<email>|<homepage>` |
 
@@ -134,6 +139,8 @@ One pipeline, one handler per config file, dispatched by filename
 | `di.xml` | `PREFERENCE_FOR` (interface→concrete), `PLUGIN_FOR` (plugin→target), `INJECTS` (constructor wiring, object + array items), virtualType `PHPClass` + `EXTENDS` |
 | `events.xml` | `Event` node + `OBSERVES` (observer class→event) |
 | `crontab.xml` + `cron_groups.xml` | `CronGroup` node + `SCHEDULED_IN` (method→group); `cron_groups.xml` adds the group's settings |
+| `webapi.xml` | `WebapiRoute` node (url) + `SERVED_BY` (route→service method; HTTP verb on the edge) |
+| `extension_attributes.xml` | `ExtensionAttribute` node + `HAS_EXTENSION_ATTRIBUTE` (interface→attribute) + `OF_TYPE` (attribute→class; scalar types stay in the node's `type` property) |
 
 Plugin→method interception is **not** stored; the plugin's target method is
 derivable at query time from `PLUGIN_FOR` + `HAS_METHOD` and the
