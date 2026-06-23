@@ -541,8 +541,9 @@ This endpoint returns the 20 most recent records ordered newest-first. It return
 - `description`
 - `nodeCount`
 - `relationshipCount`
+- `rowCount`
 
-It does not return generated Cypher or stored graph result JSON.
+Records that returned only tabular rows (scalar/aggregation queries with no nodes or relationships) are included; `rowCount` lets the tab label them. It does not return generated Cypher or stored graph result JSON.
 
 A single saved graph search can be loaded by ID through:
 
@@ -550,13 +551,15 @@ A single saved graph search can be loaded by ID through:
 GET /api/graph/get-query-history/:id
 ```
 
-This endpoint returns the saved raw normalized `result` and rebuilds `structuredResult` from that stored result. The frontend Graph page uses this endpoint when opened with a query-history ID:
+This endpoint returns the saved raw normalized `result` (which carries `columns`/`rows`) and rebuilds `structuredResult` from it. The frontend Graph page uses this endpoint when opened with a query-history ID:
 
 ```text
 /graph?queryHistoryId=<query-history-id>
 ```
 
 The Query History tab links each listed history item to that Graph page URL. When `/graph` is opened without a query-history ID, the frontend loads the latest query history item and replaces the URL with `/graph?queryHistoryId=<latest-query-history-id>`. Missing or invalid query-history IDs show an error state with a link back to Query History instead of rendering an empty graph canvas.
+
+The Graph page has two modes, toggled in place and selectable from the URL. The default renders the graph from `structuredResult`; `&view=inspect` renders the result's `columns`/`rows` as a table instead (the form for scalar/aggregation queries that produce no graph). The Query History tab links to both — "Open graph" and "Inspect Details".
 
 ## Graph Indexing API
 

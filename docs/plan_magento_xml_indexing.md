@@ -2,10 +2,9 @@
 
 > Status: **XML indexing complete on this branch** — di.xml, events.xml, crontab
 > (crontab.xml + cron_groups.xml), and webapi (webapi.xml + extension_attributes.xml),
-> all on the `PHPClass`/`PHPMethod` + config-entity label model. **One UI item
-> remains:** the list/row view (below). **`system.xml` is not in this branch** —
-> it's a future effort paired with vector search. The graph model is documented in
-> `docs/architecture_world_mapping.md`.
+> all on the `PHPClass`/`PHPMethod` + config-entity label model. **`system.xml` is
+> not in this branch** — it's a future effort paired with vector search. The graph
+> model is documented in `docs/architecture_world_mapping.md`.
 
 ## Goal
 
@@ -47,35 +46,6 @@ All on the `PHPClass`/`PHPMethod` + config-entity label model — see
 - **webapi.xml** — `WebapiRoute` nodes + `SERVED_BY` (HTTP verb on the edge).
 - **extension_attributes.xml** — `ExtensionAttribute` nodes + `HAS_EXTENSION_ATTRIBUTE`
   + `OF_TYPE` (scalar type kept as the node's `type` property).
-
-## Remaining — list/row view (UI)
-
-The one outstanding item. A graph search (`POST /api/graph/search`) can return
-**either** graph entities (a query that returns nodes/relationships) **or** plain
-**rows/columns** (a query with scalar projections or aggregations, e.g.
-`RETURN c.fqcn, count(*)`). The graph page only renders the entity form; a
-row-returning result currently has nowhere to show. We need a way to recognise a
-list/row result and display it, distinct from the graph view. (An earlier ad-hoc
-table was added to the graph page and then reverted — this should be done
-deliberately, not bolted onto the graph view.)
-
-Pointers for whoever picks this up (facts, **not** prescriptions — the design is
-open):
-
-- The data already exists in the response: `POST /api/graph/search` returns
-  `result.columns` + `result.rows` (the tabular shape) alongside `result.graph`
-  and `structuredResult` (the entity shape). No backend change is needed to *get*
-  rows.
-- The graph view (`packages/site/src/views/GraphView.tsx`, `features/graph/`)
-  renders only `structuredResult`; when `result.graph` is empty it shows a
-  "no graph nodes/relationships" message — that is exactly the row-result case.
-- Query history (`listQueryHistory` in
-  `packages/core/src/modules/search/query-history.ts`) currently lists **only**
-  graph-returning queries; surfacing row queries would mean revisiting that
-  filter.
-- Open decisions left to the implementer: separate menu item/route vs a mode on
-  the existing page; how/whether row queries appear in history; how to detect
-  "this result is a list"; pagination and formatting.
 
 ## Not in this branch — `system.xml`
 

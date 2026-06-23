@@ -8,6 +8,7 @@ type QueryHistoryItem = {
   description: string
   nodeCount: number
   relationshipCount: number
+  rowCount: number
 }
 
 type QueryHistoryResponse =
@@ -104,9 +105,9 @@ export const QueryHistoryView: React.FC = () => {
 
         {status === 'ready' && items.length > 0 ? (
           <div>
-            <div className="hidden grid-cols-[minmax(0,1fr)_150px_170px_110px] gap-4 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 lg:grid">
+            <div className="hidden grid-cols-[minmax(0,1fr)_150px_170px_150px] gap-4 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-500 lg:grid">
               <div>Query</div>
-              <div>Graph</div>
+              <div>Result</div>
               <div>Created</div>
               <div>Action</div>
             </div>
@@ -133,6 +134,9 @@ const QueryHistoryRow: React.FC<{
   onToggle: () => void
 }> = ({ item, index, isExpanded, onToggle }) => {
   const title = createTitle(item.description)
+  const hasGraphData = item.nodeCount > 0 || item.relationshipCount > 0
+  const graphLink = `/graph?queryHistoryId=${encodeURIComponent(item.id)}`
+  const inspectLink = `${graphLink}&view=inspect`
   const descriptionRef = useRef<HTMLParagraphElement | null>(null)
   const [canExpand, setCanExpand] = useState(false)
   const [expandedHeight, setExpandedHeight] = useState(0)
@@ -164,14 +168,14 @@ const QueryHistoryRow: React.FC<{
   return (
     <article
       className={[
-        'grid gap-3 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_150px_170px_110px] lg:gap-4',
+        'grid gap-3 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_150px_170px_150px] lg:gap-4',
         index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
       ].join(' ')}
     >
       <div className="min-w-0">
         <h3 className="truncate text-sm font-bold">
           <Link
-            to={`/graph?queryHistoryId=${encodeURIComponent(item.id)}`}
+            to={hasGraphData ? graphLink : inspectLink}
             className="text-gray-900 transition hover:text-gray-500 focus:outline-none"
           >
             {title}
@@ -200,10 +204,10 @@ const QueryHistoryRow: React.FC<{
       </div>
 
       <div className="text-xs font-semibold text-gray-900 lg:pt-1">
-        <span className="mr-2 font-bold uppercase tracking-[0.12em] text-gray-500 lg:hidden">Graph</span>
+        <span className="mr-2 font-bold uppercase tracking-[0.12em] text-gray-500 lg:hidden">Result</span>
         {item.nodeCount > 0 || item.relationshipCount > 0
           ? `${item.nodeCount} nodes / ${item.relationshipCount} edges`
-          : 'No graph data'}
+          : `${item.rowCount} ${item.rowCount === 1 ? 'row' : 'rows'}`}
       </div>
 
       <div className="text-xs font-semibold text-gray-900 lg:pt-1">
@@ -214,12 +218,18 @@ const QueryHistoryRow: React.FC<{
         </span>
       </div>
 
-      <div className="lg:pt-0.5">
+      <div className="flex flex-row flex-wrap gap-2 lg:flex-col lg:pt-0.5">
         <Link
-          to={`/graph?queryHistoryId=${encodeURIComponent(item.id)}`}
-          className="inline-flex h-7 cursor-pointer items-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-gray-900 transition hover:border-slate-300 hover:bg-gray-200 focus:outline-none"
+          to={graphLink}
+          className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-gray-900 transition hover:border-slate-300 hover:bg-gray-200 focus:outline-none"
         >
           Open graph
+        </Link>
+        <Link
+          to={inspectLink}
+          className="inline-flex h-7 cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-gray-900 transition hover:border-slate-300 hover:bg-gray-200 focus:outline-none"
+        >
+          Inspect Details
         </Link>
       </div>
     </article>
