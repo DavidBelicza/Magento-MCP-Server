@@ -28,6 +28,14 @@ export type GraphSearchResponse = {
   structuredResult?: unknown;
 };
 
+export type QueryResultResponse = {
+  ok: boolean;
+  id?: string;
+  description?: string;
+  result?: unknown;
+  structuredResult?: unknown;
+};
+
 export class BackendError extends Error {
   readonly status: number;
 
@@ -75,6 +83,11 @@ export function createBackendClient(baseUrl: string) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input)
+      });
+    },
+    getGraphSearchResult(id: string): Promise<QueryResultResponse> {
+      return request<QueryResultResponse>(`/api/graph/get-query-history/${encodeURIComponent(id)}`, {
+        method: "GET"
       });
     }
   };
