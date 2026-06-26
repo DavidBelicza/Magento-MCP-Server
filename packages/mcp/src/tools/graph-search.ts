@@ -10,12 +10,13 @@ import {
 } from "../graph-search-result.js";
 
 const cheatSheet = [
-  "PHP symbols carry combined labels, e.g. :Symbol:PHP:Class (also Interface, Trait, Enum, Method), so MATCH (c:Class) works.",
-  "Composer nodes are :Package and :Author.",
-  "Common relationships: EXTENDS, IMPLEMENTS, USES, HAS_METHOD, PARAM_TYPE, RETURNS_TYPE, DECLARED_IN_PACKAGE,",
+  "Classes are :PHPClass with a secondary kind label, e.g. :PHPClass:Class (also :Interface, :Trait, :Enum, :VirtualType), so MATCH (c:Class) works; a referenced-but-undeclared class is :PHPClass with no kind label. Methods are :PHPMethod (no secondary label).",
+  "Config-entity nodes: :Event, :CronGroup, :WebapiRoute, :ExtensionAttribute. Composer nodes: :Package, :Author.",
+  "Relationships: EXTENDS, IMPLEMENTS, USES, HAS_METHOD, PARAM_TYPE, RETURNS_TYPE, DECLARED_IN_PACKAGE,",
+  "PREFERENCE_FOR, PLUGIN_FOR, INJECTS, OBSERVES, SCHEDULED_IN, SERVED_BY, HAS_EXTENSION_ATTRIBUTE, OF_TYPE,",
   "PACKAGE_REQUIRES_PACKAGE, PACKAGE_REQUIRES_DEV_PACKAGE, PACKAGE_AUTHORED_BY, PACKAGE_SUGGESTS_PACKAGE,",
   "PACKAGE_REPLACES_PACKAGE, PACKAGE_PROVIDES_PACKAGE, PACKAGE_CONFLICTS_WITH_PACKAGE.",
-  "Symbol ids are FQNs; method ids are <owner FQN>::<method name>."
+  "Class/method ids are FQNs; method ids are <owner FQN>::<method name>. Config-entity ids: Event=name, CronGroup=id, WebapiRoute=url, ExtensionAttribute=<for FQN>::<code>."
 ].join(" ");
 
 const description = [

@@ -567,7 +567,7 @@ The graph is built and maintained by four internal pipelines, each a BullMQ queu
 
 - `index-packages`: parse `composer.lock` into `Package`/`Author` nodes and composer relationships (merge-and-prune writes).
 - `index-source`: stream the PHP analyzer's JSONL and write `PHPClass`/`PHPMethod` nodes and their edges (incremental upsert; also handles targeted deletion by path).
-- `index-xml`: parse Magento XML config (`di.xml`, `events.xml`, `crontab.xml`/`cron_groups.xml`) into DI/observer/cron edges plus `Event`/`CronGroup` nodes (one handler per file type; cleared by `sourceFile`).
+- `index-xml`: parse Magento XML config (`di.xml`, `events.xml`, `crontab.xml`/`cron_groups.xml`, `webapi.xml`, `extension_attributes.xml`) into DI/observer/cron/webapi/extension-attribute edges plus `Event`/`CronGroup`/`WebapiRoute`/`ExtensionAttribute` nodes (one handler per file type; cleared by `sourceFile`).
 - `index-links`: connect declared `PHPClass` nodes to their `Package` via `DECLARED_IN_PACKAGE` (PSR-4 longest-prefix, in Cypher).
 
 All indexing routes live under `/api/graph/index/*`. The `graph` segment namespaces this as *graph* indexing so a future vector-database index (for example `/api/vector/...`) stays separate. Every route returns `202 Accepted` immediately and runs asynchronously on the worker; nothing blocks the HTTP request.

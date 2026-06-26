@@ -10,6 +10,8 @@
 
 services:
   magentic_frontend:
+    environment:
+      MAGENTIC_API_TOKEN: "example-token"
     ports: !override
       - "8090:80"
 
