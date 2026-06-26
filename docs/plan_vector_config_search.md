@@ -188,6 +188,17 @@ flowchart TD
 - **Shared Postgres tech, separate instance.** `magentic_pgvector` is its own
   container, so it does not load the app DB; the `VectorStore` port keeps a later
   move to a dedicated vector DB cheap.
+- **LM Studio silently truncates oversized input** (no error; content past the
+  model's 2048-token context window is dropped). Mitigated by an **in-house token
+  estimator + length guard** — no external tokenizer library (tiktoken is
+  OpenAI-only; Transformers.js drags in onnxruntime and downloads tokenizer files).
+  The estimator is a cheap heuristic: `estimatedTokens = max(ceil(chars / 4),
+  ceil(words / 0.75))` (take the larger, conservative figure). The indexer guards
+  against a safe bound well under 2048 (e.g. ~1800 tokens) and logs/flags or
+  explicitly truncates anything over it. Descriptions are ~15 tokens, so this never
+  trips in practice — it is insurance against a future change silently losing text.
+  If exact counts are ever needed, the upgrade path is a server that errors on
+  overflow (HF TEI / vLLM via the `Embedder` port), not a client-side tokenizer.
 
 ## Out of scope (v1)
 
