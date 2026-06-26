@@ -6,6 +6,13 @@
 <h1 align="center">Magentic - Magento MCP Server</h1>
 
 <p align="center">
+  <a href="https://github.com/DavidBelicza/Magento-MCP-Server/actions/workflows/ci.yml"><img src="https://github.com/DavidBelicza/Magento-MCP-Server/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/DavidBelicza/Magento-MCP-Server/actions/workflows/release.yml"><img src="https://github.com/DavidBelicza/Magento-MCP-Server/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://github.com/DavidBelicza/Magento-MCP-Server/releases"><img src="https://img.shields.io/github/v/release/DavidBelicza/Magento-MCP-Server" alt="Latest release"></a>
+  <a href="https://github.com/DavidBelicza?tab=packages&amp;repo_name=Magento-MCP-Server"><img src="https://img.shields.io/badge/ghcr.io-images-2496ED?logo=docker&amp;logoColor=white" alt="Container images"></a>
+</p>
+
+<p align="center">
 Magentic is a self-hosted <strong>standard MCP (Model Context Protocol) server</strong>.<br/>
 Magentic maps the Magento codebase into a graph that any <strong>AI agent can explore for grounded symbolic reasoning</strong>.
 </p>
