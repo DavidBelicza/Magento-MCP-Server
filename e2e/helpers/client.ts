@@ -73,6 +73,21 @@ export async function triggerSourceIndex(directories: string[]): Promise<string>
   return job.id;
 }
 
+export async function triggerXmlIndex(directories: string[]): Promise<string> {
+  const { status, body } = await apiRequest("/api/graph/index/xml", {
+    method: "POST",
+    body: JSON.stringify({ directories })
+  });
+
+  const job = body.job as { id?: string } | undefined;
+
+  if (status !== 202 || typeof job?.id !== "string") {
+    throw new Error(`Unexpected index/xml response: ${status} ${JSON.stringify(body)}`);
+  }
+
+  return job.id;
+}
+
 export async function triggerLinks(symbolId: string | null = null): Promise<string> {
   const { status, body } = await apiRequest("/api/graph/index/links", {
     method: "POST",

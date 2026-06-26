@@ -6,6 +6,7 @@ import { createDeleteGraphWorker } from "./worker/delete-graph-worker.js";
 import { createIndexLinksWorker } from "./worker/index-links-worker.js";
 import { createIndexPackagesWorker } from "./worker/index-packages-worker.js";
 import { createIndexSourceWorker } from "./worker/index-source-worker.js";
+import { createIndexXmlWorker } from "./worker/index-xml-worker.js";
 import { readConfig } from "./config.js";
 import { logger } from "./logger.js";
 
@@ -20,6 +21,7 @@ await installSchemas(postgres, neo4jDriver);
 const indexPackagesWorker = createIndexPackagesWorker(neo4jDriver);
 const indexSourceWorker = createIndexSourceWorker(neo4jDriver, config.graphBatchSize, config.analyzerPhpUrl);
 const indexLinksWorker = createIndexLinksWorker(neo4jDriver, redis);
+const indexXmlWorker = createIndexXmlWorker(neo4jDriver, config.graphBatchSize);
 const deleteGraphWorker = createDeleteGraphWorker(neo4jDriver);
 
 function releaseLockOnFlowFailure(job?: { data?: { fullIndexFlow?: boolean } }): void {
@@ -31,6 +33,7 @@ function releaseLockOnFlowFailure(job?: { data?: { fullIndexFlow?: boolean } }):
 indexPackagesWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
 indexSourceWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
 indexLinksWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
+indexXmlWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
 deleteGraphWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
 
 function recordRun(): void {
@@ -42,6 +45,7 @@ function recordRun(): void {
 indexPackagesWorker.on("completed", recordRun);
 indexSourceWorker.on("completed", recordRun);
 indexLinksWorker.on("completed", recordRun);
+indexXmlWorker.on("completed", recordRun);
 deleteGraphWorker.on("completed", recordRun);
 
 logger.info({ event: 'worker_started' }, 'Magentic Worker is running');
@@ -50,6 +54,7 @@ process.on("SIGTERM", async () => {
   await indexPackagesWorker.close();
   await indexSourceWorker.close();
   await indexLinksWorker.close();
+  await indexXmlWorker.close();
   await deleteGraphWorker.close();
   await postgres.end();
   await redis.quit();

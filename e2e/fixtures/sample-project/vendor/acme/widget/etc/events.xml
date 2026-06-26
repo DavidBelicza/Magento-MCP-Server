@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<config>
+    <event name="acme_widget_saved">
+        <observer name="acme_widget_observer" instance="Acme\Widget\Model\Widget"/>
+    </event>
+</config>

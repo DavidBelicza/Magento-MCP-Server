@@ -10,6 +10,13 @@ Magentic is a self-hosted <strong>standard MCP (Model Context Protocol) server</
 Magentic maps the Magento codebase into a graph that any <strong>AI agent can explore for grounded symbolic reasoning</strong>.
 </p>
 
+## Features
+
+| Name | Description |
+| --- | --- |
+| **AI agent connection via MCP** | Any MCP-compatible AI agent can use Magentic by triggering it directly, just type "*use Magentic to do...*". |
+| **Code search** | Search across Composer packages, PHP, and XML config (DI, plugins, events, REST APIs). |
+
 ## How it works
 
 Magentic uses **symbolic reasoning to prevent the model from hallucinating**.

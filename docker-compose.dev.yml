@@ -19,7 +19,7 @@ services:
     volumes:
       - ./packages/site/src:/app/src
       - ./packages/site/public:/app/public
-      - ./README.md:/app/README.md
+      - ./README.md:/README.md:ro
       - ./packages/site/index.html:/app/index.html
       - ./packages/site/vite.config.ts:/app/vite.config.ts
       - ./packages/site/postcss.config.js:/app/postcss.config.js
@@ -33,6 +33,7 @@ services:
     command: ["npm", "run", "dev:backend"]
     volumes:
       - ./packages/core/src:/app/src
+      - ./packages/core/schema:/app/schema:ro
       - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:/mnt/analyzed-source:ro
       - ${MAGENTIC_CONFIG_HOST_PATH:-./data}:/app/data
 
@@ -44,6 +45,7 @@ services:
     command: ["npm", "run", "dev:worker"]
     volumes:
       - ./packages/core/src:/app/src
+      - ./packages/core/schema:/app/schema:ro
       - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:/mnt/analyzed-source:ro
 
   magentic_mcp:

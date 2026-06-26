@@ -4,6 +4,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { GraphVisualization, buildGraphStyle } from '../features/graph'
 import type { GraphVisualizationData, GraphVisualizationHandle, GraphLegendEntry } from '../features/graph'
 import { Panel } from '../components/Panel'
+import { InspectionTable } from '../components/InspectionTable'
+import type { InspectionValue } from '../components/InspectionTable'
 
 type QueryHistoryGraphResponse =
   | {
@@ -12,6 +14,10 @@ type QueryHistoryGraphResponse =
       createdAt: string
       description: string
       structuredResult: GraphVisualizationData
+      result: {
+        columns: string[]
+        rows: Array<Record<string, InspectionValue>>
+      }
     }
   | {
       ok: false
@@ -37,7 +43,10 @@ type QueryHistoryListResponse =
 export const GraphView: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryHistoryId = searchParams.get('queryHistoryId')
+  const isInspectView = searchParams.get('view') === 'inspect'
   const [queryGraph, setQueryGraph] = useState<GraphVisualizationData | null>(null)
+  const [queryColumns, setQueryColumns] = useState<string[]>([])
+  const [queryRows, setQueryRows] = useState<Array<Record<string, InspectionValue>>>([])
   const [queryDescription, setQueryDescription] = useState<string | null>(null)
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -46,6 +55,18 @@ export const GraphView: React.FC = () => {
   const hasQueryGraphData = !queryGraph || queryGraph.nodes.length > 0 || queryGraph.relationships.length > 0
   const shouldRenderGraph = status === 'ready' && hasQueryGraphData && Boolean(queryGraph)
   const graphRef = useRef<GraphVisualizationHandle | null>(null)
+
+  function toggleView() {
+    const nextParams = new URLSearchParams(searchParams)
+
+    if (isInspectView) {
+      nextParams.delete('view')
+    } else {
+      nextParams.set('view', 'inspect')
+    }
+
+    setSearchParams(nextParams, { replace: true })
+  }
 
   useEffect(() => {
     if (queryHistoryId) {
@@ -99,6 +120,8 @@ export const GraphView: React.FC = () => {
   useEffect(() => {
     if (!queryHistoryId) {
       setQueryGraph(null)
+      setQueryColumns([])
+      setQueryRows([])
       setQueryDescription(null)
       return
     }
@@ -124,6 +147,8 @@ export const GraphView: React.FC = () => {
         }
 
         setQueryGraph(body.structuredResult)
+        setQueryColumns(body.result?.columns ?? [])
+        setQueryRows(body.result?.rows ?? [])
         setQueryDescription(body.description)
         setStatus('ready')
       } catch {
@@ -146,40 +171,72 @@ export const GraphView: React.FC = () => {
       <Panel className="flex min-h-0 flex-col overflow-hidden">
         <div className="flex h-11 shrink-0 items-center justify-between gap-4 border-b border-gray-200 px-4">
           <div className="flex min-w-0 items-center gap-3">
-            {graphStyle && graphStyle.legend.length > 0 ? <GraphLegend entries={graphStyle.legend} /> : null}
+            {!isInspectView && graphStyle && graphStyle.legend.length > 0 ? <GraphLegend entries={graphStyle.legend} /> : null}
             <div className="min-w-0 truncate text-xs font-semibold text-gray-600" title={queryDescription ?? undefined}>
               {getGraphHeaderTitle(status, queryDescription)}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-3">
             <div className="text-xs font-semibold text-gray-600">
-              {graphCounts.nodes} nodes / {graphCounts.edges} edges
+              {isInspectView
+                ? `${queryRows.length} ${queryRows.length === 1 ? 'row' : 'rows'}`
+                : `${graphCounts.nodes} nodes / ${graphCounts.edges} edges`}
             </div>
             <button
               type="button"
               className="h-7 rounded-lg border border-gray-200 px-3 text-gray-600 transition hover:border-slate-300 hover:bg-gray-50 focus:outline-none inline-flex items-center justify-center"
-              onClick={() => graphRef.current?.resetView()}
+              onClick={toggleView}
             >
-              <span className="text-xs font-semibold">Reset</span>
+              <span className="text-xs font-semibold">{isInspectView ? 'See graph' : 'Inspect'}</span>
             </button>
+            {!isInspectView ? (
+              <button
+                type="button"
+                className="h-7 rounded-lg border border-gray-200 px-3 text-gray-600 transition hover:border-slate-300 hover:bg-gray-50 focus:outline-none inline-flex items-center justify-center"
+                onClick={() => graphRef.current?.resetView()}
+              >
+                <span className="text-xs font-semibold">Reset</span>
+              </button>
+            ) : null}
           </div>
         </div>
-        <div className="relative min-h-0 flex-1 overflow-hidden bg-[linear-gradient(rgba(17,24,39,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(17,24,39,0.055)_1px,transparent_1px)] bg-[position:24px_24px] bg-[size:48px_48px]">
+        <div
+          className={[
+            'relative min-h-0 flex-1 overflow-hidden',
+            isInspectView
+              ? 'bg-white'
+              : 'bg-[linear-gradient(rgba(17,24,39,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(17,24,39,0.055)_1px,transparent_1px)] bg-[position:24px_24px] bg-[size:48px_48px]'
+          ].join(' ')}
+        >
           {status === 'loading' ? (
-            <GraphStateMessage label="Loading saved graph" />
+            <GraphStateMessage label={isInspectView ? 'Loading saved result' : 'Loading saved graph'} />
           ) : null}
 
           {status === 'error' ? (
             <GraphStateMessage label={error ?? 'Query graph could not be loaded'} showHistoryLink />
           ) : null}
 
-          {queryHistoryId && status === 'ready' && queryGraph && !hasQueryGraphData ? (
-            <GraphStateMessage label="This saved query did not return graph nodes or relationships" showHistoryLink />
-          ) : null}
+          {isInspectView ? (
+            <>
+              {status === 'ready' && queryRows.length === 0 ? (
+                <GraphStateMessage label="This saved query returned no rows" showHistoryLink />
+              ) : null}
 
-          {shouldRenderGraph && graphStyle ? (
-            <GraphVisualization ref={graphRef} data={graphStyle.data} />
-          ) : null}
+              {status === 'ready' && queryRows.length > 0 ? (
+                <InspectionTable columns={queryColumns} rows={queryRows} />
+              ) : null}
+            </>
+          ) : (
+            <>
+              {queryHistoryId && status === 'ready' && queryGraph && !hasQueryGraphData ? (
+                <GraphStateMessage label="This saved query did not return graph nodes or relationships" showHistoryLink />
+              ) : null}
+
+              {shouldRenderGraph && graphStyle ? (
+                <GraphVisualization ref={graphRef} data={graphStyle.data} />
+              ) : null}
+            </>
+          )}
         </div>
       </Panel>
     </div>
@@ -189,6 +246,10 @@ export const GraphView: React.FC = () => {
 const LEGEND_LABELS: Record<string, string> = {
   type: 'Type',
   method: 'Method',
+  event: 'Event',
+  'cron-group': 'Cron group',
+  'webapi-route': 'Web API route',
+  'extension-attribute': 'Extension attribute',
   'composer-package': 'Package',
   'composer-author': 'Author',
 }

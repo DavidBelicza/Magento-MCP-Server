@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<config>
+    <preference for="Acme\Widget\Api\WidgetInterface" type="Acme\Widget\Model\Widget"/>
+    <virtualType name="acmeVirtualWidget" type="Acme\Widget\Model\Widget"/>
+</config>

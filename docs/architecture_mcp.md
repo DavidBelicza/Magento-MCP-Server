@@ -11,7 +11,8 @@ Public path: client → `http://localhost:8080/mcp` → nginx (`magentic_fronten
 ## Tools
 
 - `get_status` — proxies `GET /api/graph/index/status`. Reports `locked` / `inProgress` plus a plain-language `verdict` so an agent knows whether the graph is mid-rebuild.
-- `graph_search` — proxies `POST /api/graph/search` with `{ description, cypherQuery }`. Read-only Cypher is validated by the backend; a backend `400` is returned as a repairable tool error. The tool description carries a compact schema cheat sheet.
+- `graph_search` — proxies `POST /api/graph/search` with `{ description, cypherQuery }`. Read-only Cypher is validated by the backend; a backend `400` is returned as a repairable tool error. The tool description carries a compact schema cheat sheet. It returns a **handle, not the data**: `resultFormat` (`"graph"` or `"table"`), a `webViewUrl` (graph canvas, or the inspection table with `&view=inspect`), the `queryId`, and a `summary` (`rowCount`/`nodeCount`/`relationshipCount`/`columns` plus `estimatedTokens` per fetchable form). The agent inspects the estimate and only pulls data when needed.
+- `get_graph_search_result` — fetches the full stored result of an earlier `graph_search` by `queryId` (reuses `GET /api/graph/get-query-history/:id`; a backend `404` is a repairable tool error). `viewResult` selects the form: `"table"` returns `columns`/`rows`, `"graph"` returns de-duplicated `nodes`/`relationships` plus `rows` whose entity cells are node ids (join back to recover per-row correlation). No size cap — the agent already knows the size from `graph_search`'s `estimatedTokens`.
 - `get_graph_schema` — returns `resource/graph-schema.json` directly (no backend call, since the schema is static). The slim schema lists node kinds, relationship types, edge properties, and type-mapping rules; the worked example lives in `docs/architecture_world_mapping.md`.
 
 ## Usage signal

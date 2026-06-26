@@ -52,7 +52,7 @@ describe.skipIf(!runRealModule)(`e2e: source + links indexing (${packageName})`,
 
   it("records method parameter/return type edges from the module", async () => {
     const typeEdges = await searchScalar(
-      `MATCH (m:Method)-[r:PARAM_TYPE|RETURNS_TYPE]->() WHERE m.file STARTS WITH '${modulePrefix}' RETURN count(r) AS c`
+      `MATCH (m:PHPMethod)-[r:PARAM_TYPE|RETURNS_TYPE]->() WHERE m.file STARTS WITH '${modulePrefix}' RETURN count(r) AS c`
     );
 
     expect(typeEdges).toBeGreaterThan(0);
@@ -68,7 +68,7 @@ describe.skipIf(!runRealModule)(`e2e: source + links indexing (${packageName})`,
 
   it("links the module's declared symbols to its package after index/links", async () => {
     const declared = await searchScalar(
-      `MATCH (s:Symbol)-[:DECLARED_IN_PACKAGE]->(p:Package {name: '${packageName}'}) RETURN count(s) AS c`
+      `MATCH (s:PHPClass)-[:DECLARED_IN_PACKAGE]->(p:Package {name: '${packageName}'}) RETURN count(s) AS c`
     );
 
     expect(declared).toBeGreaterThan(0);

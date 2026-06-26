@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { Driver } from "neo4j-driver";
 import type { Pool } from "pg";
-import { GraphSearchValidationError, searchGraph } from "../../modules/graph/search/index.js";
+import { GraphSearchQueryError, GraphSearchValidationError, searchGraph } from "../../modules/graph/search/index.js";
 import { saveQueryHistory } from "../../modules/search/query-history.js";
 import { buildGraphSearchResult } from "../../modules/search/result-builder.js";
 
@@ -49,7 +49,7 @@ export function registerSearchRoute(app: FastifyInstance, deps: Dependencies): v
         structuredResult
       };
     } catch (error) {
-      if (error instanceof GraphSearchValidationError) {
+      if (error instanceof GraphSearchValidationError || error instanceof GraphSearchQueryError) {
         return reply.status(400).send({
           ok: false,
           error: error.message

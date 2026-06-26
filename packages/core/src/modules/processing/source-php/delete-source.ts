@@ -32,7 +32,7 @@ function normalizePath(path: string): string {
 async function countMatchingSymbols(session: Session, paths: string[]): Promise<number> {
   const result = await session.run(
     `UNWIND $paths AS path
-     MATCH (symbol:Symbol)
+     MATCH (symbol:PHPClass|PHPMethod)
      WHERE symbol.file = path OR symbol.file STARTS WITH path + '/'
      RETURN count(DISTINCT symbol) AS deletedCount`,
     { paths }
@@ -44,7 +44,7 @@ async function countMatchingSymbols(session: Session, paths: string[]): Promise<
 async function deleteMatchingSymbols(session: Session, paths: string[]): Promise<void> {
   await session.run(
     `UNWIND $paths AS path
-     MATCH (symbol:Symbol)
+     MATCH (symbol:PHPClass|PHPMethod)
      WHERE symbol.file = path OR symbol.file STARTS WITH path + '/'
      WITH DISTINCT symbol
      CALL { WITH symbol DETACH DELETE symbol } IN TRANSACTIONS OF ${deleteTransactionRows} ROWS`,

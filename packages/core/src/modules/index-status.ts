@@ -4,11 +4,13 @@ import { deleteGraphQueueName } from "../queue/delete-graph.js";
 import { indexLinksQueueName } from "../queue/index-links.js";
 import { indexPackagesQueueName } from "../queue/index-packages.js";
 import { indexSourceQueueName } from "../queue/index-source.js";
+import { indexXmlQueueName } from "../queue/index-xml.js";
 
 const indexQueueNames = [
   deleteGraphQueueName,
   indexPackagesQueueName,
   indexSourceQueueName,
+  indexXmlQueueName,
   indexLinksQueueName
 ];
 

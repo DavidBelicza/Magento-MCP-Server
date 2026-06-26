@@ -24,7 +24,7 @@ describe.skipIf(!runFixture)("e2e: source + links indexing (sample fixture)", ()
   it("indexes exactly the fixture's classes and interface", async () => {
     expect(await searchScalar("MATCH (c:Class) RETURN count(c) AS c")).toBe(2);
     expect(await searchScalar("MATCH (i:Interface) RETURN count(i) AS c")).toBe(1);
-    expect(await searchScalar("MATCH (m:Method) RETURN count(m) AS c")).toBe(6);
+    expect(await searchScalar("MATCH (m:PHPMethod) RETURN count(m) AS c")).toBe(6);
   });
 
   it("records the single inheritance edge (Widget extends AbstractWidget)", async () => {
@@ -46,12 +46,12 @@ describe.skipIf(!runFixture)("e2e: source + links indexing (sample fixture)", ()
   it("records method parameter and return type edges", async () => {
     expect(
       await searchScalar(
-        "MATCH (:Method {id: 'Acme\\\\Widget\\\\Model\\\\Widget::withParent'})-[:PARAM_TYPE]->(:Class {id: 'Acme\\\\Widget\\\\Model\\\\AbstractWidget'}) RETURN count(*) AS c"
+        "MATCH (:PHPMethod {id: 'Acme\\\\Widget\\\\Model\\\\Widget::withParent'})-[:PARAM_TYPE]->(:Class {id: 'Acme\\\\Widget\\\\Model\\\\AbstractWidget'}) RETURN count(*) AS c"
       )
     ).toBe(1);
     expect(
       await searchScalar(
-        "MATCH (:Method {id: 'Acme\\\\Widget\\\\Model\\\\Widget::withParent'})-[:RETURNS_TYPE]->(:Interface {id: 'Acme\\\\Widget\\\\Api\\\\WidgetInterface'}) RETURN count(*) AS c"
+        "MATCH (:PHPMethod {id: 'Acme\\\\Widget\\\\Model\\\\Widget::withParent'})-[:RETURNS_TYPE]->(:Interface {id: 'Acme\\\\Widget\\\\Api\\\\WidgetInterface'}) RETURN count(*) AS c"
       )
     ).toBe(1);
   });
@@ -59,7 +59,7 @@ describe.skipIf(!runFixture)("e2e: source + links indexing (sample fixture)", ()
   it("links all three declared symbols to the package", async () => {
     expect(
       await searchScalar(
-        "MATCH (s:Symbol)-[:DECLARED_IN_PACKAGE]->(:Package {name: 'acme/widget'}) RETURN count(s) AS c"
+        "MATCH (s:PHPClass)-[:DECLARED_IN_PACKAGE]->(:Package {name: 'acme/widget'}) RETURN count(s) AS c"
       )
     ).toBe(3);
   });

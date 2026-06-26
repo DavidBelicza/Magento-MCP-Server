@@ -541,8 +541,9 @@ This endpoint returns the 20 most recent records ordered newest-first. It return
 - `description`
 - `nodeCount`
 - `relationshipCount`
+- `rowCount`
 
-It does not return generated Cypher or stored graph result JSON.
+Records that returned only tabular rows (scalar/aggregation queries with no nodes or relationships) are included; `rowCount` lets the tab label them. It does not return generated Cypher or stored graph result JSON.
 
 A single saved graph search can be loaded by ID through:
 
@@ -550,7 +551,7 @@ A single saved graph search can be loaded by ID through:
 GET /api/graph/get-query-history/:id
 ```
 
-This endpoint returns the saved raw normalized `result` and rebuilds `structuredResult` from that stored result. The frontend Graph page uses this endpoint when opened with a query-history ID:
+This endpoint returns the saved raw normalized `result` (which carries `columns`/`rows`) and rebuilds `structuredResult` from it. The frontend Graph page uses this endpoint when opened with a query-history ID:
 
 ```text
 /graph?queryHistoryId=<query-history-id>
@@ -558,13 +559,16 @@ This endpoint returns the saved raw normalized `result` and rebuilds `structured
 
 The Query History tab links each listed history item to that Graph page URL. When `/graph` is opened without a query-history ID, the frontend loads the latest query history item and replaces the URL with `/graph?queryHistoryId=<latest-query-history-id>`. Missing or invalid query-history IDs show an error state with a link back to Query History instead of rendering an empty graph canvas.
 
+The Graph page has two modes, toggled in place and selectable from the URL. The default renders the graph from `structuredResult`; `&view=inspect` renders the result's `columns`/`rows` as a table instead (the form for scalar/aggregation queries that produce no graph). The Query History tab links to both — "Open graph" and "Inspect Details".
+
 ## Graph Indexing API
 
-The graph is built and maintained by three internal pipelines, each a BullMQ queue with its own worker:
+The graph is built and maintained by four internal pipelines, each a BullMQ queue with its own worker. See `docs/architecture_world_mapping.md` for the node/edge model:
 
 - `index-packages`: parse `composer.lock` into `Package`/`Author` nodes and composer relationships (merge-and-prune writes).
-- `index-source`: stream the PHP analyzer's JSONL and write `Symbol` nodes, member nodes, and their edges (incremental upsert; also handles targeted deletion by path).
-- `index-links`: connect declared `Symbol` nodes to their `Package` via `DECLARED_IN_PACKAGE` (PSR-4 longest-prefix, in Cypher).
+- `index-source`: stream the PHP analyzer's JSONL and write `PHPClass`/`PHPMethod` nodes and their edges (incremental upsert; also handles targeted deletion by path).
+- `index-xml`: parse Magento XML config (`di.xml`, `events.xml`, `crontab.xml`/`cron_groups.xml`, `webapi.xml`, `extension_attributes.xml`) into DI/observer/cron/webapi/extension-attribute edges plus `Event`/`CronGroup`/`WebapiRoute`/`ExtensionAttribute` nodes (one handler per file type; cleared by `sourceFile`).
+- `index-links`: connect declared `PHPClass` nodes to their `Package` via `DECLARED_IN_PACKAGE` (PSR-4 longest-prefix, in Cypher).
 
 All indexing routes live under `/api/graph/index/*`. The `graph` segment namespaces this as *graph* indexing so a future vector-database index (for example `/api/vector/...`) stays separate. Every route returns `202 Accepted` immediately and runs asynchronously on the worker; nothing blocks the HTTP request.
 
@@ -574,6 +578,8 @@ All indexing routes live under `/api/graph/index/*`. The `graph` segment namespa
 POST   /api/graph/index/packages          index composer.lock
 POST   /api/graph/index/source            index PHP source ({ "directories": [...] } optional; whole source when omitted)
 DELETE /api/graph/index/source            remove indexed source under the given paths ({ "directories": [...] }, required)
+POST   /api/graph/index/xml               index Magento XML config ({ "directories": [...] } optional; whole source when omitted)
+DELETE /api/graph/index/xml               remove indexed XML config under the given paths ({ "directories": [...] }, required)
 POST   /api/graph/index/links             (re)build DECLARED_IN_PACKAGE ({ "symbolId": "<FQN>" } optional for a scoped relink)
 ```
 
@@ -584,11 +590,11 @@ POST /api/graph/index/reindex             full rebuild, no delete
 POST /api/graph/index/reset-and-reindex   delete the whole graph, then full rebuild
 ```
 
-Both compose the pipelines with a BullMQ `FlowProducer` so they run in a guaranteed order, with `index-links` last because it depends on both source and packages:
+Both compose the pipelines with a BullMQ `FlowProducer` so they run in a guaranteed order. `index-xml` runs after `index-source` (its edges target symbols), and `index-links` is last because it depends on both source and packages:
 
 ```text
-reindex:            packages -> source -> links
-reset-and-reindex:  delete-graph -> packages -> source -> links
+reindex:            packages -> source -> xml -> links
+reset-and-reindex:  delete-graph -> packages -> source -> xml -> links
 ```
 
 `delete-graph` is a batched whole-graph delete (`DETACH DELETE` via `CALL { } IN TRANSACTIONS`). Ordering is expressed declaratively in the flow tree; the workers run unchanged. If any stage fails, `failParentOnFailure` propagates so the flow fails cleanly instead of hanging.
@@ -599,14 +605,14 @@ reset-and-reindex:  delete-graph -> packages -> source -> links
 POST /api/graph/index/delta               { "operation": "upsert" | "delete", "paths": [ ... ] }
 ```
 
-`delta` is the entry point for a future file watcher. It classifies each path — `composer.lock` routes to package indexing, `*.xml` is skipped for now, everything else routes to source — and proxies to the internal endpoints via Fastify `app.inject`. On `upsert` it also triggers a links relink. It accepts file and directory paths.
+`delta` is the file-watcher entry point. It classifies each path — `composer.lock` routes to package indexing, Magento config XML (di/events/crontab/cron_groups) routes to `index-xml`, other `*.xml` is skipped, everything else routes to source — and proxies to the internal endpoints via Fastify `app.inject`. On `upsert` of source/composer it also triggers a links relink. It accepts file and directory paths.
 
 ### Exclusivity and status
 
 A full operation runs exclusively. `reindex` and `reset-and-reindex` acquire a Redis lock (`SET NX` with a TTL safety net); a second full request while one is running returns `409`, and `/api/graph/index/delta` returns `409` while a full operation is in progress. The lock is released when the flow's terminal job finishes, on success or failure.
 
 ```text
-GET /api/graph/index/status               all in-progress jobs across the four queues, plus the lock state
+GET /api/graph/index/status               all in-progress jobs across the five queues, plus the lock state
 GET /api/graph/index/status/:jobId        a single job by id, searched across all queues
 ```
 

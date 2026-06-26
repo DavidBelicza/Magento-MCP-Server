@@ -62,24 +62,31 @@ the local dev stack or an isolated test stack without code changes.
 
 ## Current coverage
 
-- `health.test.ts` — backend and backing services are up; graph stats respond.
-- `graph-search.test.ts` — read-only Cypher runs; write/admin queries are
+- `core/health.test.ts` — backend and backing services are up; graph stats respond.
+- `core/auth.test.ts` — the nginx token gate accepts/rejects `/api` and `/mcp`
+  requests as configured.
+- `core/graph/search.test.ts` — read-only Cypher runs; write/admin queries are
   rejected end-to-end by the validation guard.
-- `mcp.test.ts` — the `/mcp` endpoint lists the tools and executes
-  `graph_search` / `get_graph_schema`.
-- `package-indexing.test.ts` — the package indexing job runs queue → worker →
-  Neo4j and produces queryable `Package` nodes.
-- `source-indexing.test.ts` — scopes source indexing to one module, runs the
+- `mcp/tools.test.ts` — the `/mcp` endpoint lists the tools, `graph_search`
+  returns a handle with a token estimate (not inline data), `get_graph_search_result`
+  fetches the stored result by `queryId` (and errors on a missing id), and a write
+  query surfaces as a tool error.
+- `core/graph/index-packages.test.ts` — the package indexing job runs queue →
+  worker → Neo4j and produces queryable `Package` nodes.
+- `core/graph/index-source.test.ts` — scopes source indexing to one module, runs the
   analyzer → worker → Neo4j source path plus `index/links`, and asserts
   version-resilient facts: the module's classes (incl. a known stable class) are
   indexed with methods, inheritance edges, and param/return type edges; the
   composer `Package` node exists with a version; and the module's declared
   symbols are linked to that package via `DECLARED_IN_PACKAGE`.
-
-- `source-indexing.fixture.test.ts` — deterministic source + links assertions
+- `core/graph/index-source.fixture.test.ts` — deterministic source + links assertions
   against the sample fixture (exact class/interface/method counts, the
   single `EXTENDS`/`IMPLEMENTS`/`PARAM_TYPE`/`RETURNS_TYPE` edges, all three
   declared symbols linked to the package, and the composer `require` edge). Runs
+  only in fixture mode.
+- `core/graph/index-xml.fixture.test.ts` — deterministic XML indexing assertions
+  against the fixture's `di.xml`/`events.xml`/`crontab.xml` (the `Event`/`CronGroup`
+  nodes and the `PREFERENCE_FOR`/`EXTENDS`/`OBSERVES`/`SCHEDULED_IN` edges). Runs
   only in fixture mode.
 
 ## Two tiers

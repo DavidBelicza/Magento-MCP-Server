@@ -8,12 +8,14 @@ export type SaveSourceBatchCounts = {
   relationships: number;
 };
 
+const sourceRelationshipTypes = ["EXTENDS", "IMPLEMENTS", "USES", "HAS_METHOD", "PARAM_TYPE", "RETURNS_TYPE"];
+
 export async function saveSourceBatch(
   session: Session,
   batch: FileFacts[],
   batchSize: number
 ): Promise<SaveSourceBatchCounts> {
-  const { nodes, relationships, clearOutboundFromNodeIds } = mapFactBatch(batch);
+  const { nodes, relationships, clearOutbound } = mapFactBatch(batch);
 
   if (nodes.length === 0 && relationships.length === 0) {
     return { nodes: 0, relationships: 0 };
@@ -27,8 +29,8 @@ export async function saveSourceBatch(
   await writeGraphUpsert(session, nodes, relationships, {
     labels,
     relationshipTypes,
-    clearOutboundFromNodeIds,
-    clearNodeLabel: "Symbol",
+    clearOutbound,
+    clearRelationshipTypes: sourceRelationshipTypes,
     batchSize
   });
 

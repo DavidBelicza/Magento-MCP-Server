@@ -17,7 +17,7 @@ Magentic is a Docker-based, self-hosted MCP server for agentic AI workflows. It 
 - `packages/mcp/resource/graph-schema.json`: slim, machine-readable graph schema (node kinds, relationship types, edge properties, type-mapping rules) served to agents by the MCP server's `get_graph_schema` tool. The worked example adjacency graph lives in `docs/architecture_world_mapping.md`.
 - `docs/test_system_sanity.md`: runtime and integration sanity checks.
 - `docs/README-performance.md`: PHP analyzer file-scanning performance notes.
-- `docs/architecture_mcp.md`: the `packages/mcp` service — a thin MCP adapter exposing `get_status`, `graph_search`, and `get_graph_schema` over Streamable HTTP at `/mcp`.
+- `docs/architecture_mcp.md`: the `packages/mcp` service — a thin MCP adapter exposing `get_status`, `graph_search`, `get_graph_search_result`, and `get_graph_schema` over Streamable HTTP at `/mcp`. `graph_search` returns a handle (format, `webViewUrl`, `queryId`, and a per-form token estimate) rather than inline data; `get_graph_search_result` fetches the stored result on demand.
 - `docs/architecture_auth.md`: access-control design — a single static token (`MAGENTIC_API_TOKEN`, default `example-token`) checked in nginx (envsubst-rendered `map`) on every `/api` and `/mcp` request.
 
 ## Docker Services
@@ -33,7 +33,7 @@ The Compose project is named `magentic`. Main services:
 - `magentic_postgres`: persistent application storage and schema history.
 - `magentic_graphdb`: Neo4j graph database, exposed for local browser/debug access.
 
-Dev Compose overrides are in `docker-compose.dev.yml`. Backend/worker/site/PHP analyzer source mounts allow most source edits without rebuilding the image. The backend/worker run `tsx` watch; the site runs `vite build --watch` and is served by nginx (refresh the browser to pick up a rebuild — no HMR). Rebuild the image only when package metadata or Dockerfiles change. In dev mode, `magentic_analyzer_php` runs Composer install on startup so `packages/php-analyzer/vendor` is available locally but ignored by Git.
+Dev Compose overrides are in `docker-compose.dev.yml`. Backend/worker/site/PHP analyzer source mounts allow most source edits without rebuilding the image; the backend/worker also mount `packages/core/schema` so new Neo4j/PostgreSQL schema scripts are installed on restart without an image rebuild. The backend/worker run `tsx` watch; the site runs `vite build --watch` and is served by nginx (refresh the browser to pick up a rebuild — no HMR). Rebuild the image only when package metadata or Dockerfiles change. In dev mode, `magentic_analyzer_php` runs Composer install on startup so `packages/php-analyzer/vendor` is available locally but ignored by Git.
 
 ## Common Commands
 
@@ -75,14 +75,15 @@ Important core paths:
 - `src/queue/index-packages.ts`: BullMQ queue contract.
 - `src/modules/processing/source-php/`: JSONL stream consumption, fact accumulation, mapping, and Neo4j writes for source indexing. See `docs/architecture_world_mapping.md`.
 - `src/modules/processing/composer-lock/`: Composer lock parsing and graph record building (writes a queryable `psr4Namespaces` list on each Package node).
-- `src/modules/processing/package-linking/`: `index-links` pipeline that connects declared `:Symbol` nodes to `:Package` nodes with `DECLARED_IN_PACKAGE` edges via PSR-4 longest-prefix matching, entirely in Cypher. Entry point `src/worker/index-links-worker.ts`; triggered by `POST /api/graph/index/links` (optional `{ "symbolId": "<FQN>" }` for a scoped relink).
+- `src/modules/processing/magento-xml/`: `index-xml` pipeline that parses Magento XML config (`di.xml`, `events.xml`, `crontab.xml`/`cron_groups.xml`, `webapi.xml`, `extension_attributes.xml`) into DI/observer/cron/webapi/extension-attribute edges and `Event`/`CronGroup`/`WebapiRoute`/`ExtensionAttribute` nodes. One handler per file type (`registry.ts`), shared `record-builder.ts`, injectable IO (`file-system.ts`), discovery + area classification (`discovery.ts`). Entry point `src/worker/index-xml-worker.ts`.
+- `src/modules/processing/package-linking/`: `index-links` pipeline that connects declared `:PHPClass` nodes to `:Package` nodes with `DECLARED_IN_PACKAGE` edges via PSR-4 longest-prefix matching, entirely in Cypher. Entry point `src/worker/index-links-worker.ts`; triggered by `POST /api/graph/index/links` (optional `{ "symbolId": "<FQN>" }` for a scoped relink).
 - `src/modules/graph/`: generic graph write helpers (`upsert.ts` for the source path, `merge-sync.ts` for the composer path — merge nodes/edges then prune what is no longer present).
 - `src/api/usage/`: `GET /api/status` (combined frontend status: indexing in-progress/locked + AI-agent connected) and `POST /api/usage/ping` (clients record recent activity). Backed by `src/modules/usage.ts`, a neutral `usage:last` Redis key with a 120s TTL (the TTL is the idle window; key present = connected).
 - `src/api/config/`: `GET /api/config` and `PUT /api/config` for user-editable runtime settings, plus `GET /api/graph/stats` (Neo4j node/edge counts) under `src/api/graph/stats.ts`. Settings are file-backed by `src/modules/app-config.ts` (JSON at `MAGENTIC_CONFIG_PATH`, default `/app/data/config.json`, bind-mounted from `./data` so it survives rebuilds) — loaded into memory at backend startup and rewritten only on UI save; manual file edits need a backend restart. Settings: `phpVersion` (parser target, threaded into the index-source job and on to the PHP analyzer's `ParserFactory`), `projectRoot` (where `composer.lock` is read, joined onto the mount in `getComposerRoot`), and `sourceSubpaths` (a list of directories scanned for PHP, each in its own analyzer pass; empty = whole mount). The worker never reads the file — the backend snapshots these into job data at enqueue time. The single index-source job loops the directories (worker concurrency is 1, so per-directory queue jobs would not parallelize anyway) and reports per-directory progress.
 - `src/config.ts`: environment-backed config, including `GRAPH_BATCH_SIZE` (source ingestion batch and transaction size, default 5000).
 - `src/schema/install-schemas.ts`: startup schema installer.
 - `schema/postgresql/`: PostgreSQL `.sql` schema scripts.
-- `schema/neo4j/`: Neo4j `.cypher` schema scripts (Symbol id uniqueness; edge identity constraints for EXTENDS, IMPLEMENTS, USES, HAS_METHOD, PARAM_TYPE, RETURNS_TYPE, and DECLARED_IN_PACKAGE).
+- `schema/neo4j/`: Neo4j `.cypher` schema scripts. Node id uniqueness is per label (`PHPClass.id`, `PHPMethod.id`, `Event.id`, `CronGroup.id`, `WebapiRoute.id`, `ExtensionAttribute.id`, `Package.id`, `Author.id`) — there is no shared `:Symbol` base. Plus edge identity constraints for EXTENDS, IMPLEMENTS, USES, HAS_METHOD, PARAM_TYPE, RETURNS_TYPE, DECLARED_IN_PACKAGE, PREFERENCE_FOR, PLUGIN_FOR, INJECTS, OBSERVES, SCHEDULED_IN, SERVED_BY, HAS_EXTENSION_ATTRIBUTE, and OF_TYPE. See `docs/architecture_world_mapping.md` for the node/edge model.
 
 Schema scripts are installed on backend/worker startup, not during Docker build and not from frontend requests. PostgreSQL stores executed schema scripts in `application_schema_history`.
 

@@ -2,23 +2,30 @@ import { createHash } from "node:crypto";
 import type { GraphNodeRecord, GraphRelationshipRecord } from "../../graph/types.js";
 import type { FileFact, FileFacts, ReferenceFact, SymbolFact } from "./types.js";
 
+export type ClearOutboundGroup = {
+  label: string;
+  ids: string[];
+};
+
 export type MappedBatch = {
   nodes: GraphNodeRecord[];
   relationships: GraphRelationshipRecord[];
-  clearOutboundFromNodeIds: string[];
+  clearOutbound: ClearOutboundGroup[];
 };
 
 type BatchCollector = {
   nodesById: Map<string, GraphNodeRecord>;
   relationshipsByIdentity: Map<string, GraphRelationshipRecord>;
-  definedIds: Set<string>;
+  definedClassIds: Set<string>;
+  definedMethodIds: Set<string>;
 };
 
 export function mapFactBatch(batch: FileFacts[]): MappedBatch {
   const collector: BatchCollector = {
     nodesById: new Map(),
     relationshipsByIdentity: new Map(),
-    definedIds: new Set()
+    definedClassIds: new Set(),
+    definedMethodIds: new Set()
   };
 
   for (const fileFacts of batch) {
@@ -30,7 +37,10 @@ export function mapFactBatch(batch: FileFacts[]): MappedBatch {
   return {
     nodes: [...collector.nodesById.values()],
     relationships: [...collector.relationshipsByIdentity.values()],
-    clearOutboundFromNodeIds: [...collector.definedIds]
+    clearOutbound: [
+      { label: "PHPClass", ids: [...collector.definedClassIds] },
+      { label: "PHPMethod", ids: [...collector.definedMethodIds] }
+    ]
   };
 }
 
@@ -44,7 +54,8 @@ function collectFact(fact: FileFact, file: string, collector: BatchCollector): v
 
 function collectSymbol(fact: SymbolFact, file: string, collector: BatchCollector): void {
   if (fact.defined) {
-    collector.definedIds.add(fact.symbolId);
+    const definedIds = fact.kind === "method" ? collector.definedMethodIds : collector.definedClassIds;
+    definedIds.add(fact.symbolId);
   }
 
   if (fact.defined || !collector.nodesById.has(fact.symbolId)) {
@@ -64,9 +75,17 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function symbolLabel(kind: string): string {
+  if (kind === "method") {
+    return "PHPMethod";
+  }
+
+  return kind ? `PHPClass:${capitalize(kind)}` : "PHPClass";
+}
+
 function mapSymbolNode(fact: SymbolFact, file: string): GraphNodeRecord {
   return {
-    label: fact.kind ? `Symbol:PHP:${capitalize(fact.kind)}` : "Symbol:PHP",
+    label: symbolLabel(fact.kind),
     id: fact.symbolId,
     fields: {
       fqcn: fact.fqcn,
@@ -77,19 +96,32 @@ function mapSymbolNode(fact: SymbolFact, file: string): GraphNodeRecord {
   };
 }
 
+function referenceEndpointLabels(kind: string): { fromLabel: string; toLabel: string } {
+  if (kind === "has_method") {
+    return { fromLabel: "PHPClass", toLabel: "PHPMethod" };
+  }
+
+  if (kind === "param_type" || kind === "returns_type") {
+    return { fromLabel: "PHPMethod", toLabel: "PHPClass" };
+  }
+
+  return { fromLabel: "PHPClass", toLabel: "PHPClass" };
+}
+
 function mapReferenceEdge(fact: ReferenceFact): GraphRelationshipRecord {
   const type = fact.kind.toUpperCase();
   const discriminator = fact.identityKey === undefined ? "" : `:${fact.identityKey}`;
   const identity = createHash("sha256")
     .update(`${fact.fromSymbolId}:${type}:${fact.toSymbolId}${discriminator}`)
     .digest("hex");
+  const { fromLabel, toLabel } = referenceEndpointLabels(fact.kind);
 
   return {
     type,
     identity,
-    fromLabel: "Symbol",
+    fromLabel,
     fromId: fact.fromSymbolId,
-    toLabel: "Symbol",
+    toLabel,
     toId: fact.toSymbolId,
     fields: fact.fields ?? {}
   };

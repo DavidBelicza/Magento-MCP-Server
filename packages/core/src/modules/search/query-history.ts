@@ -14,6 +14,7 @@ export type QueryHistoryItem = {
   description: string;
   nodeCount: number;
   relationshipCount: number;
+  rowCount: number;
 };
 
 export type QueryHistoryDetail = QueryHistoryItem & {
@@ -39,16 +40,19 @@ export async function listQueryHistory(postgres: Pool): Promise<QueryHistoryItem
     description: string;
     node_count: string;
     relationship_count: string;
+    row_count: string;
   }>(
     `SELECT
        id,
        created_at,
        description,
        jsonb_array_length(COALESCE(result #> '{graph,nodes}', '[]'::jsonb)) AS node_count,
-       jsonb_array_length(COALESCE(result #> '{graph,relationships}', '[]'::jsonb)) AS relationship_count
+       jsonb_array_length(COALESCE(result #> '{graph,relationships}', '[]'::jsonb)) AS relationship_count,
+       jsonb_array_length(COALESCE(result #> '{rows}', '[]'::jsonb)) AS row_count
      FROM query_history
      WHERE jsonb_array_length(COALESCE(result #> '{graph,nodes}', '[]'::jsonb)) > 0
         OR jsonb_array_length(COALESCE(result #> '{graph,relationships}', '[]'::jsonb)) > 0
+        OR jsonb_array_length(COALESCE(result #> '{rows}', '[]'::jsonb)) > 0
      ORDER BY created_at DESC
      LIMIT 20`
   );
@@ -58,7 +62,8 @@ export async function listQueryHistory(postgres: Pool): Promise<QueryHistoryItem
     createdAt: row.created_at.toISOString(),
     description: row.description,
     nodeCount: Number(row.node_count),
-    relationshipCount: Number(row.relationship_count)
+    relationshipCount: Number(row.relationship_count),
+    rowCount: Number(row.row_count)
   }));
 }
 
@@ -86,6 +91,7 @@ export async function getQueryHistory(postgres: Pool, id: string): Promise<Query
     description: row.description,
     nodeCount: row.result.graph.nodes.length,
     relationshipCount: row.result.graph.relationships.length,
+    rowCount: row.result.rows.length,
     result: row.result
   };
 }
