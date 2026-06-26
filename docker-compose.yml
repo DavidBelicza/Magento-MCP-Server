@@ -30,6 +30,7 @@ services:
       PORT: "3000"
       REDIS_URL: "redis://magentic_redis:6379"
       POSTGRES_URL: "postgres://${POSTGRES_USER:-magentic}:${POSTGRES_PASSWORD:-dev-password}@magentic_postgres:5432/${POSTGRES_DB:-magentic}"
+      POSTGRES_VECTOR_URL: "postgres://${POSTGRES_USER:-magentic}:${POSTGRES_PASSWORD:-dev-password}@magentic_pgvector:5432/${POSTGRES_VECTOR_DB:-magentic_vectors}"
       NEO4J_URI: "bolt://magentic_graphdb:7687"
       NEO4J_USERNAME: "${NEO4J_USERNAME:-neo4j}"
       NEO4J_PASSWORD: "${NEO4J_PASSWORD:-dev-password}"
@@ -46,6 +47,8 @@ services:
       magentic_redis:
         condition: service_healthy
       magentic_postgres:
+        condition: service_healthy
+      magentic_pgvector:
         condition: service_healthy
       magentic_graphdb:
         condition: service_healthy
@@ -67,6 +70,7 @@ services:
       NODE_ENV: production
       REDIS_URL: "redis://magentic_redis:6379"
       POSTGRES_URL: "postgres://${POSTGRES_USER:-magentic}:${POSTGRES_PASSWORD:-dev-password}@magentic_postgres:5432/${POSTGRES_DB:-magentic}"
+      POSTGRES_VECTOR_URL: "postgres://${POSTGRES_USER:-magentic}:${POSTGRES_PASSWORD:-dev-password}@magentic_pgvector:5432/${POSTGRES_VECTOR_DB:-magentic_vectors}"
       NEO4J_URI: "bolt://magentic_graphdb:7687"
       NEO4J_USERNAME: "${NEO4J_USERNAME:-neo4j}"
       NEO4J_PASSWORD: "${NEO4J_PASSWORD:-dev-password}"
@@ -78,6 +82,8 @@ services:
       magentic_redis:
         condition: service_healthy
       magentic_postgres:
+        condition: service_healthy
+      magentic_pgvector:
         condition: service_healthy
       magentic_graphdb:
         condition: service_healthy
@@ -172,6 +178,20 @@ services:
       timeout: 5s
       retries: 10
 
+  magentic_pgvector:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: "${POSTGRES_VECTOR_DB:-magentic_vectors}"
+      POSTGRES_USER: "${POSTGRES_USER:-magentic}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-dev-password}"
+    volumes:
+      - magentic_pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER:-magentic}\" -d \"$${POSTGRES_VECTOR_DB:-magentic_vectors}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   magentic_graphdb:
     image: neo4j:5-community
     environment:
@@ -232,5 +252,6 @@ services:
 volumes:
   magentic_redis_data:
   magentic_postgres_data:
+  magentic_pgvector_data:
   magentic_graphdb_data:
   magentic_graphdb_logs:

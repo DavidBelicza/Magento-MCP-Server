@@ -1,6 +1,6 @@
 import { FlowProducer } from "bullmq";
 import Fastify from "fastify";
-import { createNeo4jDriver, createPostgresPool, createRedisConnection, createRedisConnectionOptions } from "./connections.js";
+import { createNeo4jDriver, createPgVectorPool, createPostgresPool, createRedisConnection, createRedisConnectionOptions } from "./connections.js";
 import { readConfig } from "./config.js";
 import { createIndexStatus } from "./modules/index-status.js";
 import { createIndexLinksQueue } from "./queue/index-links.js";
@@ -34,6 +34,7 @@ const app = Fastify({
 
 const redis = createRedisConnection();
 const postgres = createPostgresPool();
+const pgVector = createPgVectorPool();
 const neo4jDriver = createNeo4jDriver();
 const indexPackagesQueue = createIndexPackagesQueue();
 const indexSourceQueue = createIndexSourceQueue();
@@ -90,7 +91,7 @@ registerUsagePingRoute(app, { redis });
 
 async function start() {
   try {
-    await installSchemas(postgres, neo4jDriver);
+    await installSchemas(postgres, neo4jDriver, pgVector);
     await app.listen({
       host: "0.0.0.0",
       port: config.port
@@ -111,6 +112,7 @@ process.on("SIGTERM", async () => {
   await indexStatus.close();
   await redis.quit();
   await postgres.end();
+  await pgVector.end();
   await neo4jDriver.close();
 });
 

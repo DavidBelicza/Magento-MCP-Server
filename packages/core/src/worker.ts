@@ -1,4 +1,4 @@
-import { createNeo4jDriver, createPostgresPool, createRedisConnection } from "./connections.js";
+import { createNeo4jDriver, createPgVectorPool, createPostgresPool, createRedisConnection } from "./connections.js";
 import { releaseFullIndexLock } from "./modules/index-lock.js";
 import { recordIndexRun } from "./modules/index-run-state.js";
 import { installSchemas } from "./schema/install-schemas.js";
@@ -14,9 +14,10 @@ const config = readConfig();
 
 const neo4jDriver = createNeo4jDriver();
 const postgres = createPostgresPool();
+const pgVector = createPgVectorPool();
 const redis = createRedisConnection();
 
-await installSchemas(postgres, neo4jDriver);
+await installSchemas(postgres, neo4jDriver, pgVector);
 
 const indexPackagesWorker = createIndexPackagesWorker(neo4jDriver);
 const indexSourceWorker = createIndexSourceWorker(neo4jDriver, config.graphBatchSize, config.analyzerPhpUrl);
@@ -57,6 +58,7 @@ process.on("SIGTERM", async () => {
   await indexXmlWorker.close();
   await deleteGraphWorker.close();
   await postgres.end();
+  await pgVector.end();
   await redis.quit();
   await neo4jDriver.close();
 });

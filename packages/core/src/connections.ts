@@ -41,3 +41,11 @@ export function createPostgresPool() {
     connectionString: config.postgresUrl
   });
 }
+
+export function createPgVectorPool() {
+  const config = readConfig();
+
+  return new Pool({
+    connectionString: config.pgVectorUrl
+  });
+}
