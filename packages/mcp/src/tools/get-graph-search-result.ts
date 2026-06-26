@@ -5,8 +5,7 @@ import {
   buildGraphPayload,
   buildTablePayload,
   hasGraphEntities,
-  type GraphSearchResultShape,
-  type StructuredResultShape
+  readResultShapes
 } from "../graph-search-result.js";
 
 const description = [
@@ -32,8 +31,7 @@ export function registerGetGraphSearchResult(server: McpServer, backend: Backend
     async ({ queryId, viewResult }) => {
       try {
         const response = await backend.getGraphSearchResult(queryId);
-        const result = (response.result ?? {}) as GraphSearchResultShape;
-        const structured = (response.structuredResult ?? {}) as StructuredResultShape;
+        const { result, structured } = readResultShapes(response);
         const hasGraph = hasGraphEntities(structured);
         const wantsGraph = (viewResult ?? (hasGraph ? "graph" : "table")) === "graph" && hasGraph;
 

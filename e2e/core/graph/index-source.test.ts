@@ -52,7 +52,7 @@ describe.skipIf(!runRealModule)(`e2e: source + links indexing (${packageName})`,
 
   it("records method parameter/return type edges from the module", async () => {
     const typeEdges = await searchScalar(
-      `MATCH (m:Method)-[r:PARAM_TYPE|RETURNS_TYPE]->() WHERE m.file STARTS WITH '${modulePrefix}' RETURN count(r) AS c`
+      `MATCH (m:PHPMethod)-[r:PARAM_TYPE|RETURNS_TYPE]->() WHERE m.file STARTS WITH '${modulePrefix}' RETURN count(r) AS c`
     );
 
     expect(typeEdges).toBeGreaterThan(0);

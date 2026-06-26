@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<config>
+    <group id="acme">
+        <job name="acme_widget_cleanup" instance="Acme\Widget\Model\Widget" method="withParent">
+            <schedule>0 0 * * *</schedule>
+        </job>
+    </group>
+</config>

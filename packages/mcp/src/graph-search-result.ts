@@ -43,6 +43,16 @@ export function collapseEntityReferences(value: unknown): unknown {
   return value;
 }
 
+export function readResultShapes(source: { result?: unknown; structuredResult?: unknown }): {
+  result: GraphSearchResultShape;
+  structured: StructuredResultShape;
+} {
+  return {
+    result: (source.result ?? {}) as GraphSearchResultShape,
+    structured: (source.structuredResult ?? {}) as StructuredResultShape
+  };
+}
+
 export function hasGraphEntities(structured: StructuredResultShape): boolean {
   return (structured.nodes?.length ?? 0) > 0 || (structured.relationships?.length ?? 0) > 0;
 }

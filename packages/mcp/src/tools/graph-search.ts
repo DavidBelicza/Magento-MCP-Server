@@ -6,8 +6,7 @@ import {
   buildTablePayload,
   estimateTokens,
   hasGraphEntities,
-  type GraphSearchResultShape,
-  type StructuredResultShape
+  readResultShapes
 } from "../graph-search-result.js";
 
 const cheatSheet = [
@@ -42,8 +41,7 @@ export function registerGraphSearch(server: McpServer, backend: BackendClient, f
     async ({ cypherQuery, description: queryDescription }) => {
       try {
         const response = await backend.searchGraph({ cypherQuery, description: queryDescription });
-        const result = (response.result ?? {}) as GraphSearchResultShape;
-        const structured = (response.structuredResult ?? {}) as StructuredResultShape;
+        const { result, structured } = readResultShapes(response);
         const hasGraph = hasGraphEntities(structured);
 
         const estimatedTokens: Record<string, number> = {
@@ -54,11 +52,11 @@ export function registerGraphSearch(server: McpServer, backend: BackendClient, f
           estimatedTokens.graph = estimateTokens(buildGraphPayload(result, structured));
         }
 
+        const graphUrl = `${frontendBaseUrl}/graph?queryHistoryId=${response.historyId}`;
+
         const payload = {
           resultFormat: hasGraph ? "graph" : "table",
-          webViewUrl: hasGraph
-            ? `${frontendBaseUrl}/graph?queryHistoryId=${response.historyId}`
-            : `${frontendBaseUrl}/graph?queryHistoryId=${response.historyId}&view=inspect`,
+          webViewUrl: hasGraph ? graphUrl : `${graphUrl}&view=inspect`,
           queryId: response.historyId,
           summary: {
             rowCount: result.rows?.length ?? 0,
