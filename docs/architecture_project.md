@@ -127,6 +127,7 @@ Services use the `magentic_` prefix:
 - `magentic_analyzer_php`
 - `magentic_redis`
 - `magentic_postgres`
+- `magentic_pgvector`
 - `magentic_graphdb`
 - `magentic_loki` (optional, via telemetry profile)
 - `magentic_promtail` (optional, via telemetry profile)
@@ -271,6 +272,16 @@ Responsibilities:
 - future persisted metadata that does not belong in Redis or Neo4j
 
 Uses the official PostgreSQL image directly.
+
+### `magentic_pgvector`
+
+Private PostgreSQL + `pgvector` service (image `pgvector/pgvector:pg17`, database `magentic_vectors`), separate from `magentic_postgres`.
+
+Responsibilities:
+
+- store the `config_embeddings` semantic-search vectors (`embedding vector(768)`, keyed by the Magento config `path`) for the independent vector pipeline and `store_config_search`
+
+Kept as its own instance so the vector store stays isolated and swappable (a future dedicated vector database would replace it without touching the application database). Schema history is still tracked in `magentic_postgres`.
 
 ### `magentic_graphdb`
 
@@ -570,7 +581,17 @@ The graph is built and maintained by four internal pipelines, each a BullMQ queu
 - `index-xml`: parse Magento XML config (`di.xml`, `events.xml`, `crontab.xml`/`cron_groups.xml`, `webapi.xml`, `extension_attributes.xml`) into DI/observer/cron/webapi/extension-attribute edges plus `Event`/`CronGroup`/`WebapiRoute`/`ExtensionAttribute` nodes (one handler per file type; cleared by `sourceFile`).
 - `index-links`: connect declared `PHPClass` nodes to their `Package` via `DECLARED_IN_PACKAGE` (PSR-4 longest-prefix, in Cypher).
 
-All indexing routes live under `/api/graph/index/*`. The `graph` segment namespaces this as *graph* indexing so a future vector-database index (for example `/api/vector/...`) stays separate. Every route returns `202 Accepted` immediately and runs asynchronously on the worker; nothing blocks the HTTP request.
+The graph indexing routes live under `/api/graph/index/*`. The `graph` segment namespaces this as *graph* indexing, keeping it separate from the **vector** index (`/api/vector/*`). Every route returns `202 Accepted` immediately and runs asynchronously on the worker; nothing blocks the HTTP request.
+
+A fifth, fully independent **vector** pipeline (`index-vector`) runs alongside the graph ones in the same worker process. It parses Magento `system.xml` admin configuration into natural-language descriptions, embeds them with an external model (OpenAI-format endpoint, configurable URL/model/bearer), and writes the vectors to `magentic_pgvector` (`config_embeddings`) — not the graph. It is decoupled (its own queue, its own `magentic:vector-index:lock`, its own DB), so it neither blocks nor is blocked by graph indexing. Routes:
+
+```text
+POST   /api/vector/index    reindex store configuration (clear + re-embed)
+DELETE /api/vector/index    reset (clear the config_embeddings table)
+POST   /api/vector/search   semantic search ({ "query": "...", "limit": 5 })
+```
+
+Backing the `store_config_search` MCP tool, `/api/vector/search` embeds the query and returns the top matches as `{ path, description, score }`. See `docs/plan_vector_config_search.md`.
 
 ### Single-pipeline endpoints
 

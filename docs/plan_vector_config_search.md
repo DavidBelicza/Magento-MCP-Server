@@ -1,10 +1,21 @@
 # Plan: Vector Config Search (semantic search over `system.xml`)
 
-> Status: **planned, not started.** A second, independent indexing pipeline that
+> Status: **implemented (UI pending).** A second, independent indexing pipeline that
 > embeds Magento admin-config descriptions into a vector database so an AI agent
 > can find configuration by plain-English meaning ("where do I set the payment
 > gateway?") rather than exact keywords. It is fully decoupled from the graph —
 > no shared nodes or edges; the config path string is the only id.
+>
+> **Done:** the `magentic_pgvector` service + `config_embeddings` schema; the
+> `store-config` parser (`modules/processing/store-config`); the embedding +
+> abstract vector-store layer (`modules/vector`); the `index-vector`
+> queue/worker chaining read → merge → describe → embed → upsert; the
+> `POST`/`DELETE /api/vector/index` routes under `magentic:vector-index:lock`;
+> the `POST /api/vector/search` route; and the `store_config_search` MCP tool.
+> **Pending:** the UI (a vector reindex/reset section + the two independent
+> index statuses) and optional follow-ups (embedding batching, `/api/status`
+> vector integration). The graph index lock was renamed `full-index` →
+> `graph-index` so the two pipelines read symmetrically.
 
 ## Goal
 
