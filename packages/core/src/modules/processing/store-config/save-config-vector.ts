@@ -1,16 +1,9 @@
 import type { Pool } from "pg";
 import { embedding } from "../../vector/embedding.js";
 import type { EmbeddingConfig } from "../../vector/embedding/types.js";
-import type { VectorTable } from "../../vector/types.js";
 import { createVectorStore } from "../../vector/vector-store.js";
+import { configEmbeddingsTable } from "./config-embeddings-table.js";
 import type { ConfigFieldDescription } from "./types.js";
-
-const configEmbeddingsTable: VectorTable = {
-  name: "config_embeddings",
-  idColumn: "path",
-  embeddingColumn: "embedding",
-  dataColumns: ["description", "config_path", "model", "source_file"]
-};
 
 export async function saveConfigVector(
   descriptions: ConfigFieldDescription[],

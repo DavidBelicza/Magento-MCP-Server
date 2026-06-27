@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { Redis } from "ioredis";
 import type { Pool } from "pg";
 import { getAppSettings } from "../../modules/app-config.js";
-import { isFullIndexLocked } from "../../modules/index-lock.js";
+import { isGraphIndexLocked } from "../../modules/index-lock.js";
 import { getIndexRunState } from "../../modules/index-run-state.js";
 import type { createIndexStatus } from "../../modules/index-status.js";
 import { getUsage } from "../../modules/usage.js";
@@ -20,7 +20,7 @@ export function registerStatusRoute(app: FastifyInstance, deps: Dependencies): v
     try {
       const [inProgress, locked, agent, runState] = await Promise.all([
         indexStatus.getInProgress(),
-        isFullIndexLocked(redis),
+        isGraphIndexLocked(redis),
         getUsage(redis),
         getIndexRunState(postgres)
       ]);

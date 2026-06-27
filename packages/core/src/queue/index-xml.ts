@@ -8,7 +8,7 @@ export type IndexXmlJob = {
   directories: string[];
   operation: IndexXmlOperation;
   requestedAt: string;
-  fullIndexFlow?: boolean;
+  graphIndexFlow?: boolean;
 };
 
 export const indexXmlQueueName = "index-xml";

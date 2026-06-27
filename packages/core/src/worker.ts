@@ -1,11 +1,12 @@
 import { createNeo4jDriver, createPgVectorPool, createPostgresPool, createRedisConnection } from "./connections.js";
-import { releaseFullIndexLock } from "./modules/index-lock.js";
+import { releaseGraphIndexLock, releaseVectorIndexLock } from "./modules/index-lock.js";
 import { recordIndexRun } from "./modules/index-run-state.js";
 import { installSchemas } from "./schema/install-schemas.js";
 import { createDeleteGraphWorker } from "./worker/delete-graph-worker.js";
 import { createIndexLinksWorker } from "./worker/index-links-worker.js";
 import { createIndexPackagesWorker } from "./worker/index-packages-worker.js";
 import { createIndexSourceWorker } from "./worker/index-source-worker.js";
+import { createIndexVectorWorker } from "./worker/index-vector-worker.js";
 import { createIndexXmlWorker } from "./worker/index-xml-worker.js";
 import { readConfig } from "./config.js";
 import { logger } from "./logger.js";
@@ -23,11 +24,19 @@ const indexPackagesWorker = createIndexPackagesWorker(neo4jDriver);
 const indexSourceWorker = createIndexSourceWorker(neo4jDriver, config.graphBatchSize, config.analyzerPhpUrl);
 const indexLinksWorker = createIndexLinksWorker(neo4jDriver, redis);
 const indexXmlWorker = createIndexXmlWorker(neo4jDriver, config.graphBatchSize);
+const indexVectorWorker = createIndexVectorWorker(pgVector, {
+  endpoint: config.embedderUrl,
+  model: config.embedderModel,
+  bearerToken: config.embedderBearerToken
+});
 const deleteGraphWorker = createDeleteGraphWorker(neo4jDriver);
 
-function releaseLockOnFlowFailure(job?: { data?: { fullIndexFlow?: boolean } }): void {
-  if (job?.data?.fullIndexFlow) {
-    void releaseFullIndexLock(redis);
+indexVectorWorker.on("completed", () => void releaseVectorIndexLock(redis));
+indexVectorWorker.on("failed", () => void releaseVectorIndexLock(redis));
+
+function releaseLockOnFlowFailure(job?: { data?: { graphIndexFlow?: boolean } }): void {
+  if (job?.data?.graphIndexFlow) {
+    void releaseGraphIndexLock(redis);
   }
 }
 
@@ -56,6 +65,7 @@ process.on("SIGTERM", async () => {
   await indexSourceWorker.close();
   await indexLinksWorker.close();
   await indexXmlWorker.close();
+  await indexVectorWorker.close();
   await deleteGraphWorker.close();
   await postgres.end();
   await pgVector.end();

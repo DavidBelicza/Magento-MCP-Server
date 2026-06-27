@@ -1,7 +1,7 @@
 import type { FlowProducer } from "bullmq";
 import type { FastifyInstance } from "fastify";
 import type { Redis } from "ioredis";
-import { acquireFullIndexLock } from "../../modules/index-lock.js";
+import { acquireGraphIndexLock } from "../../modules/index-lock.js";
 import { buildIndexFlow } from "./build-index-flow.js";
 
 type Dependencies = {
@@ -17,10 +17,10 @@ export function registerIndexReindexRoute(app: FastifyInstance, deps: Dependenci
   const { indexFlowProducer, redis, getComposerRoot, getMountPath, getSourceDirectories, getPhpVersion } = deps;
 
   app.post("/api/graph/index/reindex", async (_request, reply) => {
-    if (!(await acquireFullIndexLock(redis))) {
+    if (!(await acquireGraphIndexLock(redis))) {
       return reply.status(409).send({
         ok: false,
-        error: "a reset or full reindex is already in progress"
+        error: "a graph reindex or reset is already in progress"
       });
     }
 

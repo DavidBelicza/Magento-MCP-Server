@@ -19,7 +19,7 @@ export function buildIndexFlow(
         {
           name: deleteGraphJobName,
           queueName: deleteGraphQueueName,
-          data: { requestedAt, fullIndexFlow: true },
+          data: { requestedAt, graphIndexFlow: true },
           opts: failParent
         }
       ]
@@ -28,7 +28,7 @@ export function buildIndexFlow(
   return {
     name: indexLinksJobName,
     queueName: indexLinksQueueName,
-    data: { symbolId: null, requestedAt, fullIndexFlow: true },
+    data: { symbolId: null, requestedAt, graphIndexFlow: true },
     children: [
       {
         name: indexXmlJobName,
@@ -38,7 +38,7 @@ export function buildIndexFlow(
           directories: sourceDirectories,
           operation: "index",
           requestedAt,
-          fullIndexFlow: true
+          graphIndexFlow: true
         },
         opts: failParent,
         children: [
@@ -51,14 +51,14 @@ export function buildIndexFlow(
               operation: "index",
               phpVersion,
               requestedAt,
-              fullIndexFlow: true
+              graphIndexFlow: true
             },
             opts: failParent,
             children: [
               {
                 name: indexPackagesJobName,
                 queueName: indexPackagesQueueName,
-                data: { analyzedSourcePath: composerRoot, requestedAt, fullIndexFlow: true },
+                data: { analyzedSourcePath: composerRoot, requestedAt, graphIndexFlow: true },
                 opts: failParent,
                 children: deleteChildren
               }

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { Redis } from "ioredis";
-import { isFullIndexLocked } from "../../modules/index-lock.js";
+import { isGraphIndexLocked } from "../../modules/index-lock.js";
 import type { createIndexStatus } from "../../modules/index-status.js";
 
 type Dependencies = {
@@ -17,7 +17,7 @@ export function registerIndexStatusRoute(app: FastifyInstance, deps: Dependencie
     return reply.send({
       ok: true,
       inProgress: items.length,
-      locked: await isFullIndexLocked(redis),
+      locked: await isGraphIndexLocked(redis),
       items
     });
   });

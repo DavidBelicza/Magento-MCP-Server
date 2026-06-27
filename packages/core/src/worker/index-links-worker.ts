@@ -2,7 +2,7 @@ import { Worker, type Job } from "bullmq";
 import type { Redis } from "ioredis";
 import type { Driver } from "neo4j-driver";
 import { createRedisConnectionOptions } from "../connections.js";
-import { releaseFullIndexLock } from "../modules/index-lock.js";
+import { releaseGraphIndexLock } from "../modules/index-lock.js";
 import { linkSymbolsToPackages } from "../modules/processing/package-linking/link-symbols-to-packages.js";
 import {
   indexLinksJobName,
@@ -40,8 +40,8 @@ async function handleJob(job: Job<IndexLinksJob>, driver: Driver, redis: Redis):
   try {
     return await linkSymbolsToPackages(driver, scope);
   } finally {
-    if (job.data.fullIndexFlow) {
-      await releaseFullIndexLock(redis);
+    if (job.data.graphIndexFlow) {
+      await releaseGraphIndexLock(redis);
     }
   }
 }
