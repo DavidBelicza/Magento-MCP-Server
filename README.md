@@ -21,8 +21,9 @@ Magentic maps the Magento codebase into a graph that any <strong>AI agent can ex
 
 | Name | Description |
 | --- | --- |
-| **AI agent connection via MCP** | Any MCP-compatible AI agent can use Magentic by triggering it directly, just type "*use Magentic to do...*". |
-| **Code search** | Search across Composer packages, PHP, and XML config (DI, plugins, events, REST APIs). |
+| **MCP for AI Agents** | Any MCP-compatible AI agent can use Magentic by triggering it directly, just type "*use Magentic to do...*". |
+| **Code Search** | Search across Composer packages, PHP, and XML config (DI, plugins, events, REST APIs). |
+| **Semantic Search** | AI-powered semantic search in store configurations using embedding models. |
 
 ## How it works
 

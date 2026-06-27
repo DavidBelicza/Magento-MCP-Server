@@ -10,7 +10,7 @@
 > `store-config` parser (`modules/processing/store-config`); the embedding +
 > abstract vector-store layer (`modules/vector`); the `index-vector`
 > queue/worker chaining read → merge → describe → embed → upsert; the
-> `POST /api/vector/index` (reindex) + `POST /api/vector/reset-and-index`
+> `POST /api/vector/index/reindex` (reindex) + `POST /api/vector/index/reset-and-reindex`
 > routes under `magentic:vector-index:lock`;
 > the `POST /api/vector/search` route; and the `store_config_search` MCP tool.
 > The Database/Settings UI lists both pipelines (Graph + Vector) as always-visible
@@ -123,7 +123,7 @@ resolve translations.)
 ## Index pipeline (new, independent)
 
 - New `index-embeddings` queue + worker inside the existing `magentic_worker`.
-- Trigger `POST /api/vector/index` (reindex) and `POST /api/vector/reset-and-index`
+- Trigger `POST /api/vector/index/reindex` (reindex) and `POST /api/vector/index/reset-and-reindex`
   (clear `config_embeddings`, then re-embed) — mirroring the graph's
   `reindex`/`reset-and-reindex` pair; there is no truncate-only route.
 - Holds `magentic:vector-index:lock` while running; never checks the graph lock.

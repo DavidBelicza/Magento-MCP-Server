@@ -3,7 +3,8 @@
 > Status: **implemented.** Access control is a single static token
 > (`MAGENTIC_API_TOKEN`, default `example-token`) checked directly in nginx (the
 > token is `envsubst`-rendered into the config and matched with a `map`). Every
-> `/api` and `/mcp` request is checked; there is no unauthenticated path. This
+> `/api` (including the `/api/stream` SSE status route) and `/mcp` request is
+> checked; there is no unauthenticated path. This
 > document is the reference for the design and its rationale.
 
 ## Goal and threat model

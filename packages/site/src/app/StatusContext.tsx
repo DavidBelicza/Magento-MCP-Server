@@ -33,7 +33,9 @@ export type StatusData = {
   watcherEnabled: boolean
 }
 
-const pollIntervalMs = 3000
+const pollIntervalMs = 59000
+const reconnectBaseMs = 1000
+const reconnectMaxMs = 15000
 
 const StatusContext = createContext<StatusData | null>(null)
 
@@ -42,8 +44,11 @@ export const StatusProvider: React.FC<React.PropsWithChildren> = ({ children }) 
 
   useEffect(() => {
     let active = true
+    let controller: AbortController | null = null
+    let reconnectTimer = 0
+    let attempt = 0
 
-    const poll = () => {
+    const fetchOnce = () =>
       apiFetch('/api/status')
         .then((response) => {
           if (!response.ok) {
@@ -57,23 +62,102 @@ export const StatusProvider: React.FC<React.PropsWithChildren> = ({ children }) 
             setStatus(data)
           }
         })
-        .catch(() => {
-          if (active) {
-            setStatus(null)
+        .catch(() => undefined)
+
+    const connect = () => {
+      controller = new AbortController()
+
+      readStatusStream(controller.signal, (data) => {
+        if (active) {
+          attempt = 0
+          setStatus(data)
+        }
+      })
+        .catch(() => undefined)
+        .finally(() => {
+          if (!active) {
+            return
           }
+
+          const delay = Math.min(reconnectMaxMs, reconnectBaseMs * 2 ** attempt)
+          attempt += 1
+          reconnectTimer = window.setTimeout(() => {
+            void fetchOnce()
+            connect()
+          }, delay)
         })
     }
 
-    poll()
-    const timer = window.setInterval(poll, pollIntervalMs)
+    void fetchOnce()
+    connect()
+    const timer = window.setInterval(fetchOnce, pollIntervalMs)
 
     return () => {
       active = false
       window.clearInterval(timer)
+      window.clearTimeout(reconnectTimer)
+      controller?.abort()
     }
   }, [])
 
   return <StatusContext.Provider value={status}>{children}</StatusContext.Provider>
+}
+
+async function readStatusStream(signal: AbortSignal, onStatus: (data: StatusData) => void): Promise<void> {
+  const response = await apiFetch('/api/stream/status', { signal })
+
+  if (!response.ok || !response.body) {
+    throw new Error(`stream ${response.status}`)
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  for (;;) {
+    const { value, done } = await reader.read()
+
+    if (done) {
+      return
+    }
+
+    buffer += decoder.decode(value, { stream: true })
+
+    let separator = buffer.indexOf('\n\n')
+
+    while (separator !== -1) {
+      handleStreamEvent(buffer.slice(0, separator), onStatus)
+      buffer = buffer.slice(separator + 2)
+      separator = buffer.indexOf('\n\n')
+    }
+  }
+}
+
+function handleStreamEvent(raw: string, onStatus: (data: StatusData) => void): void {
+  let event = 'message'
+  const dataLines: string[] = []
+
+  for (const line of raw.split('\n')) {
+    if (line.startsWith(':')) {
+      continue
+    }
+
+    if (line.startsWith('event:')) {
+      event = line.slice(6).trim()
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trim())
+    }
+  }
+
+  if (event !== 'index' || dataLines.length === 0) {
+    return
+  }
+
+  try {
+    onStatus(JSON.parse(dataLines.join('\n')) as StatusData)
+  } catch {
+    return
+  }
 }
 
 export function useStatus(): StatusData | null {

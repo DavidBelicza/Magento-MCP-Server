@@ -1,5 +1,7 @@
 import { createNeo4jDriver, createPgVectorPool, createPostgresPool, createRedisConnection } from "./connections.js";
 import { releaseGraphIndexLock, releaseVectorIndexLock } from "./modules/index-lock.js";
+import { publishStatusEvent } from "./modules/stream/status-events.js";
+import { forwardIndexEvents } from "./modules/stream/forward-index-events.js";
 import { recordIndexRun } from "./modules/index-run-state.js";
 import { installSchemas } from "./schema/install-schemas.js";
 import { createDeleteGraphWorker } from "./worker/delete-graph-worker.js";
@@ -28,20 +30,36 @@ const indexXmlWorker = createIndexXmlWorker(neo4jDriver, config.graphBatchSize);
 const indexVectorWorker = createIndexVectorWorker(pgVector, readEmbeddingConfig());
 const deleteGraphWorker = createDeleteGraphWorker(neo4jDriver);
 
-indexVectorWorker.on("completed", () => void releaseVectorIndexLock(redis));
-indexVectorWorker.on("failed", () => void releaseVectorIndexLock(redis));
+const graphWorkers = [indexPackagesWorker, indexSourceWorker, indexLinksWorker, indexXmlWorker, deleteGraphWorker];
 
-function releaseLockOnFlowFailure(job?: { data?: { graphIndexFlow?: boolean } }): void {
-  if (job?.data?.graphIndexFlow) {
-    void releaseGraphIndexLock(redis);
-  }
+forwardIndexEvents(redis, [...graphWorkers, indexVectorWorker]);
+
+function notifyIndexChange(): void {
+  publishStatusEvent(redis, { type: "index" });
 }
 
-indexPackagesWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
-indexSourceWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
-indexLinksWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
-indexXmlWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
-deleteGraphWorker.on("failed", (job) => releaseLockOnFlowFailure(job));
+async function releaseVectorLock(): Promise<void> {
+  await releaseVectorIndexLock(redis);
+  notifyIndexChange();
+}
+
+indexVectorWorker.on("completed", () => void releaseVectorLock());
+indexVectorWorker.on("failed", () => void releaseVectorLock());
+
+function releaseLockOnFlowFailure(job?: { data?: { graphIndexFlow?: boolean } }): void {
+  void (async () => {
+    if (job?.data?.graphIndexFlow) {
+      await releaseGraphIndexLock(redis);
+    }
+
+    notifyIndexChange();
+  })();
+}
+
+for (const worker of graphWorkers) {
+  worker.on("failed", (job) => releaseLockOnFlowFailure(job));
+  worker.on("completed", notifyIndexChange);
+}
 
 function recordRun(): void {
   void recordIndexRun(postgres, neo4jDriver).catch((error) => {

@@ -586,8 +586,8 @@ The graph indexing routes live under `/api/graph/index/*`. The `graph` segment n
 A fifth, fully independent **vector** pipeline (`index-vector`) runs alongside the graph ones in the same worker process. It parses Magento `system.xml` admin configuration into natural-language descriptions, embeds them with an external model (OpenAI-format endpoint, configurable URL/model/bearer), and writes the vectors to `magentic_pgvector` (`config_embeddings`) — not the graph. It is decoupled (its own queue, its own `magentic:vector-index:lock`, its own DB), so it neither blocks nor is blocked by graph indexing. Routes:
 
 ```text
-POST   /api/vector/index             reindex store configuration (upsert)
-POST   /api/vector/reset-and-index    clear the config_embeddings table, then re-embed
+POST   /api/vector/index/reindex             reindex store configuration (upsert)
+POST   /api/vector/index/reset-and-reindex    clear the config_embeddings table, then re-embed
 POST   /api/vector/search             semantic search ({ "query": "...", "limit": 5 })
 ```
 

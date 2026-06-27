@@ -97,8 +97,8 @@ const IndexingSection: React.FC = () => {
 
   const graphIndex: IndexRequest = { endpoint: '/api/graph/index/reindex' }
   const graphReset: IndexRequest = { endpoint: '/api/graph/index/reset-and-reindex' }
-  const vectorIndex: IndexRequest = { endpoint: '/api/vector/index' }
-  const vectorReset: IndexRequest = { endpoint: '/api/vector/reset-and-index' }
+  const vectorIndex: IndexRequest = { endpoint: '/api/vector/index/reindex' }
+  const vectorReset: IndexRequest = { endpoint: '/api/vector/index/reset-and-reindex' }
 
   return (
     <Panel className="p-5">

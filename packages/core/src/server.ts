@@ -17,13 +17,17 @@ import { registerIndexReindexRoute } from "./api/graph/index-reindex.js";
 import { registerIndexResetAndReindexRoute } from "./api/graph/index-reset-and-reindex.js";
 import { registerIndexSourceRoute } from "./api/graph/index-source.js";
 import { registerIndexXmlRoute } from "./api/graph/index-xml.js";
-import { registerIndexVectorRoute } from "./api/vector/index-vector.js";
+import { registerVectorIndexReindexRoute } from "./api/vector/index-reindex.js";
+import { registerVectorIndexResetAndReindexRoute } from "./api/vector/index-reset-and-reindex.js";
 import { registerVectorSearchRoute } from "./api/vector/search.js";
 import { readEmbeddingConfig } from "./modules/vector/embedding/read-embedding-config.js";
 import { registerIndexStatusRoute } from "./api/graph/index-status.js";
 import { registerSearchRoute } from "./api/graph/search.js";
 import { registerHealthApi } from "./api/health.js";
-import { registerStatusRoute } from "./api/usage/status.js";
+import { registerStatusRoute } from "./api/status.js";
+import { registerStreamStatusRoute } from "./api/stream/status.js";
+import { buildStatusSnapshot } from "./modules/stream/build-status-snapshot.js";
+import { createStreamer } from "./modules/stream/streamer.js";
 import { registerUsagePingRoute } from "./api/usage/ping.js";
 import { registerGetConfigRoute } from "./api/config/get.js";
 import { registerUpdateConfigRoute } from "./api/config/update.js";
@@ -49,6 +53,11 @@ const indexVectorQueue = createIndexVectorQueue();
 const indexFlowProducer = new FlowProducer({ connection: createRedisConnectionOptions() });
 const indexStatus = createIndexStatus(graphIndexQueueNames);
 const vectorIndexStatus = createIndexStatus(vectorIndexQueueNames);
+const statusSnapshotDeps = { indexStatus, vectorIndexStatus, redis, postgres };
+const streamer = createStreamer({
+  redis,
+  handlers: { index: () => buildStatusSnapshot(statusSnapshotDeps) }
+});
 
 loadAppSettings();
 
@@ -85,7 +94,8 @@ registerGetQueryHistoryRoute(app, { postgres });
 registerIndexPackagesRoute(app, { indexPackagesQueue, getComposerRoot });
 registerIndexSourceRoute(app, { indexSourceQueue, getMountPath, getSourceDirectories, getPhpVersion });
 registerIndexXmlRoute(app, { indexXmlQueue, getMountPath, getSourceDirectories });
-registerIndexVectorRoute(app, { indexVectorQueue, redis, getMountPath, getSourceDirectories });
+registerVectorIndexReindexRoute(app, { indexVectorQueue, redis, getMountPath, getSourceDirectories });
+registerVectorIndexResetAndReindexRoute(app, { indexVectorQueue, redis, getMountPath, getSourceDirectories });
 registerVectorSearchRoute(app, { pgVector, embeddingConfig });
 registerIndexLinksRoute(app, { indexLinksQueue });
 registerIndexDeltaRoute(app, { redis });
@@ -93,6 +103,7 @@ registerIndexReindexRoute(app, { indexFlowProducer, redis, getComposerRoot, getM
 registerIndexResetAndReindexRoute(app, { indexFlowProducer, redis, getComposerRoot, getMountPath, getSourceDirectories, getPhpVersion });
 registerIndexStatusRoute(app, { indexStatus, redis });
 registerStatusRoute(app, { indexStatus, vectorIndexStatus, redis, postgres });
+registerStreamStatusRoute(app, { streamer });
 registerGetConfigRoute(app, { getMountPath, getSourceHostPath });
 registerUpdateConfigRoute(app);
 registerGraphStatsRoute(app, { neo4jDriver });
@@ -121,6 +132,7 @@ process.on("SIGTERM", async () => {
   await indexFlowProducer.close();
   await indexStatus.close();
   await vectorIndexStatus.close();
+  await streamer.close();
   await redis.quit();
   await postgres.end();
   await pgVector.end();

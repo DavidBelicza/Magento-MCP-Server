@@ -2,6 +2,7 @@ import type { FlowProducer } from "bullmq";
 import type { FastifyInstance } from "fastify";
 import type { Redis } from "ioredis";
 import { acquireGraphIndexLock } from "../../modules/index-lock.js";
+import { publishStatusEvent } from "../../modules/stream/status-events.js";
 import { buildIndexFlow } from "./build-index-flow.js";
 
 type Dependencies = {
@@ -27,6 +28,8 @@ export function registerIndexResetAndReindexRoute(app: FastifyInstance, deps: De
     const flow = await indexFlowProducer.add(
       buildIndexFlow(getComposerRoot(), getMountPath(), getSourceDirectories(), true, getPhpVersion())
     );
+
+    publishStatusEvent(redis, { type: "index" });
 
     return reply.status(202).send({
       ok: true,
