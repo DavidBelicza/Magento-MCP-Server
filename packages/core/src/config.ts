@@ -8,6 +8,9 @@ export type AppConfig = {
   neo4jPassword: string;
   graphBatchSize: number;
   analyzerPhpUrl: string;
+  embedderUrl: string;
+  embedderModel: string;
+  embedderBearerToken: string | null;
   enableTelemetry: boolean;
 };
 
@@ -32,6 +35,9 @@ export function readConfig(): AppConfig {
     neo4jPassword: process.env.NEO4J_PASSWORD ?? "dev-password",
     graphBatchSize: readNumber(process.env.GRAPH_BATCH_SIZE, 5000),
     analyzerPhpUrl: process.env.ANALYZER_PHP_URL ?? "http://magentic_analyzer_php",
+    embedderUrl: process.env.EMBEDDER_URL ?? "http://host.docker.internal:1234/v1/embeddings",
+    embedderModel: process.env.EMBEDDER_MODEL ?? "text-embedding-embeddinggemma-300m-qat",
+    embedderBearerToken: process.env.EMBEDDER_BEARER_TOKEN || null,
     enableTelemetry: process.env.ENABLE_TELEMETRY === "true"
   };
 }
