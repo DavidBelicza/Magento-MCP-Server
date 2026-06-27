@@ -37,6 +37,13 @@ services:
       MAGENTIC_ANALYZED_SOURCE_PATH: "/mnt/analyzed-source"
       MAGENTIC_ANALYZED_SOURCE_HOST_PATH: "${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}"
       MAGENTIC_CONFIG_PATH: "/app/data/config.json"
+      EMBEDDER_TYPE: "${EMBEDDER_TYPE:-local}"
+      LOCAL_EMBEDDER_URL: "${LOCAL_EMBEDDER_URL:-http://magentic_embedder:8080/v1/embeddings}"
+      LOCAL_EMBEDDER_MODEL: "${LOCAL_EMBEDDER_MODEL:-embeddinggemma-300m-qat}"
+      LOCAL_EMBEDDER_BEARER_TOKEN: "${LOCAL_EMBEDDER_BEARER_TOKEN:-}"
+      REMOTE_EMBEDDER_URL: "${REMOTE_EMBEDDER_URL:-http://host.docker.internal:1234/v1/embeddings}"
+      REMOTE_EMBEDDER_MODEL: "${REMOTE_EMBEDDER_MODEL:-text-embedding-embeddinggemma-300m-qat}"
+      REMOTE_EMBEDDER_BEARER_TOKEN: "${REMOTE_EMBEDDER_BEARER_TOKEN:-}"
       ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-false}"
     volumes:
       - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:/mnt/analyzed-source:ro
@@ -76,6 +83,13 @@ services:
       NEO4J_PASSWORD: "${NEO4J_PASSWORD:-dev-password}"
       GRAPH_BATCH_SIZE: "${GRAPH_BATCH_SIZE:-5000}"
       MAGENTIC_ANALYZED_SOURCE_PATH: "/mnt/analyzed-source"
+      EMBEDDER_TYPE: "${EMBEDDER_TYPE:-local}"
+      LOCAL_EMBEDDER_URL: "${LOCAL_EMBEDDER_URL:-http://magentic_embedder:8080/v1/embeddings}"
+      LOCAL_EMBEDDER_MODEL: "${LOCAL_EMBEDDER_MODEL:-embeddinggemma-300m-qat}"
+      LOCAL_EMBEDDER_BEARER_TOKEN: "${LOCAL_EMBEDDER_BEARER_TOKEN:-}"
+      REMOTE_EMBEDDER_URL: "${REMOTE_EMBEDDER_URL:-http://host.docker.internal:1234/v1/embeddings}"
+      REMOTE_EMBEDDER_MODEL: "${REMOTE_EMBEDDER_MODEL:-text-embedding-embeddinggemma-300m-qat}"
+      REMOTE_EMBEDDER_BEARER_TOKEN: "${REMOTE_EMBEDDER_BEARER_TOKEN:-}"
       ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-false}"
     volumes: *magentic_analyzed_source_volumes
     depends_on:
@@ -152,6 +166,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  magentic_embedder:
+    image: ghcr.io/davidbelicza/magentic_embedder:latest
+    build:
+      context: .
+      dockerfile: services/embedder/Dockerfile
+    expose:
+      - "8080"
 
   magentic_redis:
     image: redis:7-alpine

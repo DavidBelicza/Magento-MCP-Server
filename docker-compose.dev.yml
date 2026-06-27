@@ -77,6 +77,12 @@ services:
       - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:/mnt/analyzed-source:ro
       - ${MAGENTIC_CONFIG_HOST_PATH:-./data}:/app/data:ro
 
+  magentic_embedder:
+    image: magentic_embedder_dev:latest
+    build:
+      context: .
+      dockerfile: services/embedder/Dockerfile
+
   magentic_analyzer_php:
     image: magentic_analyzer_php_dev:latest
     build: *magentic_analyzer_php_dev_build

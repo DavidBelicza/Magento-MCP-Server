@@ -29,6 +29,8 @@ jobs:
             dockerfile: services/mcp/Dockerfile
           - image: magentic_analyzer_php
             dockerfile: services/analyzer-php/Dockerfile
+          - image: magentic_embedder
+            dockerfile: services/embedder/Dockerfile
     steps:
       - uses: actions/checkout@v5
 
