@@ -4,15 +4,18 @@ import { deleteGraphQueueName } from "../queue/delete-graph.js";
 import { indexLinksQueueName } from "../queue/index-links.js";
 import { indexPackagesQueueName } from "../queue/index-packages.js";
 import { indexSourceQueueName } from "../queue/index-source.js";
+import { indexVectorQueueName } from "../queue/index-vector.js";
 import { indexXmlQueueName } from "../queue/index-xml.js";
 
-const indexQueueNames = [
+export const graphIndexQueueNames = [
   deleteGraphQueueName,
   indexPackagesQueueName,
   indexSourceQueueName,
   indexXmlQueueName,
   indexLinksQueueName
 ];
+
+export const vectorIndexQueueNames = [indexVectorQueueName];
 
 const inProgressStates: JobType[] = ["active", "waiting", "waiting-children", "delayed", "prioritized"];
 
@@ -25,8 +28,8 @@ export type InProgressJob = {
   timestamp: number;
 };
 
-export function createIndexStatus() {
-  const queues = indexQueueNames.map(
+export function createIndexStatus(queueNames: string[]) {
+  const queues = queueNames.map(
     (name) => new Queue(name, { connection: createRedisConnectionOptions() })
   );
 

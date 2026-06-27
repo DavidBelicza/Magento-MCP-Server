@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../lib/api'
 import { Panel, SectionHeader } from '../components/Panel'
-import { IndexingStatusList } from '../components/IndexingStatusList'
+import { IndexGroup, graphIndexCatalog, vectorIndexCatalog } from '../components/IndexingStatusList'
 import { useStatus } from '../app/StatusContext'
+
+const emptyGroup = { inProgress: 0, locked: false, items: [] }
 
 type GraphStats = {
   nodeCount: number
@@ -86,8 +88,9 @@ const IndexingPanel: React.FC = () => {
   return (
     <Panel className="p-5">
       <SectionHeader title="Indexing Pipeline" />
-      <div className="mt-5">
-        <IndexingStatusList items={status?.indexing.items ?? []} locked={status?.indexing.locked ?? false} />
+      <div className="mt-5 grid gap-3">
+        <IndexGroup title="Graph" catalog={graphIndexCatalog} status={status?.indexing ?? emptyGroup} />
+        <IndexGroup title="Vector" catalog={vectorIndexCatalog} status={status?.vector ?? emptyGroup} />
       </div>
     </Panel>
   )

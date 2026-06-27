@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Panel, SectionHeader } from '../components/Panel'
-import { IndexingStatusList } from '../components/IndexingStatusList'
+import { IndexGroup, graphIndexCatalog, vectorIndexCatalog } from '../components/IndexingStatusList'
 import { useStatus } from '../app/StatusContext'
 import { apiFetch, getApiToken, setApiToken } from '../lib/api'
 
@@ -30,6 +30,10 @@ export const SettingsView: React.FC = () => {
   )
 }
 
+type IndexRequest = { endpoint: string }
+
+const emptyGroup = { inProgress: 0, locked: false, items: [] }
+
 const IndexingSection: React.FC = () => {
   const status = useStatus()
   const [busy, setBusy] = useState(false)
@@ -37,7 +41,9 @@ const IndexingSection: React.FC = () => {
   const [watcherOverride, setWatcherOverride] = useState<boolean | null>(null)
   const wasRunning = useRef(false)
 
-  const running = (status?.indexing.inProgress ?? 0) > 0 || (status?.indexing.locked ?? false)
+  const graphRunning = (status?.indexing.inProgress ?? 0) > 0 || (status?.indexing.locked ?? false)
+  const vectorRunning = (status?.vector.inProgress ?? 0) > 0 || (status?.vector.locked ?? false)
+  const running = graphRunning || vectorRunning
 
   useEffect(() => {
     if (wasRunning.current && !running) {
@@ -63,7 +69,7 @@ const IndexingSection: React.FC = () => {
     }).catch(() => undefined)
   }
 
-  const run = (endpoint: string, label: string) => {
+  const run = (requests: IndexRequest[], label: string) => {
     if (!window.confirm(`Start ${label}? This runs against the configured source.`)) {
       return
     }
@@ -72,31 +78,67 @@ const IndexingSection: React.FC = () => {
 
     setBusy(true)
     setMessage(startMessage)
-    apiFetch(endpoint, { method: 'POST' })
-      .then((response) => response.json())
-      .then((data) => {
-        if (!data.ok) {
-          setMessage(data.error ?? `${label} failed.`)
-        }
-      })
+    Promise.all(
+      requests.map((request) =>
+        apiFetch(request.endpoint, { method: 'POST' })
+          .then((response) => response.json())
+          .then((data) => {
+            if (!data.ok) {
+              setMessage(data.error ?? `${label} failed.`)
+            }
+          })
+      )
+    )
       .catch(() => setMessage(`${label} failed.`))
       .finally(() => setBusy(false))
 
     window.setTimeout(() => setMessage((current) => (current === startMessage ? null : current)), 2000)
   }
 
+  const graphIndex: IndexRequest = { endpoint: '/api/graph/index/reindex' }
+  const graphReset: IndexRequest = { endpoint: '/api/graph/index/reset-and-reindex' }
+  const vectorIndex: IndexRequest = { endpoint: '/api/vector/index' }
+  const vectorReset: IndexRequest = { endpoint: '/api/vector/reset-and-index' }
+
   return (
     <Panel className="p-5">
       <SectionHeader title="Indexing Pipeline" />
       <div className="mt-5">
-        <IndexingStatusList items={status?.indexing.items ?? []} locked={status?.indexing.locked ?? false} />
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <ActionButton label="Reindex" disabled={busy || running} onClick={() => run('/api/graph/index/reindex', 'reindex')} />
+        <div className="mb-4 flex flex-wrap gap-2">
           <ActionButton
-            label="Reset & reindex"
+            label="Index all"
             disabled={busy || running}
-            onClick={() => run('/api/graph/index/reset-and-reindex', 'reset and reindex')}
+            onClick={() => run([graphIndex, vectorIndex], 'a full index')}
+          />
+          <ActionButton
+            label="Reset & index all"
+            disabled={busy || running}
+            onClick={() => run([graphReset, vectorReset], 'a full reset')}
+          />
+        </div>
+
+        <div className="grid gap-3">
+          <IndexGroup
+            title="Graph"
+            catalog={graphIndexCatalog}
+            status={status?.indexing ?? emptyGroup}
+            actions={
+              <>
+                <ActionButton label="Index" disabled={busy || graphRunning} onClick={() => run([graphIndex], 'a graph index')} />
+                <ActionButton label="Reset & index" disabled={busy || graphRunning} onClick={() => run([graphReset], 'a graph reset')} />
+              </>
+            }
+          />
+          <IndexGroup
+            title="Vector"
+            catalog={vectorIndexCatalog}
+            status={status?.vector ?? emptyGroup}
+            actions={
+              <>
+                <ActionButton label="Index" disabled={busy || vectorRunning} onClick={() => run([vectorIndex], 'a vector index')} />
+                <ActionButton label="Reset & index" disabled={busy || vectorRunning} onClick={() => run([vectorReset], 'a vector reset')} />
+              </>
+            }
           />
         </div>
         {message ? <p className="mt-3 text-xs text-gray-500">{message}</p> : null}

@@ -30,7 +30,7 @@ export function registerIndexVectorRoute(app: FastifyInstance, deps: Dependencie
     });
   });
 
-  app.delete("/api/vector/index", async (_request, reply) => {
+  app.post("/api/vector/reset-and-index", async (_request, reply) => {
     if (!(await acquireVectorIndexLock(redis))) {
       return reply.status(409).send({
         ok: false,
@@ -38,12 +38,12 @@ export function registerIndexVectorRoute(app: FastifyInstance, deps: Dependencie
       });
     }
 
-    const job = await indexVectorQueue.add(getMountPath(), [], "reset");
+    const job = await indexVectorQueue.add(getMountPath(), getSourceDirectories(), "reset-and-index");
 
     return reply.status(202).send({
       ok: true,
       job,
-      message: "Vector reset request accepted."
+      message: "Vector reset and reindex request accepted."
     });
   });
 }

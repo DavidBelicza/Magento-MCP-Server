@@ -23,21 +23,18 @@ export function createIndexVectorWorker(pgVector: Pool, embeddingConfig: Embeddi
 }
 
 async function handleJob(job: Job<IndexVectorJob>, pgVector: Pool, embeddingConfig: EmbeddingConfig): Promise<void> {
-  if (job.data.operation === "reset") {
-    await resetConfigVector(pgVector);
-
-    return;
-  }
-
   const sources = await collectSources(job.data.analyzedSourcePath, job.data.directories);
   const descriptions = buildConfigDescriptions(mergeStoreConfig(sources));
 
   logger.info(
-    { event: "index_vector_descriptions", count: descriptions.length },
+    { event: "index_vector_descriptions", count: descriptions.length, operation: job.data.operation },
     "Embedding store configuration descriptions"
   );
 
-  await resetConfigVector(pgVector);
+  if (job.data.operation === "reset-and-index") {
+    await resetConfigVector(pgVector);
+  }
+
   await saveConfigVector(descriptions, pgVector, embeddingConfig);
 }
 

@@ -2,7 +2,7 @@ import { FlowProducer } from "bullmq";
 import Fastify from "fastify";
 import { createNeo4jDriver, createPgVectorPool, createPostgresPool, createRedisConnection, createRedisConnectionOptions } from "./connections.js";
 import { readConfig } from "./config.js";
-import { createIndexStatus } from "./modules/index-status.js";
+import { createIndexStatus, graphIndexQueueNames, vectorIndexQueueNames } from "./modules/index-status.js";
 import { createIndexLinksQueue } from "./queue/index-links.js";
 import { createIndexPackagesQueue } from "./queue/index-packages.js";
 import { createIndexSourceQueue } from "./queue/index-source.js";
@@ -47,7 +47,8 @@ const indexLinksQueue = createIndexLinksQueue();
 const indexXmlQueue = createIndexXmlQueue();
 const indexVectorQueue = createIndexVectorQueue();
 const indexFlowProducer = new FlowProducer({ connection: createRedisConnectionOptions() });
-const indexStatus = createIndexStatus();
+const indexStatus = createIndexStatus(graphIndexQueueNames);
+const vectorIndexStatus = createIndexStatus(vectorIndexQueueNames);
 
 loadAppSettings();
 
@@ -91,7 +92,7 @@ registerIndexDeltaRoute(app, { redis });
 registerIndexReindexRoute(app, { indexFlowProducer, redis, getComposerRoot, getMountPath, getSourceDirectories, getPhpVersion });
 registerIndexResetAndReindexRoute(app, { indexFlowProducer, redis, getComposerRoot, getMountPath, getSourceDirectories, getPhpVersion });
 registerIndexStatusRoute(app, { indexStatus, redis });
-registerStatusRoute(app, { indexStatus, redis, postgres });
+registerStatusRoute(app, { indexStatus, vectorIndexStatus, redis, postgres });
 registerGetConfigRoute(app, { getMountPath, getSourceHostPath });
 registerUpdateConfigRoute(app);
 registerGraphStatsRoute(app, { neo4jDriver });
@@ -119,6 +120,7 @@ process.on("SIGTERM", async () => {
   await indexVectorQueue.close();
   await indexFlowProducer.close();
   await indexStatus.close();
+  await vectorIndexStatus.close();
   await redis.quit();
   await postgres.end();
   await pgVector.end();

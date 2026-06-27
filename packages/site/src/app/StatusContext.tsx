@@ -23,8 +23,11 @@ export type IndexJob = {
   progress?: JobProgress | number | null
 }
 
+export type IndexGroupStatus = { inProgress: number; locked: boolean; items: IndexJob[] }
+
 export type StatusData = {
-  indexing: { inProgress: number; locked: boolean; items: IndexJob[] }
+  indexing: IndexGroupStatus
+  vector: IndexGroupStatus
   indexed: boolean
   agent: { connected: boolean; lastSeenAt: number | null }
   watcherEnabled: boolean
