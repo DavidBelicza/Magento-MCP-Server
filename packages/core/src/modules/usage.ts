@@ -9,13 +9,16 @@ export type UsageStatus = {
   lastSeenAt: number | null;
 };
 
-export async function recordUsage(redis: Redis): Promise<void> {
+export async function recordUsage(redis: Redis): Promise<boolean> {
   const now = Date.now().toString();
+  const wasActive = await redis.exists(activeKey);
 
   await Promise.all([
     redis.set(activeKey, now, "EX", idleWindowSeconds),
     redis.set(lastSeenKey, now)
   ]);
+
+  return wasActive === 0;
 }
 
 export async function getUsage(redis: Redis): Promise<UsageStatus> {

@@ -1,70 +1,58 @@
 import type { ServerResponse } from "node:http";
 import type { Redis } from "ioredis";
 import { logger } from "../../logger.js";
-import { statusEventsChannel, type StatusEventType } from "./status-events.js";
-
-type SnapshotHandler = () => Promise<unknown>;
+import { statusEventsChannel } from "./status-events.js";
 
 type Dependencies = {
   redis: Redis;
-  handlers: Record<StatusEventType, SnapshotHandler>;
+  snapshot: () => Promise<unknown>;
 };
 
 const debounceMs = 80;
 const heartbeatMs = 20000;
+const eventName = "status";
 
 export function createStreamer(deps: Dependencies) {
-  const { redis, handlers } = deps;
+  const { redis, snapshot } = deps;
   const subscriber = redis.duplicate();
   const clients = new Set<ServerResponse>();
-  const timers = new Map<StatusEventType, ReturnType<typeof setTimeout>>();
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
   void subscriber.subscribe(statusEventsChannel);
 
-  subscriber.on("message", (_channel, payload) => {
-    const type = parseType(payload);
+  subscriber.on("message", () => scheduleDispatch());
 
-    if (type && handlers[type]) {
-      scheduleDispatch(type);
-    }
-  });
-
-  function scheduleDispatch(type: StatusEventType): void {
-    const existing = timers.get(type);
-
-    if (existing) {
-      clearTimeout(existing);
+  function scheduleDispatch(): void {
+    if (timer) {
+      clearTimeout(timer);
     }
 
-    timers.set(
-      type,
-      setTimeout(() => {
-        timers.delete(type);
-        void dispatch(type);
-      }, debounceMs)
-    );
+    timer = setTimeout(() => {
+      timer = null;
+      void dispatch();
+    }, debounceMs);
   }
 
-  async function dispatch(type: StatusEventType): Promise<void> {
+  async function dispatch(): Promise<void> {
     try {
-      const snapshot = await handlers[type]();
-      broadcast(type, snapshot);
+      const data = await snapshot();
+      const text = frame(data);
+
+      for (const client of clients) {
+        safeWrite(client, text);
+      }
     } catch (error) {
-      logger.error({ event: "status_stream_dispatch_failed", type, err: error }, "Failed to dispatch status snapshot");
+      logger.error({ event: "status_stream_dispatch_failed", err: error }, "Failed to dispatch status snapshot");
     }
   }
 
-  function broadcast(type: StatusEventType, snapshot: unknown): void {
-    const frame = `event: ${type}\ndata: ${JSON.stringify(snapshot)}\n\n`;
-
-    for (const client of clients) {
-      safeWrite(client, frame);
-    }
+  function frame(data: unknown): string {
+    return `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
   }
 
-  function safeWrite(client: ServerResponse, frame: string): void {
+  function safeWrite(client: ServerResponse, text: string): void {
     try {
-      client.write(frame);
+      client.write(text);
     } catch (error) {
       logger.warn({ event: "status_stream_write_failed", err: error }, "Dropping a disconnected status client");
       clients.delete(client);
@@ -81,13 +69,10 @@ export function createStreamer(deps: Dependencies) {
     addClient: async (response: ServerResponse): Promise<void> => {
       clients.add(response);
 
-      for (const type of Object.keys(handlers) as StatusEventType[]) {
-        try {
-          const snapshot = await handlers[type]();
-          safeWrite(response, `event: ${type}\ndata: ${JSON.stringify(snapshot)}\n\n`);
-        } catch (error) {
-          logger.error({ event: "status_stream_initial_failed", type, err: error }, "Failed to send the initial snapshot");
-        }
+      try {
+        safeWrite(response, frame(await snapshot()));
+      } catch (error) {
+        logger.error({ event: "status_stream_initial_failed", err: error }, "Failed to send the initial snapshot");
       }
     },
     removeClient: (response: ServerResponse): void => {
@@ -96,7 +81,7 @@ export function createStreamer(deps: Dependencies) {
     close: async (): Promise<void> => {
       clearInterval(heartbeat);
 
-      for (const timer of timers.values()) {
+      if (timer) {
         clearTimeout(timer);
       }
 
@@ -108,14 +93,4 @@ export function createStreamer(deps: Dependencies) {
       await subscriber.quit();
     }
   };
-}
-
-function parseType(payload: string): StatusEventType | null {
-  try {
-    const parsed = JSON.parse(payload) as { type?: StatusEventType };
-
-    return parsed.type ?? null;
-  } catch {
-    return null;
-  }
 }

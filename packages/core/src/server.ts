@@ -56,7 +56,7 @@ const vectorIndexStatus = createIndexStatus(vectorIndexQueueNames);
 const statusSnapshotDeps = { indexStatus, vectorIndexStatus, redis, postgres };
 const streamer = createStreamer({
   redis,
-  handlers: { index: () => buildStatusSnapshot(statusSnapshotDeps) }
+  snapshot: () => buildStatusSnapshot(statusSnapshotDeps)
 });
 
 loadAppSettings();

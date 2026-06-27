@@ -149,7 +149,7 @@ function handleStreamEvent(raw: string, onStatus: (data: StatusData) => void): v
     }
   }
 
-  if (event !== 'index' || dataLines.length === 0) {
+  if (event !== 'status' || dataLines.length === 0) {
     return
   }
 

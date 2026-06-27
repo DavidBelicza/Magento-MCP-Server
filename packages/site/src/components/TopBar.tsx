@@ -8,7 +8,9 @@ export const TopBar: React.FC<{ activeLabel: string }> = ({ activeLabel }) => {
   const navigate = useNavigate()
   const openSettings = () => navigate(viewRoutes.settings)
 
-  const indexing = status?.indexing.inProgress ? true : status?.indexing.locked ?? false
+  const graphBusy = (status?.indexing.inProgress ?? 0) > 0 || (status?.indexing.locked ?? false)
+  const vectorBusy = (status?.vector.inProgress ?? 0) > 0 || (status?.vector.locked ?? false)
+  const indexing = graphBusy || vectorBusy
   const indexed = status?.indexed ?? false
   const indexingValue = indexing ? 'Indexing' : indexed ? 'Indexed' : 'No data'
   const agentConnected = status?.agent.connected ?? false
