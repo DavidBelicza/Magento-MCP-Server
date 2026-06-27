@@ -18,6 +18,8 @@ import { registerIndexResetAndReindexRoute } from "./api/graph/index-reset-and-r
 import { registerIndexSourceRoute } from "./api/graph/index-source.js";
 import { registerIndexXmlRoute } from "./api/graph/index-xml.js";
 import { registerIndexVectorRoute } from "./api/vector/index-vector.js";
+import { registerVectorSearchRoute } from "./api/vector/search.js";
+import { readEmbeddingConfig } from "./modules/vector/embedding/read-embedding-config.js";
 import { registerIndexStatusRoute } from "./api/graph/index-status.js";
 import { registerSearchRoute } from "./api/graph/search.js";
 import { registerHealthApi } from "./api/health.js";
@@ -37,6 +39,7 @@ const app = Fastify({
 const redis = createRedisConnection();
 const postgres = createPostgresPool();
 const pgVector = createPgVectorPool();
+const embeddingConfig = readEmbeddingConfig();
 const neo4jDriver = createNeo4jDriver();
 const indexPackagesQueue = createIndexPackagesQueue();
 const indexSourceQueue = createIndexSourceQueue();
@@ -82,6 +85,7 @@ registerIndexPackagesRoute(app, { indexPackagesQueue, getComposerRoot });
 registerIndexSourceRoute(app, { indexSourceQueue, getMountPath, getSourceDirectories, getPhpVersion });
 registerIndexXmlRoute(app, { indexXmlQueue, getMountPath, getSourceDirectories });
 registerIndexVectorRoute(app, { indexVectorQueue, redis, getMountPath, getSourceDirectories });
+registerVectorSearchRoute(app, { pgVector, embeddingConfig });
 registerIndexLinksRoute(app, { indexLinksQueue });
 registerIndexDeltaRoute(app, { redis });
 registerIndexReindexRoute(app, { indexFlowProducer, redis, getComposerRoot, getMountPath, getSourceDirectories, getPhpVersion });

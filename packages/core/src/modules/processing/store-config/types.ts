@@ -29,4 +29,10 @@ export type ConfigFieldDescription = {
   sourceFile: string;
 };
 
+export type ConfigVectorMatch = {
+  path: string;
+  description: string;
+  score: number;
+};
+
 export type ParsedXml = Record<string, unknown>;

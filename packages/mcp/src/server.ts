@@ -5,6 +5,7 @@ import { BackendError, createBackendClient } from "./client.js";
 import { readConfig } from "./config.js";
 import { registerGetGraphSchema } from "./tools/get-graph-schema.js";
 import { registerGetGraphSearchResult } from "./tools/get-graph-search-result.js";
+import { registerStoreConfigSearch } from "./tools/store-config-search.js";
 import { registerGetStatus } from "./tools/get-status.js";
 import { registerGraphSearch } from "./tools/graph-search.js";
 
@@ -18,6 +19,7 @@ function buildMcpServer(): McpServer {
   registerGetStatus(server, backend);
   registerGraphSearch(server, backend, config.frontendBaseUrl);
   registerGetGraphSearchResult(server, backend);
+  registerStoreConfigSearch(server, backend);
   registerGetGraphSchema(server);
 
   return server;

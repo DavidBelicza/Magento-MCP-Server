@@ -6,6 +6,7 @@ import { createDeleteGraphWorker } from "./worker/delete-graph-worker.js";
 import { createIndexLinksWorker } from "./worker/index-links-worker.js";
 import { createIndexPackagesWorker } from "./worker/index-packages-worker.js";
 import { createIndexSourceWorker } from "./worker/index-source-worker.js";
+import { readEmbeddingConfig } from "./modules/vector/embedding/read-embedding-config.js";
 import { createIndexVectorWorker } from "./worker/index-vector-worker.js";
 import { createIndexXmlWorker } from "./worker/index-xml-worker.js";
 import { readConfig } from "./config.js";
@@ -24,11 +25,7 @@ const indexPackagesWorker = createIndexPackagesWorker(neo4jDriver);
 const indexSourceWorker = createIndexSourceWorker(neo4jDriver, config.graphBatchSize, config.analyzerPhpUrl);
 const indexLinksWorker = createIndexLinksWorker(neo4jDriver, redis);
 const indexXmlWorker = createIndexXmlWorker(neo4jDriver, config.graphBatchSize);
-const indexVectorWorker = createIndexVectorWorker(pgVector, {
-  endpoint: config.embedderUrl,
-  model: config.embedderModel,
-  bearerToken: config.embedderBearerToken
-});
+const indexVectorWorker = createIndexVectorWorker(pgVector, readEmbeddingConfig());
 const deleteGraphWorker = createDeleteGraphWorker(neo4jDriver);
 
 indexVectorWorker.on("completed", () => void releaseVectorIndexLock(redis));
