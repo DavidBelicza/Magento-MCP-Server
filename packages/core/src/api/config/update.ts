@@ -6,6 +6,10 @@ type Body = {
   projectRoot?: string;
   sourceSubpaths?: string[];
   watcherEnabled?: boolean;
+  embedderType?: string;
+  remoteEmbedderUrl?: string;
+  remoteEmbedderModel?: string;
+  remoteEmbedderBearerToken?: string;
 };
 
 export function registerUpdateConfigRoute(app: FastifyInstance): void {
@@ -16,6 +20,10 @@ export function registerUpdateConfigRoute(app: FastifyInstance): void {
       return reply.status(400).send({ ok: false, error: "unsupported phpVersion" });
     }
 
+    if (body.embedderType !== undefined && body.embedderType !== "local" && body.embedderType !== "remote") {
+      return reply.status(400).send({ ok: false, error: "embedderType must be 'local' or 'remote'" });
+    }
+
     const settings = getAppSettings();
 
     try {
@@ -23,7 +31,11 @@ export function registerUpdateConfigRoute(app: FastifyInstance): void {
         phpVersion: body.phpVersion ?? settings.phpVersion,
         projectRoot: body.projectRoot ?? settings.projectRoot,
         sourceSubpaths: body.sourceSubpaths ?? settings.sourceSubpaths,
-        watcherEnabled: body.watcherEnabled ?? settings.watcherEnabled
+        watcherEnabled: body.watcherEnabled ?? settings.watcherEnabled,
+        embedderType: (body.embedderType as "local" | "remote" | undefined) ?? settings.embedderType,
+        remoteEmbedderUrl: body.remoteEmbedderUrl ?? settings.remoteEmbedderUrl,
+        remoteEmbedderModel: body.remoteEmbedderModel ?? settings.remoteEmbedderModel,
+        remoteEmbedderBearerToken: body.remoteEmbedderBearerToken ?? settings.remoteEmbedderBearerToken
       });
 
       return reply.send({ ok: true, settings: updated });

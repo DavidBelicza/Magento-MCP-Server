@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { createRedisConnectionOptions } from "../connections.js";
+import type { EmbeddingConfig } from "../modules/vector/embedding/types.js";
 
 export type IndexVectorOperation = "index" | "reset-and-index" | "delta";
 
@@ -7,6 +8,7 @@ export type IndexVectorJob = {
   analyzedSourcePath: string;
   directories: string[];
   operation: IndexVectorOperation;
+  embeddingConfig: EmbeddingConfig;
   requestedAt: string;
 };
 
@@ -19,11 +21,17 @@ export function createIndexVectorQueue() {
   });
 
   return {
-    add: async (analyzedSourcePath: string, directories: string[], operation: IndexVectorOperation = "index") => {
+    add: async (
+      analyzedSourcePath: string,
+      directories: string[],
+      embeddingConfig: EmbeddingConfig,
+      operation: IndexVectorOperation = "index"
+    ) => {
       const job = await queue.add(indexVectorJobName, {
         analyzedSourcePath,
         directories,
         operation,
+        embeddingConfig,
         requestedAt: new Date().toISOString()
       });
 

@@ -219,6 +219,19 @@ flowchart TD
 
 - Any graph↔vector link (no `:ConfigField` graph nodes, no shared ids beyond `path`).
 - Model swapping / multi-model support.
-- File-watcher-driven incremental re-embedding.
 - ANN index tuning (exact search is fine for now).
 - i18n label resolution.
+
+## Known limitations / possible improvements
+
+- **Changes during a full reindex can be lost (watcher does not retry on 409).**
+  The incremental `POST /api/vector/index/delta` is now wired (the watcher fans
+  each batch out to both the graph and vector deltas). But if a config file
+  changes *while a full vector reindex holds the lock*, the delta gets a `409`
+  and the watcher **drops** the batch. The running reindex re-parses everything,
+  so it usually captures the change — except in the race window where the file
+  changes *after* the reindex already read the sources. The same gap exists on
+  the graph side (the watcher pauses during a graph reindex and chokidar does not
+  replay changes missed while stopped). **Possible fix:** on a `409`, keep the
+  changed paths and retry once the lock releases (the watcher already polls
+  `/api/status` every 4s), making delta application airtight for both pipelines.

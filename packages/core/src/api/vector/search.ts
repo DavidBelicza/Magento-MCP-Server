@@ -5,11 +5,11 @@ import type { EmbeddingConfig } from "../../modules/vector/embedding/types.js";
 
 type Dependencies = {
   pgVector: Pool;
-  embeddingConfig: EmbeddingConfig;
+  getEmbeddingConfig: () => EmbeddingConfig;
 };
 
 export function registerVectorSearchRoute(app: FastifyInstance, deps: Dependencies): void {
-  const { pgVector, embeddingConfig } = deps;
+  const { pgVector, getEmbeddingConfig } = deps;
 
   app.post<{ Body: { query?: unknown; limit?: unknown } }>("/api/vector/search", async (request, reply) => {
     const query = typeof request.body?.query === "string" ? request.body.query.trim() : "";
@@ -19,7 +19,7 @@ export function registerVectorSearchRoute(app: FastifyInstance, deps: Dependenci
     }
 
     try {
-      const results = await searchConfigVector(query, pgVector, embeddingConfig, normalizeLimit(request.body?.limit));
+      const results = await searchConfigVector(query, pgVector, getEmbeddingConfig(), normalizeLimit(request.body?.limit));
 
       return { ok: true, results };
     } catch (error) {

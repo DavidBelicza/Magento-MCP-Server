@@ -89,8 +89,8 @@ const IndexingPanel: React.FC = () => {
     <Panel className="p-5">
       <SectionHeader title="Indexing Pipeline" />
       <div className="mt-5 grid gap-3">
-        <IndexGroup title="Graph" catalog={graphIndexCatalog} status={status?.indexing ?? emptyGroup} />
-        <IndexGroup title="Vector" catalog={vectorIndexCatalog} status={status?.vector ?? emptyGroup} />
+        <IndexGroup title="Graph database" catalog={graphIndexCatalog} status={status?.indexing ?? emptyGroup} />
+        <IndexGroup title="Vector database" catalog={vectorIndexCatalog} status={status?.vector ?? emptyGroup} />
       </div>
     </Panel>
   )

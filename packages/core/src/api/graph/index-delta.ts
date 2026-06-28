@@ -59,10 +59,10 @@ export function registerIndexDeltaRoute(app: FastifyInstance, deps: Dependencies
     }
 
     if (Object.keys(dispatched).length === 0) {
-      return reply.status(400).send({
-        ok: false,
-        error: "no applicable paths in request",
-        skipped: routed.skipped
+      return reply.status(200).send({
+        ok: true,
+        skipped: routed.skipped,
+        message: "No graph-relevant paths in request."
       });
     }
 

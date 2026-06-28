@@ -10,20 +10,20 @@ import { readStoreConfigSources } from "../modules/processing/store-config/read-
 import { resetConfigVector } from "../modules/processing/store-config/reset-config-vector.js";
 import { saveConfigVector } from "../modules/processing/store-config/save-config-vector.js";
 import type { StoreConfigSource } from "../modules/processing/store-config/types.js";
-import type { EmbeddingConfig } from "../modules/vector/embedding/types.js";
 import { indexVectorJobName, indexVectorQueueName, type IndexVectorJob } from "../queue/index-vector.js";
 
-export function createIndexVectorWorker(pgVector: Pool, embeddingConfig: EmbeddingConfig) {
+export function createIndexVectorWorker(pgVector: Pool) {
   return new Worker<IndexVectorJob, void, typeof indexVectorJobName>(
     indexVectorQueueName,
-    (job) => handleJob(job, pgVector, embeddingConfig),
+    (job) => handleJob(job, pgVector),
     {
       connection: createRedisConnectionOptions()
     }
   );
 }
 
-async function handleJob(job: Job<IndexVectorJob>, pgVector: Pool, embeddingConfig: EmbeddingConfig): Promise<void> {
+async function handleJob(job: Job<IndexVectorJob>, pgVector: Pool): Promise<void> {
+  const embeddingConfig = job.data.embeddingConfig;
   const sources = await collectSources(job.data.analyzedSourcePath, job.data.directories);
   const descriptions = buildConfigDescriptions(mergeStoreConfig(sources));
 

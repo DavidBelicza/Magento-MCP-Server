@@ -1,14 +1,16 @@
 import { readConfig } from "../../../config.js";
+import { getAppSettings } from "../../app-config.js";
 import type { EmbeddingConfig } from "./types.js";
 
 export function readEmbeddingConfig(): EmbeddingConfig {
   const config = readConfig();
+  const settings = getAppSettings();
 
-  if (config.embedderType === "remote") {
+  if (settings.embedderType === "remote") {
     return {
-      endpoint: config.remoteEmbedderUrl,
-      model: config.remoteEmbedderModel,
-      bearerToken: config.remoteEmbedderBearerToken
+      endpoint: settings.remoteEmbedderUrl,
+      model: settings.remoteEmbedderModel,
+      bearerToken: settings.remoteEmbedderBearerToken === "" ? null : settings.remoteEmbedderBearerToken
     };
   }
 

@@ -11,13 +11,20 @@ type AppSettings = {
   projectRoot: string
   sourceSubpaths: string[]
   watcherEnabled: boolean
+  embedderType: 'local' | 'remote'
+  remoteEmbedderUrl: string
+  remoteEmbedderModel: string
+  remoteEmbedderBearerToken: string
 }
+
+type LocalEmbedder = { url: string; model: string; bearerToken: string }
 
 type ConfigResponse = {
   settings: AppSettings
   mountPath: string
   hostPath: string
   phpVersionOptions: string[]
+  localEmbedder: LocalEmbedder
 }
 
 export const SettingsView: React.FC = () => {
@@ -25,6 +32,7 @@ export const SettingsView: React.FC = () => {
     <section className="grid min-h-full grid-cols-1 gap-5 xl:grid-cols-2">
       <ConfigSection />
       <IndexingSection />
+      <EmbedderSection />
       <McpSection />
     </section>
   )
@@ -119,7 +127,7 @@ const IndexingSection: React.FC = () => {
 
         <div className="grid gap-3">
           <IndexGroup
-            title="Graph"
+            title="Graph database"
             catalog={graphIndexCatalog}
             status={status?.indexing ?? emptyGroup}
             actions={
@@ -130,7 +138,7 @@ const IndexingSection: React.FC = () => {
             }
           />
           <IndexGroup
-            title="Vector"
+            title="Vector database"
             catalog={vectorIndexCatalog}
             status={status?.vector ?? emptyGroup}
             actions={
@@ -285,6 +293,113 @@ const ConfigSection: React.FC = () => {
         <div className="flex items-center gap-3">
           <ActionButton label={saving ? 'Saving…' : 'Save'} disabled={saving} onClick={save} />
           {message ? <span className="text-xs text-gray-500">{message}</span> : null}
+        </div>
+      </div>
+    </Panel>
+  )
+}
+
+const inputClass =
+  'h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-slate-300 focus:outline-none'
+const readonlyInputClass = 'h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-500'
+
+const EmbedderSection: React.FC = () => {
+  const [embedderType, setEmbedderType] = useState<'local' | 'remote'>('local')
+  const [remoteUrl, setRemoteUrl] = useState('')
+  const [remoteModel, setRemoteModel] = useState('')
+  const [remoteToken, setRemoteToken] = useState('')
+  const [local, setLocal] = useState<LocalEmbedder | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    apiFetch('/api/config')
+      .then((response) => response.json())
+      .then((data: ConfigResponse) => {
+        setEmbedderType(data.settings.embedderType)
+        setRemoteUrl(data.settings.remoteEmbedderUrl)
+        setRemoteModel(data.settings.remoteEmbedderModel)
+        setRemoteToken(data.settings.remoteEmbedderBearerToken)
+        setLocal(data.localEmbedder)
+      })
+      .catch(() => undefined)
+  }, [])
+
+  const save = () => {
+    setSaving(true)
+    setMessage(null)
+    apiFetch('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embedderType,
+        remoteEmbedderUrl: remoteUrl,
+        remoteEmbedderModel: remoteModel,
+        remoteEmbedderBearerToken: remoteToken
+      })
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setMessage(data.ok ? 'Saved. Switching embedder needs a vector reset & index.' : (data.error ?? 'Failed to save.'))
+      })
+      .catch(() => setMessage('Failed to save.'))
+      .finally(() => setSaving(false))
+  }
+
+  return (
+    <Panel className="p-5 xl:col-span-2">
+      <SectionHeader title="Embedding Model" />
+      <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">
+        <div className="grid gap-4">
+          <label className="grid gap-1.5">
+            <span className="text-sm text-gray-600">Active embedder</span>
+            <select
+              value={embedderType}
+              onChange={(event) => setEmbedderType(event.target.value as 'local' | 'remote')}
+              className="h-9 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-slate-300 focus:outline-none"
+            >
+              <option value="local">Local — bundled model</option>
+              <option value="remote">Remote — external server or LM Studio</option>
+            </select>
+            <span className="text-xs text-gray-400">
+              Switching requires a vector reset &amp; index so stored and query vectors come from the same model. This is
+              the embedder that writes the vector database.
+            </span>
+          </label>
+
+          <div className="grid gap-1.5">
+            <span className="text-sm text-gray-600">Local embedder (read-only — set via environment)</span>
+            <input value={local?.url ?? ''} readOnly disabled className={readonlyInputClass} />
+            <input value={local?.model ?? ''} readOnly disabled className={readonlyInputClass} />
+            <span className="text-xs text-gray-400">URL and model of the bundled magentic_embedder.</span>
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          <label className="grid gap-1.5">
+            <span className="text-sm text-gray-600">Remote URL</span>
+            <input value={remoteUrl} onChange={(event) => setRemoteUrl(event.target.value)} className={inputClass} />
+            <span className="text-xs text-gray-400">From the public internet, or LM Studio running on your machine.</span>
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-sm text-gray-600">Remote model</span>
+            <input value={remoteModel} onChange={(event) => setRemoteModel(event.target.value)} className={inputClass} />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-sm text-gray-600">Remote bearer token</span>
+            <input
+              type="password"
+              value={remoteToken}
+              onChange={(event) => setRemoteToken(event.target.value)}
+              placeholder="empty = no token"
+              className={inputClass}
+            />
+          </label>
+
+          <div className="flex items-center gap-3">
+            <ActionButton label={saving ? 'Saving…' : 'Save'} disabled={saving} onClick={save} />
+            {message ? <span className="text-xs text-gray-500">{message}</span> : null}
+          </div>
         </div>
       </div>
     </Panel>

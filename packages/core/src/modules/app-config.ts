@@ -1,20 +1,33 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { readConfig } from "../config.js";
+
+export type EmbedderType = "local" | "remote";
 
 export type AppSettings = {
   phpVersion: string;
   projectRoot: string;
   sourceSubpaths: string[];
   watcherEnabled: boolean;
+  embedderType: EmbedderType;
+  remoteEmbedderUrl: string;
+  remoteEmbedderModel: string;
+  remoteEmbedderBearerToken: string;
 };
 
 export const phpVersionOptions = ["8.5", "8.4", "8.3", "8.2", "8.1", "8.0", "7.4"] as const;
+
+const envConfig = readConfig();
 
 const defaults: AppSettings = {
   phpVersion: "8.4",
   projectRoot: "",
   sourceSubpaths: [],
-  watcherEnabled: true
+  watcherEnabled: true,
+  embedderType: envConfig.embedderType,
+  remoteEmbedderUrl: envConfig.remoteEmbedderUrl,
+  remoteEmbedderModel: envConfig.remoteEmbedderModel,
+  remoteEmbedderBearerToken: envConfig.remoteEmbedderBearerToken ?? ""
 };
 
 let current: AppSettings | null = null;
@@ -76,7 +89,12 @@ function normalize(raw: Record<string, unknown> | null): AppSettings {
     phpVersion: sanitizePhpVersion(raw?.phpVersion),
     projectRoot,
     sourceSubpaths,
-    watcherEnabled: typeof raw?.watcherEnabled === "boolean" ? raw.watcherEnabled : defaults.watcherEnabled
+    watcherEnabled: typeof raw?.watcherEnabled === "boolean" ? raw.watcherEnabled : defaults.watcherEnabled,
+    embedderType: raw?.embedderType === "remote" || raw?.embedderType === "local" ? raw.embedderType : defaults.embedderType,
+    remoteEmbedderUrl: typeof raw?.remoteEmbedderUrl === "string" ? raw.remoteEmbedderUrl : defaults.remoteEmbedderUrl,
+    remoteEmbedderModel: typeof raw?.remoteEmbedderModel === "string" ? raw.remoteEmbedderModel : defaults.remoteEmbedderModel,
+    remoteEmbedderBearerToken:
+      typeof raw?.remoteEmbedderBearerToken === "string" ? raw.remoteEmbedderBearerToken : defaults.remoteEmbedderBearerToken
   };
 }
 

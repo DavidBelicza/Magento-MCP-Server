@@ -3,6 +3,7 @@ import type { Redis } from "ioredis";
 import { acquireVectorIndexLock } from "../../modules/index-lock.js";
 import { isStoreConfigXml } from "../../modules/processing/store-config/is-store-config-xml.js";
 import { publishStatusEvent } from "../../modules/stream/status-events.js";
+import type { EmbeddingConfig } from "../../modules/vector/embedding/types.js";
 import type { createIndexVectorQueue } from "../../queue/index-vector.js";
 
 type Dependencies = {
@@ -10,10 +11,11 @@ type Dependencies = {
   redis: Redis;
   getMountPath: () => string;
   getSourceDirectories: () => string[];
+  getEmbeddingConfig: () => EmbeddingConfig;
 };
 
 export function registerVectorIndexDeltaRoute(app: FastifyInstance, deps: Dependencies): void {
-  const { indexVectorQueue, redis, getMountPath, getSourceDirectories } = deps;
+  const { indexVectorQueue, redis, getMountPath, getSourceDirectories, getEmbeddingConfig } = deps;
 
   app.post<{ Body: { paths?: unknown } }>("/api/vector/index/delta", async (request, reply) => {
     const paths = request.body?.paths;
@@ -33,7 +35,7 @@ export function registerVectorIndexDeltaRoute(app: FastifyInstance, deps: Depend
       });
     }
 
-    const job = await indexVectorQueue.add(getMountPath(), getSourceDirectories(), "delta");
+    const job = await indexVectorQueue.add(getMountPath(), getSourceDirectories(), getEmbeddingConfig(), "delta");
 
     publishStatusEvent(redis, { type: "index" });
 
