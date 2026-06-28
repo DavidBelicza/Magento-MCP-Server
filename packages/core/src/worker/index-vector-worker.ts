@@ -4,6 +4,7 @@ import type { Pool } from "pg";
 import { createRedisConnectionOptions } from "../connections.js";
 import { logger } from "../logger.js";
 import { buildConfigDescriptions } from "../modules/processing/store-config/build-config-descriptions.js";
+import { deltaConfigVector } from "../modules/processing/store-config/delta-config-vector.js";
 import { mergeStoreConfig } from "../modules/processing/store-config/merge-store-config.js";
 import { readStoreConfigSources } from "../modules/processing/store-config/read-store-config-sources.js";
 import { resetConfigVector } from "../modules/processing/store-config/reset-config-vector.js";
@@ -25,6 +26,17 @@ export function createIndexVectorWorker(pgVector: Pool, embeddingConfig: Embeddi
 async function handleJob(job: Job<IndexVectorJob>, pgVector: Pool, embeddingConfig: EmbeddingConfig): Promise<void> {
   const sources = await collectSources(job.data.analyzedSourcePath, job.data.directories);
   const descriptions = buildConfigDescriptions(mergeStoreConfig(sources));
+
+  if (job.data.operation === "delta") {
+    const delta = await deltaConfigVector(descriptions, pgVector, embeddingConfig);
+
+    logger.info(
+      { event: "index_vector_delta", upserted: delta.upserted, deleted: delta.deleted },
+      "Applied store configuration vector delta"
+    );
+
+    return;
+  }
 
   logger.info(
     { event: "index_vector_descriptions", count: descriptions.length, operation: job.data.operation },

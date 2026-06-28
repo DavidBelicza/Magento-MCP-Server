@@ -16,4 +16,6 @@ export type VectorStore = {
   reset: () => Promise<void>;
   upsert: (rows: VectorRow[]) => Promise<void>;
   search: (embedding: number[], limit: number) => Promise<VectorMatch[]>;
+  list: () => Promise<VectorRow[]>;
+  deleteByIds: (ids: string[]) => Promise<void>;
 };

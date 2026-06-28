@@ -34,6 +34,21 @@ export function createVectorStore(pool: Pool, table: VectorTable): VectorStore {
       );
 
       return result.rows.map(toMatch);
+    },
+    list: async () => {
+      const selectColumns = [table.idColumn, ...table.dataColumns];
+      const result = await pool.query<Record<string, unknown>>(
+        `SELECT ${selectColumns.map(ident).join(", ")} FROM ${ident(table.name)}`
+      );
+
+      return result.rows;
+    },
+    deleteByIds: async (ids) => {
+      if (ids.length === 0) {
+        return;
+      }
+
+      await pool.query(`DELETE FROM ${ident(table.name)} WHERE ${ident(table.idColumn)} = ANY($1)`, [ids]);
     }
   };
 }

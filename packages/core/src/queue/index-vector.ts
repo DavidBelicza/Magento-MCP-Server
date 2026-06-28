@@ -1,7 +1,7 @@
 import { Queue } from "bullmq";
 import { createRedisConnectionOptions } from "../connections.js";
 
-export type IndexVectorOperation = "index" | "reset-and-index";
+export type IndexVectorOperation = "index" | "reset-and-index" | "delta";
 
 export type IndexVectorJob = {
   analyzedSourcePath: string;

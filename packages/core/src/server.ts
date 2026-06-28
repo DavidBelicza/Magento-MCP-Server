@@ -19,6 +19,7 @@ import { registerIndexSourceRoute } from "./api/graph/index-source.js";
 import { registerIndexXmlRoute } from "./api/graph/index-xml.js";
 import { registerVectorIndexReindexRoute } from "./api/vector/index-reindex.js";
 import { registerVectorIndexResetAndReindexRoute } from "./api/vector/index-reset-and-reindex.js";
+import { registerVectorIndexDeltaRoute } from "./api/vector/index-delta.js";
 import { registerVectorSearchRoute } from "./api/vector/search.js";
 import { readEmbeddingConfig } from "./modules/vector/embedding/read-embedding-config.js";
 import { registerIndexStatusRoute } from "./api/graph/index-status.js";
@@ -96,6 +97,7 @@ registerIndexSourceRoute(app, { indexSourceQueue, getMountPath, getSourceDirecto
 registerIndexXmlRoute(app, { indexXmlQueue, getMountPath, getSourceDirectories });
 registerVectorIndexReindexRoute(app, { indexVectorQueue, redis, getMountPath, getSourceDirectories });
 registerVectorIndexResetAndReindexRoute(app, { indexVectorQueue, redis, getMountPath, getSourceDirectories });
+registerVectorIndexDeltaRoute(app, { indexVectorQueue, redis, getMountPath, getSourceDirectories });
 registerVectorSearchRoute(app, { pgVector, embeddingConfig });
 registerIndexLinksRoute(app, { indexLinksQueue });
 registerIndexDeltaRoute(app, { redis });
