@@ -151,7 +151,7 @@ Technology:
 
 Responsibilities:
 
-- expose the app on localhost, for example `http://localhost:8080`
+- expose the app on localhost, for example `http://localhost:8081`
 - serve the React/Vite static site
 - support frontend deep links and refreshes by falling back to `index.html`
 - proxy `/api/*` requests to `magentic_backend`
@@ -160,12 +160,12 @@ Responsibilities:
 Expected routing:
 
 ```text
-Browser -> http://localhost:8080/
+Browser -> http://localhost:8081/
 Nginx   -> serves packages/site build output
 ```
 
 ```text
-Browser -> http://localhost:8080/api/health
+Browser -> http://localhost:8081/api/health
 Nginx   -> http://magentic_backend:3000/api/health
 Fastify -> receives /api/health
 ```
@@ -285,7 +285,7 @@ Kept as its own instance so the vector store stays isolated and swappable (a fut
 
 ### `magentic_embedder`
 
-Bundled embedding-model service: a `llama.cpp` server (multi-stage image — the server binaries copied onto `ubuntu:24.04` — with the `embeddinggemma-300m` GGUF, 768 dims, baked in) exposing an OpenAI-format `/v1/embeddings` on port `8080`. Always enabled, so semantic search works out of the box without an external LM Studio.
+Bundled embedding-model service: a `llama.cpp` server (multi-stage image — the server binaries copied onto `ubuntu:24.04` — with the `embeddinggemma-300m` GGUF, 768 dims, baked in) exposing an OpenAI-format `/v1/embeddings` on port `8080` (internal). Always enabled, so semantic search works out of the box without an external LM Studio.
 
 Responsibilities:
 
@@ -377,13 +377,13 @@ magentic_graphdb
 The first version uses HTTP only:
 
 ```text
-http://localhost:8080
+http://localhost:8081
 ```
 
 The frontend host port is configurable:
 
 ```env
-FRONTEND_HTTP_PORT=8080
+FRONTEND_HTTP_PORT=8081
 ```
 
 Recommended Compose mapping:

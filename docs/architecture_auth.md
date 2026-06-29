@@ -11,7 +11,7 @@
 
 Today every endpoint behind the nginx front door is reachable without
 credentials. That is fine while the published port (`FRONTEND_HTTP_PORT`, default
-`8080`) is bound to `localhost` on a single-user machine — the only "client" is
+`8081`) is bound to `localhost` on a single-user machine — the only "client" is
 the operator and their local agent.
 
 The risk appears the moment the port is **exposed beyond localhost** (to let a
@@ -99,7 +99,7 @@ missing token yields `401` and the agent reports the server as unavailable).
 
 ```bash
 # Claude Code
-claude mcp add --transport http magentic http://localhost:8080/mcp \
+claude mcp add --transport http magentic http://localhost:8081/mcp \
   --header "Authorization: Bearer <token>"
 ```
 
@@ -108,7 +108,7 @@ claude mcp add --transport http magentic http://localhost:8080/mcp \
 {
   "mcpServers": {
     "magentic": {
-      "url": "http://localhost:8080/mcp",
+      "url": "http://localhost:8081/mcp",
       "headers": { "Authorization": "Bearer <token>" }
     }
   }

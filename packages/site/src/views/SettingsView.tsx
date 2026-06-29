@@ -422,7 +422,7 @@ const McpSection: React.FC = () => {
   const snippet = `{
   "mcpServers": {
     "magentic": {
-      "url": "http://localhost:8080/mcp"${headersBlock}
+      "url": "http://localhost:8081/mcp"${headersBlock}
     }
   }
 }`
@@ -434,7 +434,7 @@ const McpSection: React.FC = () => {
         <div className="grid gap-3 text-sm text-gray-600">
           <p>Point your agent at the Streamable HTTP endpoint below, then add the JSON to your MCP client config.</p>
           <Row label="Transport">Streamable HTTP</Row>
-          <Row label="Endpoint">http://localhost:8080/mcp</Row>
+          <Row label="Endpoint">http://localhost:8081/mcp</Row>
           <Row label="Tools">get_status, graph_search, get_graph_schema</Row>
 
           <label className="mt-1 grid gap-1 text-xs font-semibold text-gray-600">

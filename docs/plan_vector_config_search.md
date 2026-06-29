@@ -46,7 +46,7 @@ with an external model, and stores the vector so the agent can search by meaning
   so it runs concurrently with the graph workers on the single event loop).
 - **No re-embed cache in v1.** A full vector reindex re-embeds everything; that is
   acceptable at `system.xml` scale and bounded later by selective reindex.
-- **File-watcher-driven incremental re-embedding is deferred** — not defined yet.
+- **File-watcher-driven incremental re-embedding is wired** via `POST /api/vector/index/delta` (see the delta flow below and the Known Limitations note on the 409 race).
 
 ## Business logic lives in core
 

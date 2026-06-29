@@ -6,7 +6,7 @@
 
 MCP Streamable HTTP at a single endpoint, `POST /mcp`. Stateless JSON mode (no sessions): the SDK transport runs with `sessionIdGenerator: undefined` and `enableJsonResponse: true`. `GET`/`DELETE /mcp` return `405`. The `Origin` header is validated — a present, unrecognized origin gets `403`; a missing origin is allowed so CLI clients work.
 
-Public path: client → `http://localhost:8080/mcp` → nginx (`magentic_frontend`) → `magentic_mcp:3000`. The Fastify host runs with `ignoreTrailingSlash`, so `/mcp` and `/mcp/` both work. The allowed-origin list (`MCP_ALLOWED_ORIGINS`) defaults to localhost/127.0.0.1 on `FRONTEND_HTTP_PORT`, so changing the published port is enough; override it only to serve from another host/domain. See `README.md` ("Connecting an MCP Client") for Claude Code, Codex, and Antigravity setup. nginx gates `/mcp` (and `/api`) against `MAGENTIC_API_TOKEN`, so clients must also send `Authorization: Bearer <token>`; see `docs/architecture_auth.md`.
+Public path: client → `http://localhost:8081/mcp` → nginx (`magentic_frontend`) → `magentic_mcp:3000`. The Fastify host runs with `ignoreTrailingSlash`, so `/mcp` and `/mcp/` both work. The allowed-origin list (`MCP_ALLOWED_ORIGINS`) defaults to localhost/127.0.0.1 on `FRONTEND_HTTP_PORT`, so changing the published port is enough; override it only to serve from another host/domain. See `README.md` ("Connecting an MCP Client") for Claude Code, Codex, and Antigravity setup. nginx gates `/mcp` (and `/api`) against `MAGENTIC_API_TOKEN`, so clients must also send `Authorization: Bearer <token>`; see `docs/architecture_auth.md`.
 
 ## Tools
 
@@ -43,7 +43,7 @@ All env-backed with local defaults (see `src/config.ts`):
 
 - `MCP_PORT` — default `3000`
 - `MAGENTIC_BACKEND_URL` — default `http://magentic_backend:3000`
-- `MCP_ALLOWED_ORIGINS` — comma-separated, default `http://localhost:8080,http://127.0.0.1:8080`
+- `MCP_ALLOWED_ORIGINS` — comma-separated, default `http://localhost:8081,http://127.0.0.1:8081`
 
 ## Docker and proxying
 
@@ -53,17 +53,17 @@ All env-backed with local defaults (see `src/config.ts`):
 
 ```bash
 # initialize
-curl -s http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -s http://localhost:8081/mcp -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"curl","version":"0.0.1"}}}'
 
 # tools/list
-curl -s http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -s http://localhost:8081/mcp -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
 
 # rejected origin -> 403
-curl -i http://localhost:8080/mcp -H "Origin: http://evil.example" \
+curl -i http://localhost:8081/mcp -H "Origin: http://evil.example" \
   -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
