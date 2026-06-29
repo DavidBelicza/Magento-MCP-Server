@@ -30,12 +30,20 @@ services:
       PORT: "3000"
       REDIS_URL: "redis://magentic_redis:6379"
       POSTGRES_URL: "postgres://${POSTGRES_USER:-magentic}:${POSTGRES_PASSWORD:-dev-password}@magentic_postgres:5432/${POSTGRES_DB:-magentic}"
+      POSTGRES_VECTOR_URL: "postgres://${POSTGRES_USER:-magentic}:${POSTGRES_PASSWORD:-dev-password}@magentic_pgvector:5432/${POSTGRES_VECTOR_DB:-magentic_vectors}"
       NEO4J_URI: "bolt://magentic_graphdb:7687"
       NEO4J_USERNAME: "${NEO4J_USERNAME:-neo4j}"
       NEO4J_PASSWORD: "${NEO4J_PASSWORD:-dev-password}"
       MAGENTIC_ANALYZED_SOURCE_PATH: "/mnt/analyzed-source"
       MAGENTIC_ANALYZED_SOURCE_HOST_PATH: "${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}"
       MAGENTIC_CONFIG_PATH: "/app/data/config.json"
+      EMBEDDER_TYPE: "${EMBEDDER_TYPE:-local}"
+      LOCAL_EMBEDDER_URL: "${LOCAL_EMBEDDER_URL:-http://magentic_embedder:8080/v1/embeddings}"
+      LOCAL_EMBEDDER_MODEL: "${LOCAL_EMBEDDER_MODEL:-embeddinggemma-300m-qat}"
+      LOCAL_EMBEDDER_BEARER_TOKEN: "${LOCAL_EMBEDDER_BEARER_TOKEN:-}"
+      REMOTE_EMBEDDER_URL: "${REMOTE_EMBEDDER_URL:-http://host.docker.internal:1234/v1/embeddings}"
+      REMOTE_EMBEDDER_MODEL: "${REMOTE_EMBEDDER_MODEL:-text-embedding-embeddinggemma-300m-qat}"
+      REMOTE_EMBEDDER_BEARER_TOKEN: "${REMOTE_EMBEDDER_BEARER_TOKEN:-}"
       ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-false}"
     volumes:
       - ${MAGENTIC_ANALYZED_SOURCE_HOST_PATH:-./www/path/to/magento/source-code}:/mnt/analyzed-source:ro
@@ -46,6 +54,8 @@ services:
       magentic_redis:
         condition: service_healthy
       magentic_postgres:
+        condition: service_healthy
+      magentic_pgvector:
         condition: service_healthy
       magentic_graphdb:
         condition: service_healthy
@@ -67,6 +77,7 @@ services:
       NODE_ENV: production
       REDIS_URL: "redis://magentic_redis:6379"
       POSTGRES_URL: "postgres://${POSTGRES_USER:-magentic}:${POSTGRES_PASSWORD:-dev-password}@magentic_postgres:5432/${POSTGRES_DB:-magentic}"
+      POSTGRES_VECTOR_URL: "postgres://${POSTGRES_USER:-magentic}:${POSTGRES_PASSWORD:-dev-password}@magentic_pgvector:5432/${POSTGRES_VECTOR_DB:-magentic_vectors}"
       NEO4J_URI: "bolt://magentic_graphdb:7687"
       NEO4J_USERNAME: "${NEO4J_USERNAME:-neo4j}"
       NEO4J_PASSWORD: "${NEO4J_PASSWORD:-dev-password}"
@@ -78,6 +89,8 @@ services:
       magentic_redis:
         condition: service_healthy
       magentic_postgres:
+        condition: service_healthy
+      magentic_pgvector:
         condition: service_healthy
       magentic_graphdb:
         condition: service_healthy
@@ -147,6 +160,14 @@ services:
       timeout: 5s
       retries: 10
 
+  magentic_embedder:
+    image: ghcr.io/davidbelicza/magentic_embedder:latest
+    build:
+      context: .
+      dockerfile: services/embedder/Dockerfile
+    expose:
+      - "8080"
+
   magentic_redis:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
@@ -168,6 +189,20 @@ services:
       - magentic_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER:-magentic}\" -d \"$${POSTGRES_DB:-magentic}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  magentic_pgvector:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: "${POSTGRES_VECTOR_DB:-magentic_vectors}"
+      POSTGRES_USER: "${POSTGRES_USER:-magentic}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-dev-password}"
+    volumes:
+      - magentic_pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER:-magentic}\" -d \"$${POSTGRES_VECTOR_DB:-magentic_vectors}\""]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -232,5 +267,6 @@ services:
 volumes:
   magentic_redis_data:
   magentic_postgres_data:
+  magentic_pgvector_data:
   magentic_graphdb_data:
   magentic_graphdb_logs:

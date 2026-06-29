@@ -9,7 +9,7 @@ export type IndexSourceJob = {
   operation: IndexSourceOperation;
   phpVersion?: string;
   requestedAt: string;
-  fullIndexFlow?: boolean;
+  graphIndexFlow?: boolean;
 };
 
 export const indexSourceQueueName = "index-source";

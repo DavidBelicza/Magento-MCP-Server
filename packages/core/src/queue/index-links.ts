@@ -4,7 +4,7 @@ import { createRedisConnectionOptions } from "../connections.js";
 export type IndexLinksJob = {
   symbolId: string | null;
   requestedAt: string;
-  fullIndexFlow?: boolean;
+  graphIndexFlow?: boolean;
 };
 
 export const indexLinksQueueName = "index-links";

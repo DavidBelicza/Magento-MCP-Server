@@ -6,13 +6,14 @@
 
 MCP Streamable HTTP at a single endpoint, `POST /mcp`. Stateless JSON mode (no sessions): the SDK transport runs with `sessionIdGenerator: undefined` and `enableJsonResponse: true`. `GET`/`DELETE /mcp` return `405`. The `Origin` header is validated — a present, unrecognized origin gets `403`; a missing origin is allowed so CLI clients work.
 
-Public path: client → `http://localhost:8080/mcp` → nginx (`magentic_frontend`) → `magentic_mcp:3000`. The Fastify host runs with `ignoreTrailingSlash`, so `/mcp` and `/mcp/` both work. The allowed-origin list (`MCP_ALLOWED_ORIGINS`) defaults to localhost/127.0.0.1 on `FRONTEND_HTTP_PORT`, so changing the published port is enough; override it only to serve from another host/domain. See `README.md` ("Connecting an MCP Client") for Claude Code, Codex, and Antigravity setup. nginx gates `/mcp` (and `/api`) against `MAGENTIC_API_TOKEN`, so clients must also send `Authorization: Bearer <token>`; see `docs/architecture_auth.md`.
+Public path: client → `http://localhost:8081/mcp` → nginx (`magentic_frontend`) → `magentic_mcp:3000`. The Fastify host runs with `ignoreTrailingSlash`, so `/mcp` and `/mcp/` both work. The allowed-origin list (`MCP_ALLOWED_ORIGINS`) defaults to localhost/127.0.0.1 on `FRONTEND_HTTP_PORT`, so changing the published port is enough; override it only to serve from another host/domain. See `README.md` ("Connecting an MCP Client") for Claude Code, Codex, and Antigravity setup. nginx gates `/mcp` (and `/api`) against `MAGENTIC_API_TOKEN`, so clients must also send `Authorization: Bearer <token>`; see `docs/architecture_auth.md`.
 
 ## Tools
 
 - `get_status` — proxies `GET /api/graph/index/status`. Reports `locked` / `inProgress` plus a plain-language `verdict` so an agent knows whether the graph is mid-rebuild.
 - `graph_search` — proxies `POST /api/graph/search` with `{ description, cypherQuery }`. Read-only Cypher is validated by the backend; a backend `400` is returned as a repairable tool error. The tool description carries a compact schema cheat sheet. It returns a **handle, not the data**: `resultFormat` (`"graph"` or `"table"`), a `webViewUrl` (graph canvas, or the inspection table with `&view=inspect`), the `queryId`, and a `summary` (`rowCount`/`nodeCount`/`relationshipCount`/`columns` plus `estimatedTokens` per fetchable form). The agent inspects the estimate and only pulls data when needed.
 - `get_graph_search_result` — fetches the full stored result of an earlier `graph_search` by `queryId` (reuses `GET /api/graph/get-query-history/:id`; a backend `404` is a repairable tool error). `viewResult` selects the form: `"table"` returns `columns`/`rows`, `"graph"` returns de-duplicated `nodes`/`relationships` plus `rows` whose entity cells are node ids (join back to recover per-row correlation). No size cap — the agent already knows the size from `graph_search`'s `estimatedTokens`.
+- `store_config_search` — proxies `POST /api/vector/search` with `{ query, limit? }`. Plain-English **semantic** search over Magento admin store configuration (`system.xml`), distinct from `graph_search`'s structural code questions. The backend embeds the query with the configured model and runs an ANN search over the `config_embeddings` vectors in `magentic_pgvector`. Returns up to `limit` (default 5) results, each `{ path, description, score }` — `path` is the actionable Magento config path (`config_path` when the field declares one, otherwise the structural `section/group/field`). See `docs/plan_vector_config_search.md`.
 - `get_graph_schema` — returns `resource/graph-schema.json` directly (no backend call, since the schema is static). The slim schema lists node kinds, relationship types, edge properties, and type-mapping rules; the worked example lives in `docs/architecture_world_mapping.md`.
 
 ## Usage signal
@@ -42,7 +43,7 @@ All env-backed with local defaults (see `src/config.ts`):
 
 - `MCP_PORT` — default `3000`
 - `MAGENTIC_BACKEND_URL` — default `http://magentic_backend:3000`
-- `MCP_ALLOWED_ORIGINS` — comma-separated, default `http://localhost:8080,http://127.0.0.1:8080`
+- `MCP_ALLOWED_ORIGINS` — comma-separated, default `http://localhost:8081,http://127.0.0.1:8081`
 
 ## Docker and proxying
 
@@ -52,17 +53,17 @@ All env-backed with local defaults (see `src/config.ts`):
 
 ```bash
 # initialize
-curl -s http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -s http://localhost:8081/mcp -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"curl","version":"0.0.1"}}}'
 
 # tools/list
-curl -s http://localhost:8080/mcp -H "Content-Type: application/json" \
+curl -s http://localhost:8081/mcp -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
 
 # rejected origin -> 403
-curl -i http://localhost:8080/mcp -H "Origin: http://evil.example" \
+curl -i http://localhost:8081/mcp -H "Origin: http://evil.example" \
   -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```

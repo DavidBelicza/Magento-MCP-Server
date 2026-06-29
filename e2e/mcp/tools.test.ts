@@ -25,7 +25,13 @@ describe("e2e: MCP endpoint", () => {
     const names = tools.map((tool) => tool.name);
 
     expect(names).toEqual(
-      expect.arrayContaining(["get_status", "graph_search", "get_graph_search_result", "get_graph_schema"])
+      expect.arrayContaining([
+        "get_status",
+        "graph_search",
+        "get_graph_search_result",
+        "get_graph_schema",
+        "store_config_search"
+      ])
     );
   });
 

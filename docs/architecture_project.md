@@ -127,6 +127,7 @@ Services use the `magentic_` prefix:
 - `magentic_analyzer_php`
 - `magentic_redis`
 - `magentic_postgres`
+- `magentic_pgvector`
 - `magentic_graphdb`
 - `magentic_loki` (optional, via telemetry profile)
 - `magentic_promtail` (optional, via telemetry profile)
@@ -150,7 +151,7 @@ Technology:
 
 Responsibilities:
 
-- expose the app on localhost, for example `http://localhost:8080`
+- expose the app on localhost, for example `http://localhost:8081`
 - serve the React/Vite static site
 - support frontend deep links and refreshes by falling back to `index.html`
 - proxy `/api/*` requests to `magentic_backend`
@@ -159,12 +160,12 @@ Responsibilities:
 Expected routing:
 
 ```text
-Browser -> http://localhost:8080/
+Browser -> http://localhost:8081/
 Nginx   -> serves packages/site build output
 ```
 
 ```text
-Browser -> http://localhost:8080/api/health
+Browser -> http://localhost:8081/api/health
 Nginx   -> http://magentic_backend:3000/api/health
 Fastify -> receives /api/health
 ```
@@ -272,6 +273,26 @@ Responsibilities:
 
 Uses the official PostgreSQL image directly.
 
+### `magentic_pgvector`
+
+Private PostgreSQL + `pgvector` service (image `pgvector/pgvector:pg17`, database `magentic_vectors`), separate from `magentic_postgres`.
+
+Responsibilities:
+
+- store the `config_embeddings` semantic-search vectors (`embedding vector(768)`, keyed by the Magento config `path`) for the independent vector pipeline and `store_config_search`
+
+Kept as its own instance so the vector store stays isolated and swappable (a future dedicated vector database would replace it without touching the application database). Schema history is still tracked in `magentic_postgres`.
+
+### `magentic_embedder`
+
+Bundled embedding-model service: a `llama.cpp` server (multi-stage image — the server binaries copied onto `ubuntu:24.04` — with the `embeddinggemma-300m` GGUF, 768 dims, baked in) exposing an OpenAI-format `/v1/embeddings` on port `8080` (internal). Always enabled, so semantic search works out of the box without an external LM Studio.
+
+Responsibilities:
+
+- embed store-config descriptions (indexing) and search queries for `store_config_search`, on CPU (no GPU passthrough on macOS containers)
+
+The backend/worker choose the active provider with `EMBEDDER_TYPE` (`local` → this service; `remote` → an external OpenAI-format server, defaulting to LM Studio on the host). `EMBEDDER_TYPE` and the remote URL/model/token are user-editable from the Settings UI (file-backed in `config.json`); the local URL/model stay env-only. Switching providers needs a vector reset-and-reindex so stored and query vectors come from the same model.
+
 ### `magentic_graphdb`
 
 Neo4j graph database service.
@@ -356,13 +377,13 @@ magentic_graphdb
 The first version uses HTTP only:
 
 ```text
-http://localhost:8080
+http://localhost:8081
 ```
 
 The frontend host port is configurable:
 
 ```env
-FRONTEND_HTTP_PORT=8080
+FRONTEND_HTTP_PORT=8081
 ```
 
 Recommended Compose mapping:
@@ -376,15 +397,22 @@ The backend listens on port `3000` inside Docker. This internal port remains fix
 
 ## Nginx Routing Rules
 
-The `magentic_frontend` service uses Nginx with three important behaviors:
+The `magentic_frontend` service uses Nginx with these important behaviors:
 
 1. Proxy `/api/*` to `http://magentic_backend:3000`.
 2. Preserve the `/api` prefix.
-3. Fall back non-API paths to `index.html` for React Router or equivalent client-side routing.
+3. A dedicated `/api/stream` location with buffering off for the Server-Sent Events status stream.
+4. Fall back non-API paths to `index.html` for React Router or equivalent client-side routing.
 
 Expected Nginx behavior:
 
 ```nginx
+location /api/stream {
+    proxy_pass http://magentic_backend:3000;
+    proxy_buffering off;
+    proxy_read_timeout 3600s;
+}
+
 location /api/ {
     proxy_pass http://magentic_backend:3000;
 }
@@ -393,6 +421,8 @@ location / {
     try_files $uri $uri/ /index.html;
 }
 ```
+
+The backend pushes a single combined status snapshot (graph + vector indexing, agent connectivity, watcher) over `GET /api/stream/status` as SSE — a Redis pub/sub channel triggers a debounced rebuild + broadcast on any indexing or agent-ping change. The frontend consumes it via a `fetch`-reader (so the bearer header applies) and keeps a slow safety poll of `GET /api/status`. See `AGENTS.md` for the producer/subscriber detail.
 
 ## Dockerfile Requirements
 
@@ -570,7 +600,18 @@ The graph is built and maintained by four internal pipelines, each a BullMQ queu
 - `index-xml`: parse Magento XML config (`di.xml`, `events.xml`, `crontab.xml`/`cron_groups.xml`, `webapi.xml`, `extension_attributes.xml`) into DI/observer/cron/webapi/extension-attribute edges plus `Event`/`CronGroup`/`WebapiRoute`/`ExtensionAttribute` nodes (one handler per file type; cleared by `sourceFile`).
 - `index-links`: connect declared `PHPClass` nodes to their `Package` via `DECLARED_IN_PACKAGE` (PSR-4 longest-prefix, in Cypher).
 
-All indexing routes live under `/api/graph/index/*`. The `graph` segment namespaces this as *graph* indexing so a future vector-database index (for example `/api/vector/...`) stays separate. Every route returns `202 Accepted` immediately and runs asynchronously on the worker; nothing blocks the HTTP request.
+The graph indexing routes live under `/api/graph/index/*`. The `graph` segment namespaces this as *graph* indexing, keeping it separate from the **vector** index (`/api/vector/*`). Every route returns `202 Accepted` immediately and runs asynchronously on the worker; nothing blocks the HTTP request.
+
+A fifth, fully independent **vector** pipeline (`index-vector`) runs alongside the graph ones in the same worker process. It parses Magento `system.xml` admin configuration into natural-language descriptions, embeds them via `magentic_embedder` (or an external OpenAI-format model when `EMBEDDER_TYPE=remote`), and writes the vectors to `magentic_pgvector` (`config_embeddings`) — not the graph. It is decoupled (its own queue, its own `magentic:vector-index:lock`, its own DB), so it neither blocks nor is blocked by graph indexing. Routes:
+
+```text
+POST   /api/vector/index/reindex              reindex store configuration (upsert)
+POST   /api/vector/index/reset-and-reindex    clear the config_embeddings table, then re-embed
+POST   /api/vector/index/delta                incremental update: re-parse, diff by content, embed only changed
+POST   /api/vector/search                     semantic search ({ "query": "...", "limit": 5 })
+```
+
+`delta` mirrors the graph delta: the watcher fans config-file changes to it, it re-parses the whole config (cheap — no embedding), diffs the rebuilt descriptions against the stored rows by content (path + description + model), then embeds only new/changed fields and deletes removed ones. It accepts an optional `{ "paths": [...] }` and skips when none are store-config XML; it acquires `magentic:vector-index:lock`, returning `409` during a full reindex. The embedder config is resolved at enqueue and snapshotted into the job, so the worker (which has no `config.json` mount) uses it without a restart. Backing the `store_config_search` MCP tool, `/api/vector/search` embeds the query and returns the top matches as `{ path, description, score }`. See `docs/plan_vector_config_search.md`.
 
 ### Single-pipeline endpoints
 

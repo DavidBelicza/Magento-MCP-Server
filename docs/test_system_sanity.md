@@ -104,7 +104,7 @@ Expected result:
 - `magentic_redis` is healthy.
 - `magentic_postgres` is healthy.
 - `magentic_graphdb` is healthy.
-- `magentic_frontend` publishes `8080->80`.
+- `magentic_frontend` publishes `8081->80`.
 - `magentic_graphdb` publishes `7474->7474` and `7687->7687`.
 - `magentic_backend` does not publish a host port.
 - `magentic_worker` does not publish a host port.
@@ -115,7 +115,7 @@ Expected result:
 Check the frontend API proxy:
 
 ```bash
-curl -s http://localhost:8080/api/health
+curl -s http://localhost:8081/api/health
 ```
 
 Expected response:
@@ -127,7 +127,7 @@ Expected response:
 Check frontend deep-link fallback:
 
 ```bash
-curl -I http://localhost:8080/deep/link
+curl -I http://localhost:8081/deep/link
 ```
 
 Expected result:
@@ -150,7 +150,7 @@ Expected result:
 Check a basic read-only graph search:
 
 ```bash
-curl -s -X POST http://localhost:8080/api/graph/search \
+curl -s -X POST http://localhost:8081/api/graph/search \
   -H 'Content-Type: application/json' \
   -d '{"description":"Return a constant from Neo4j to verify graph search","cypherQuery":"RETURN 1 AS answer"}'
 ```
@@ -166,7 +166,7 @@ Expected response:
 Check graph path extraction when graph data is available:
 
 ```bash
-curl -s -X POST http://localhost:8080/api/graph/search \
+curl -s -X POST http://localhost:8081/api/graph/search \
   -H 'Content-Type: application/json' \
   -d '{"description":"Return one graph path to verify node and relationship extraction","cypherQuery":"MATCH path = (fromNode)-[relationship]->(toNode) RETURN path LIMIT 1"}'
 ```
@@ -182,7 +182,7 @@ Check read-only validation:
 
 ```bash
 curl -s -o /tmp/magentic_graph_search_unsafe.out -w '%{http_code}' \
-  -X POST http://localhost:8080/api/graph/search \
+  -X POST http://localhost:8081/api/graph/search \
   -H 'Content-Type: application/json' \
   -d '{"description":"Attempt an unsafe write query","cypherQuery":"CREATE (n:UnsafeTest) RETURN n"}'
 ```
@@ -196,7 +196,7 @@ Check required description validation:
 
 ```bash
 curl -s -o /tmp/magentic_graph_search_missing_description.out -w '%{http_code}' \
-  -X POST http://localhost:8080/api/graph/search \
+  -X POST http://localhost:8081/api/graph/search \
   -H 'Content-Type: application/json' \
   -d '{"cypherQuery":"RETURN 1 AS answer"}'
 ```
@@ -222,7 +222,7 @@ Expected result:
 Check the query history list endpoint:
 
 ```bash
-curl -s http://localhost:8080/api/graph/get-query-history
+curl -s http://localhost:8081/api/graph/get-query-history
 ```
 
 Expected response:
@@ -236,7 +236,7 @@ Expected response:
 Check a saved query history detail using an `id` returned from the list endpoint:
 
 ```bash
-curl -s http://localhost:8080/api/graph/get-query-history/<history-id>
+curl -s http://localhost:8081/api/graph/get-query-history/<history-id>
 ```
 
 Expected response:
@@ -250,7 +250,7 @@ Expected response:
 Check the Query History frontend tab:
 
 ```text
-http://localhost:8080/history
+http://localhost:8081/history
 ```
 
 Expected result:
@@ -270,7 +270,7 @@ Expected result:
 Check a saved query graph page using an `id` returned from the list endpoint:
 
 ```text
-http://localhost:8080/graph?queryHistoryId=<history-id>
+http://localhost:8081/graph?queryHistoryId=<history-id>
 ```
 
 Expected result:
@@ -284,7 +284,7 @@ Expected result:
 Check the Graph page without an explicit query history ID:
 
 ```text
-http://localhost:8080/graph
+http://localhost:8081/graph
 ```
 
 Expected result:
@@ -296,7 +296,7 @@ Expected result:
 Check the Graph page with a missing query history ID:
 
 ```text
-http://localhost:8080/graph?queryHistoryId=00000000-0000-0000-0000-000000000000
+http://localhost:8081/graph?queryHistoryId=00000000-0000-0000-0000-000000000000
 ```
 
 Expected result:
@@ -304,6 +304,85 @@ Expected result:
 - The graph canvas is not rendered.
 - The page shows a query-history-not-found message.
 - The page includes a link back to Query History.
+
+## Vector Search Endpoint Checks
+
+These checks exercise the semantic store-config pipeline (`magentic_pgvector` + `magentic_embedder`), independent of the graph. The embedder is always enabled, so no external server is required.
+
+Trigger a vector reset-and-reindex (clear, then re-embed every `system.xml` field):
+
+```bash
+curl -s -X POST http://localhost:8081/api/vector/index/reset-and-reindex
+```
+
+Expected response:
+
+- `ok` is `true`.
+- `job.id` is present.
+
+Check the vector indexing status until it is idle:
+
+```bash
+curl -s http://localhost:8081/api/status
+```
+
+Expected result once embedding finishes:
+
+- `vector.inProgress` is `0`.
+- `vector.locked` is `false`.
+
+Check a plain-English semantic search:
+
+```bash
+curl -s -X POST http://localhost:8081/api/vector/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"where do I set the payment gateway","limit":5}'
+```
+
+Expected result when config vectors exist:
+
+- `ok` is `true`.
+- `results` is an array of `{ path, description, score }`, ordered by descending `score`.
+- `path` is an actionable Magento config path (`section/group/field`, or the field's `config_path` when declared).
+
+Check empty-query validation:
+
+```bash
+curl -s -o /tmp/magentic_vector_search_empty.out -w '%{http_code}' \
+  -X POST http://localhost:8081/api/vector/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"   "}'
+```
+
+Expected result:
+
+- HTTP status is `400`.
+
+Check that a delta with no store-config paths is skipped without locking:
+
+```bash
+curl -s -X POST http://localhost:8081/api/vector/index/delta \
+  -H 'Content-Type: application/json' \
+  -d '{"paths":["app/code/Acme/Foo/Model/Config.php"]}'
+```
+
+Expected result:
+
+- `ok` is `true`.
+- `skipped` is `true`.
+
+Check the `store_config_search` MCP tool over the public `/mcp` endpoint:
+
+```bash
+curl -s http://localhost:8081/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"store_config_search","arguments":{"query":"where do I set the payment gateway","limit":5}}}'
+```
+
+Expected result:
+
+- The response carries `structuredContent.results` with the same `{ path, description, score }` shape as `/api/vector/search`.
 
 ## Container npm Checks
 

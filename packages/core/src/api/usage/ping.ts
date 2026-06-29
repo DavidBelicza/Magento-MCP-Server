@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { Redis } from "ioredis";
+import { publishStatusEvent } from "../../modules/stream/status-events.js";
 import { recordUsage } from "../../modules/usage.js";
 
 type Dependencies = {
@@ -11,7 +12,11 @@ export function registerUsagePingRoute(app: FastifyInstance, deps: Dependencies)
 
   app.post("/api/usage/ping", async (_request, reply) => {
     try {
-      await recordUsage(redis);
+      const becameActive = await recordUsage(redis);
+
+      if (becameActive) {
+        publishStatusEvent(redis, { type: "agent_ping" });
+      }
 
       return reply.send({ ok: true });
     } catch (error) {

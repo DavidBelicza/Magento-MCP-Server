@@ -101,6 +101,71 @@ export async function triggerLinks(symbolId: string | null = null): Promise<stri
   return body.jobId;
 }
 
+export async function triggerVectorReindex(): Promise<string> {
+  return acceptVectorJob("/api/vector/index/reindex");
+}
+
+export async function triggerVectorResetAndReindex(): Promise<string> {
+  return acceptVectorJob("/api/vector/index/reset-and-reindex");
+}
+
+export async function triggerVectorDelta(paths: string[]): Promise<ApiResponse> {
+  return apiRequest("/api/vector/index/delta", {
+    method: "POST",
+    body: JSON.stringify({ paths })
+  });
+}
+
+export type VectorMatch = {
+  path: string;
+  description: string;
+  score: number;
+};
+
+export async function searchVector(query: string, limit?: number): Promise<VectorMatch[]> {
+  const { status, body } = await apiRequest("/api/vector/search", {
+    method: "POST",
+    body: JSON.stringify(limit === undefined ? { query } : { query, limit })
+  });
+
+  if (status !== 200 || body.ok !== true) {
+    throw new Error(`Unexpected vector search response: ${status} ${JSON.stringify(body)}`);
+  }
+
+  return body.results as VectorMatch[];
+}
+
+async function acceptVectorJob(path: string): Promise<string> {
+  const { status, body } = await apiRequest(path, { method: "POST" });
+  const job = body.job as { id?: string } | undefined;
+
+  if (status !== 202 || typeof job?.id !== "string") {
+    throw new Error(`Unexpected ${path} response: ${status} ${JSON.stringify(body)}`);
+  }
+
+  return job.id;
+}
+
+export async function waitForVectorIdle({
+  timeoutMs = 180_000,
+  intervalMs = 1_000
+}: { timeoutMs?: number; intervalMs?: number } = {}): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const { status, body } = await apiRequest("/api/status");
+    const vector = body.vector as { inProgress?: number; locked?: boolean } | undefined;
+
+    if (status === 200 && vector?.inProgress === 0 && vector?.locked === false) {
+      return;
+    }
+
+    await delay(intervalMs);
+  }
+
+  throw new Error(`Vector indexing did not become idle within ${timeoutMs}ms`);
+}
+
 export async function waitForIdle({
   timeoutMs = 180_000,
   intervalMs = 1_000

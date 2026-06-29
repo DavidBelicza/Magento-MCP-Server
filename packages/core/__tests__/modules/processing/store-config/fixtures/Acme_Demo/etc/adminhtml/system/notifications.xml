@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<include>
+    <group id="notifications">
+        <label>Notifications</label>
+        <field id="webhook_url">
+            <label>Webhook URL</label>
+            <comment>The URL that receives event notifications.</comment>
+        </field>
+    </group>
+</include>

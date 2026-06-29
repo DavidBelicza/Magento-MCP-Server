@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import type { Driver } from "neo4j-driver";
 import type { Pool, PoolClient } from "pg";
 
-type DatabaseType = "postgresql" | "neo4j";
+type DatabaseType = "postgresql" | "neo4j" | "pgvector";
 
 type SchemaScript = {
   id: string;
@@ -28,10 +28,11 @@ CREATE TABLE IF NOT EXISTS application_schema_history (
 );
 `;
 
-export async function installSchemas(postgres: Pool, neo4jDriver: Driver): Promise<void> {
+export async function installSchemas(postgres: Pool, neo4jDriver: Driver, pgVector: Pool): Promise<void> {
   const schemaRoot = await resolveSchemaRoot();
   const postgresScripts = await readSchemaScripts(schemaRoot, "postgresql", ".sql");
   const neo4jScripts = await readSchemaScripts(schemaRoot, "neo4j", ".cypher");
+  const pgVectorScripts = await readSchemaScripts(schemaRoot, "pgvector", ".sql");
   const client = await postgres.connect();
 
   try {
@@ -45,9 +46,42 @@ export async function installSchemas(postgres: Pool, neo4jDriver: Driver): Promi
     for (const script of neo4jScripts) {
       await applyNeo4jScript(client, neo4jDriver, script);
     }
+
+    for (const script of pgVectorScripts) {
+      await applyPgVectorScript(client, pgVector, script);
+    }
   } finally {
     await client.query("SELECT pg_advisory_unlock($1)", [schemaLockKey]).catch(() => undefined);
     client.release();
+  }
+}
+
+async function applyPgVectorScript(historyClient: PoolClient, pgVector: Pool, script: SchemaScript): Promise<void> {
+  if (await isScriptApplied(historyClient, script)) {
+    return;
+  }
+
+  const pgVectorClient = await pgVector.connect();
+
+  try {
+    await pgVectorClient.query("BEGIN");
+    await pgVectorClient.query(script.sql);
+    await pgVectorClient.query("COMMIT");
+  } catch (error) {
+    await pgVectorClient.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    pgVectorClient.release();
+  }
+
+  await historyClient.query("BEGIN");
+
+  try {
+    await recordScript(historyClient, script);
+    await historyClient.query("COMMIT");
+  } catch (error) {
+    await historyClient.query("ROLLBACK");
+    throw error;
   }
 }
 

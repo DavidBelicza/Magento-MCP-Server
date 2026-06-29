@@ -1,10 +1,24 @@
 # Plan: Vector Config Search (semantic search over `system.xml`)
 
-> Status: **planned, not started.** A second, independent indexing pipeline that
+> Status: **implemented (UI pending).** A second, independent indexing pipeline that
 > embeds Magento admin-config descriptions into a vector database so an AI agent
 > can find configuration by plain-English meaning ("where do I set the payment
 > gateway?") rather than exact keywords. It is fully decoupled from the graph —
 > no shared nodes or edges; the config path string is the only id.
+>
+> **Done:** the `magentic_pgvector` service + `config_embeddings` schema; the
+> `store-config` parser (`modules/processing/store-config`); the embedding +
+> abstract vector-store layer (`modules/vector`); the `index-vector`
+> queue/worker chaining read → merge → describe → embed → upsert; the
+> `POST /api/vector/index/reindex` (reindex) + `POST /api/vector/index/reset-and-reindex`
+> routes under `magentic:vector-index:lock`;
+> the `POST /api/vector/search` route; and the `store_config_search` MCP tool.
+> The Database/Settings UI lists both pipelines (Graph + Vector) as always-visible
+> index groups — each entry shows live progress when running, otherwise "Done" —
+> with top-level Index / Reset-&-index buttons that drive both groups and per-group
+> buttons that drive one. **Pending:** optional follow-ups (embedding batching,
+> `/api/status` vector integration). The graph index lock was renamed
+> `full-index` → `graph-index` so the two pipelines read symmetrically.
 
 ## Goal
 
@@ -32,7 +46,7 @@ with an external model, and stores the vector so the agent can search by meaning
   so it runs concurrently with the graph workers on the single event loop).
 - **No re-embed cache in v1.** A full vector reindex re-embeds everything; that is
   acceptable at `system.xml` scale and bounded later by selective reindex.
-- **File-watcher-driven incremental re-embedding is deferred** — not defined yet.
+- **File-watcher-driven incremental re-embedding is wired** via `POST /api/vector/index/delta` (see the delta flow below and the Known Limitations note on the 409 race).
 
 ## Business logic lives in core
 
@@ -109,8 +123,9 @@ resolve translations.)
 ## Index pipeline (new, independent)
 
 - New `index-embeddings` queue + worker inside the existing `magentic_worker`.
-- Trigger `POST /api/vector/index` (full reindex) and a reset that truncates
-  `config_embeddings`.
+- Trigger `POST /api/vector/index/reindex` (reindex) and `POST /api/vector/index/reset-and-reindex`
+  (clear `config_embeddings`, then re-embed) — mirroring the graph's
+  `reindex`/`reset-and-reindex` pair; there is no truncate-only route.
 - Holds `magentic:vector-index:lock` while running; never checks the graph lock.
 - Added to the index status list so it surfaces in `/api/status` independently.
 - Flow per run: discover `system.xml` → parse → build descriptions → `Embedder.embed`
@@ -188,11 +203,35 @@ flowchart TD
 - **Shared Postgres tech, separate instance.** `magentic_pgvector` is its own
   container, so it does not load the app DB; the `VectorStore` port keeps a later
   move to a dedicated vector DB cheap.
+- **LM Studio silently truncates oversized input** (no error; content past the
+  model's 2048-token context window is dropped). Mitigated by an **in-house token
+  estimator + length guard** — no external tokenizer library (tiktoken is
+  OpenAI-only; Transformers.js drags in onnxruntime and downloads tokenizer files).
+  The estimator is a cheap heuristic: `estimatedTokens = max(ceil(chars / 4),
+  ceil(words / 0.75))` (take the larger, conservative figure). The indexer guards
+  against a safe bound well under 2048 (e.g. ~1800 tokens) and logs/flags or
+  explicitly truncates anything over it. Descriptions are ~15 tokens, so this never
+  trips in practice — it is insurance against a future change silently losing text.
+  If exact counts are ever needed, the upgrade path is a server that errors on
+  overflow (HF TEI / vLLM via the `Embedder` port), not a client-side tokenizer.
 
 ## Out of scope (v1)
 
 - Any graph↔vector link (no `:ConfigField` graph nodes, no shared ids beyond `path`).
 - Model swapping / multi-model support.
-- File-watcher-driven incremental re-embedding.
 - ANN index tuning (exact search is fine for now).
 - i18n label resolution.
+
+## Known limitations / possible improvements
+
+- **Changes during a full reindex can be lost (watcher does not retry on 409).**
+  The incremental `POST /api/vector/index/delta` is now wired (the watcher fans
+  each batch out to both the graph and vector deltas). But if a config file
+  changes *while a full vector reindex holds the lock*, the delta gets a `409`
+  and the watcher **drops** the batch. The running reindex re-parses everything,
+  so it usually captures the change — except in the race window where the file
+  changes *after* the reindex already read the sources. The same gap exists on
+  the graph side (the watcher pauses during a graph reindex and chokidar does not
+  replay changes missed while stopped). **Possible fix:** on a `409`, keep the
+  changed paths and retry once the lock releases (the watcher already polls
+  `/api/status` every 4s), making delta application airtight for both pipelines.

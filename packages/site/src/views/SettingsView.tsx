@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Panel, SectionHeader } from '../components/Panel'
-import { IndexingStatusList } from '../components/IndexingStatusList'
+import { IndexGroup, graphIndexCatalog, vectorIndexCatalog } from '../components/IndexingStatusList'
 import { useStatus } from '../app/StatusContext'
 import { apiFetch, getApiToken, setApiToken } from '../lib/api'
 
@@ -11,13 +11,20 @@ type AppSettings = {
   projectRoot: string
   sourceSubpaths: string[]
   watcherEnabled: boolean
+  embedderType: 'local' | 'remote'
+  remoteEmbedderUrl: string
+  remoteEmbedderModel: string
+  remoteEmbedderBearerToken: string
 }
+
+type LocalEmbedder = { url: string; model: string; bearerToken: string }
 
 type ConfigResponse = {
   settings: AppSettings
   mountPath: string
   hostPath: string
   phpVersionOptions: string[]
+  localEmbedder: LocalEmbedder
 }
 
 export const SettingsView: React.FC = () => {
@@ -25,10 +32,15 @@ export const SettingsView: React.FC = () => {
     <section className="grid min-h-full grid-cols-1 gap-5 xl:grid-cols-2">
       <ConfigSection />
       <IndexingSection />
+      <EmbedderSection />
       <McpSection />
     </section>
   )
 }
+
+type IndexRequest = { endpoint: string }
+
+const emptyGroup = { inProgress: 0, locked: false, items: [] }
 
 const IndexingSection: React.FC = () => {
   const status = useStatus()
@@ -37,7 +49,9 @@ const IndexingSection: React.FC = () => {
   const [watcherOverride, setWatcherOverride] = useState<boolean | null>(null)
   const wasRunning = useRef(false)
 
-  const running = (status?.indexing.inProgress ?? 0) > 0 || (status?.indexing.locked ?? false)
+  const graphRunning = (status?.indexing.inProgress ?? 0) > 0 || (status?.indexing.locked ?? false)
+  const vectorRunning = (status?.vector.inProgress ?? 0) > 0 || (status?.vector.locked ?? false)
+  const running = graphRunning || vectorRunning
 
   useEffect(() => {
     if (wasRunning.current && !running) {
@@ -63,7 +77,7 @@ const IndexingSection: React.FC = () => {
     }).catch(() => undefined)
   }
 
-  const run = (endpoint: string, label: string) => {
+  const run = (requests: IndexRequest[], label: string) => {
     if (!window.confirm(`Start ${label}? This runs against the configured source.`)) {
       return
     }
@@ -72,31 +86,67 @@ const IndexingSection: React.FC = () => {
 
     setBusy(true)
     setMessage(startMessage)
-    apiFetch(endpoint, { method: 'POST' })
-      .then((response) => response.json())
-      .then((data) => {
-        if (!data.ok) {
-          setMessage(data.error ?? `${label} failed.`)
-        }
-      })
+    Promise.all(
+      requests.map((request) =>
+        apiFetch(request.endpoint, { method: 'POST' })
+          .then((response) => response.json())
+          .then((data) => {
+            if (!data.ok) {
+              setMessage(data.error ?? `${label} failed.`)
+            }
+          })
+      )
+    )
       .catch(() => setMessage(`${label} failed.`))
       .finally(() => setBusy(false))
 
     window.setTimeout(() => setMessage((current) => (current === startMessage ? null : current)), 2000)
   }
 
+  const graphIndex: IndexRequest = { endpoint: '/api/graph/index/reindex' }
+  const graphReset: IndexRequest = { endpoint: '/api/graph/index/reset-and-reindex' }
+  const vectorIndex: IndexRequest = { endpoint: '/api/vector/index/reindex' }
+  const vectorReset: IndexRequest = { endpoint: '/api/vector/index/reset-and-reindex' }
+
   return (
     <Panel className="p-5">
       <SectionHeader title="Indexing Pipeline" />
       <div className="mt-5">
-        <IndexingStatusList items={status?.indexing.items ?? []} locked={status?.indexing.locked ?? false} />
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <ActionButton label="Reindex" disabled={busy || running} onClick={() => run('/api/graph/index/reindex', 'reindex')} />
+        <div className="mb-4 flex flex-wrap gap-2">
           <ActionButton
-            label="Reset & reindex"
+            label="Index all"
             disabled={busy || running}
-            onClick={() => run('/api/graph/index/reset-and-reindex', 'reset and reindex')}
+            onClick={() => run([graphIndex, vectorIndex], 'a full index')}
+          />
+          <ActionButton
+            label="Reset & index all"
+            disabled={busy || running}
+            onClick={() => run([graphReset, vectorReset], 'a full reset')}
+          />
+        </div>
+
+        <div className="grid gap-3">
+          <IndexGroup
+            title="Graph database"
+            catalog={graphIndexCatalog}
+            status={status?.indexing ?? emptyGroup}
+            actions={
+              <>
+                <ActionButton label="Index" disabled={busy || graphRunning} onClick={() => run([graphIndex], 'a graph index')} />
+                <ActionButton label="Reset & index" disabled={busy || graphRunning} onClick={() => run([graphReset], 'a graph reset')} />
+              </>
+            }
+          />
+          <IndexGroup
+            title="Vector database"
+            catalog={vectorIndexCatalog}
+            status={status?.vector ?? emptyGroup}
+            actions={
+              <>
+                <ActionButton label="Index" disabled={busy || vectorRunning} onClick={() => run([vectorIndex], 'a vector index')} />
+                <ActionButton label="Reset & index" disabled={busy || vectorRunning} onClick={() => run([vectorReset], 'a vector reset')} />
+              </>
+            }
           />
         </div>
         {message ? <p className="mt-3 text-xs text-gray-500">{message}</p> : null}
@@ -249,6 +299,113 @@ const ConfigSection: React.FC = () => {
   )
 }
 
+const inputClass =
+  'h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-slate-300 focus:outline-none'
+const readonlyInputClass = 'h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-500'
+
+const EmbedderSection: React.FC = () => {
+  const [embedderType, setEmbedderType] = useState<'local' | 'remote'>('local')
+  const [remoteUrl, setRemoteUrl] = useState('')
+  const [remoteModel, setRemoteModel] = useState('')
+  const [remoteToken, setRemoteToken] = useState('')
+  const [local, setLocal] = useState<LocalEmbedder | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    apiFetch('/api/config')
+      .then((response) => response.json())
+      .then((data: ConfigResponse) => {
+        setEmbedderType(data.settings.embedderType)
+        setRemoteUrl(data.settings.remoteEmbedderUrl)
+        setRemoteModel(data.settings.remoteEmbedderModel)
+        setRemoteToken(data.settings.remoteEmbedderBearerToken)
+        setLocal(data.localEmbedder)
+      })
+      .catch(() => undefined)
+  }, [])
+
+  const save = () => {
+    setSaving(true)
+    setMessage(null)
+    apiFetch('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embedderType,
+        remoteEmbedderUrl: remoteUrl,
+        remoteEmbedderModel: remoteModel,
+        remoteEmbedderBearerToken: remoteToken
+      })
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setMessage(data.ok ? 'Saved. Switching embedder needs a vector reset & index.' : (data.error ?? 'Failed to save.'))
+      })
+      .catch(() => setMessage('Failed to save.'))
+      .finally(() => setSaving(false))
+  }
+
+  return (
+    <Panel className="p-5 xl:col-span-2">
+      <SectionHeader title="Embedding Model" />
+      <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">
+        <div className="grid gap-4">
+          <label className="grid gap-1.5">
+            <span className="text-sm text-gray-600">Active embedder</span>
+            <select
+              value={embedderType}
+              onChange={(event) => setEmbedderType(event.target.value as 'local' | 'remote')}
+              className="h-9 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-slate-300 focus:outline-none"
+            >
+              <option value="local">Local — bundled model</option>
+              <option value="remote">Remote — external server or LM Studio</option>
+            </select>
+            <span className="text-xs text-gray-400">
+              Switching requires a vector reset &amp; index so stored and query vectors come from the same model. This is
+              the embedder that writes the vector database.
+            </span>
+          </label>
+
+          <div className="grid gap-1.5">
+            <span className="text-sm text-gray-600">Local embedder (read-only — set via environment)</span>
+            <input value={local?.url ?? ''} readOnly disabled className={readonlyInputClass} />
+            <input value={local?.model ?? ''} readOnly disabled className={readonlyInputClass} />
+            <span className="text-xs text-gray-400">URL and model of the bundled magentic_embedder.</span>
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          <label className="grid gap-1.5">
+            <span className="text-sm text-gray-600">Remote URL</span>
+            <input value={remoteUrl} onChange={(event) => setRemoteUrl(event.target.value)} className={inputClass} />
+            <span className="text-xs text-gray-400">From the public internet, or LM Studio running on your machine.</span>
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-sm text-gray-600">Remote model</span>
+            <input value={remoteModel} onChange={(event) => setRemoteModel(event.target.value)} className={inputClass} />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-sm text-gray-600">Remote bearer token</span>
+            <input
+              type="password"
+              value={remoteToken}
+              onChange={(event) => setRemoteToken(event.target.value)}
+              placeholder="empty = no token"
+              className={inputClass}
+            />
+          </label>
+
+          <div className="flex items-center gap-3">
+            <ActionButton label={saving ? 'Saving…' : 'Save'} disabled={saving} onClick={save} />
+            {message ? <span className="text-xs text-gray-500">{message}</span> : null}
+          </div>
+        </div>
+      </div>
+    </Panel>
+  )
+}
+
 const McpSection: React.FC = () => {
   const [token, setToken] = useState(() => getApiToken())
 
@@ -265,7 +422,7 @@ const McpSection: React.FC = () => {
   const snippet = `{
   "mcpServers": {
     "magentic": {
-      "url": "http://localhost:8080/mcp"${headersBlock}
+      "url": "http://localhost:8081/mcp"${headersBlock}
     }
   }
 }`
@@ -277,7 +434,7 @@ const McpSection: React.FC = () => {
         <div className="grid gap-3 text-sm text-gray-600">
           <p>Point your agent at the Streamable HTTP endpoint below, then add the JSON to your MCP client config.</p>
           <Row label="Transport">Streamable HTTP</Row>
-          <Row label="Endpoint">http://localhost:8080/mcp</Row>
+          <Row label="Endpoint">http://localhost:8081/mcp</Row>
           <Row label="Tools">get_status, graph_search, get_graph_schema</Row>
 
           <label className="mt-1 grid gap-1 text-xs font-semibold text-gray-600">

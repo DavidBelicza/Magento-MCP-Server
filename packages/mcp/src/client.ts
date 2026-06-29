@@ -36,6 +36,16 @@ export type QueryResultResponse = {
   structuredResult?: unknown;
 };
 
+export type StoreConfigSearchInput = {
+  query: string;
+  limit?: number;
+};
+
+export type StoreConfigSearchResponse = {
+  ok: boolean;
+  results?: Array<{ path: string; description: string; score: number }>;
+};
+
 export class BackendError extends Error {
   readonly status: number;
 
@@ -88,6 +98,13 @@ export function createBackendClient(baseUrl: string) {
     getGraphSearchResult(id: string): Promise<QueryResultResponse> {
       return request<QueryResultResponse>(`/api/graph/get-query-history/${encodeURIComponent(id)}`, {
         method: "GET"
+      });
+    },
+    searchStoreConfig(input: StoreConfigSearchInput): Promise<StoreConfigSearchResponse> {
+      return request<StoreConfigSearchResponse>("/api/vector/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input)
       });
     }
   };

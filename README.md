@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src=".github/logo.png" alt="Magentic logo" width="140" height="140">
+  <img src=".github/logo.jpg" alt="Magentic logo" width="140" height="140">
 </p>
 
 <h1 align="center">Magentic - Magento MCP Server</h1>
@@ -14,40 +14,47 @@
 
 <p align="center">
 Magentic is a self-hosted <strong>standard MCP (Model Context Protocol) server</strong>.<br/>
-Magentic maps the Magento codebase into a graph that any <strong>AI agent can explore for grounded symbolic reasoning</strong>.
+Magentic maps the Magento codebase into a graph and a vector database that any <strong>AI agent can explore for grounded symbolic reasoning and semantic understanding</strong>.
 </p>
 
 ## Features
 
 | Name | Description |
 | --- | --- |
-| **AI agent connection via MCP** | Any MCP-compatible AI agent can use Magentic by triggering it directly, just type "*use Magentic to do...*". |
-| **Code search** | Search across Composer packages, PHP, and XML config (DI, plugins, events, REST APIs). |
+| 🤖 **MCP for AI Agents** | Any MCP-compatible AI agent can use Magentic by triggering it directly, just type "*use Magentic to do...*". |
+| 🕸️ **Symbolic Search** | Search across Composer packages, PHP, and XML config (DI, plugins, events, REST APIs) using a knowledge graph. |
+| 🧠 **Semantic Search** | AI-powered semantic search in store configurations using embedding AI models and a vector database. |
 
 ## How it works
-
-Magentic uses **symbolic reasoning to prevent the model from hallucinating**.
-There are four participants in the algorithm: the AI Agent, the Magentic MCP, the Magentic Graph Database, and the Magento source. It works with any standard AI agent solution that implements MCP, such as *Anthropic Claude, OpenAI Codex, Google Antigravity*, and others.
-
-- Magentic watches your source for file changes and runs a partial update or a full reindex.
-- It understands the PHP abstract syntax tree and pushes it into the graph database.
-- Your AI agent talks to the Magentic MCP, and Magentic searches the graph for it.
 
 ```mermaid
 flowchart TD
     Source[Magento source]
     Magentic[Magentic MCP]
     Graph[(Graph Database)]
+    Embedder[AI Embedder]
+    Vector[(Vector Database)]
     Agent[AI Agent]
 
-    Source -->|watches changes, reads PHP AST| Magentic
+    Source -->|watches changes, reads PHP AST, XML| Magentic
     Magentic -->|writes nodes and edges| Graph
+    Magentic <-->|sends text, gets embeddings| Embedder
+    Magentic -->|stores embeddings| Vector
     Agent <-->|asks and receives| Magentic
-    Magentic -->|searches| Graph
+    Magentic -->|searches code| Graph
+    Magentic -->|semantic search| Vector
 
     classDef brand fill:#fd8504,stroke:#d97004,color:#ffffff;
-    class Source,Magentic,Graph,Agent brand;
+    class Source,Magentic,Graph,Embedder,Vector,Agent brand;
 ```
+
+Magentic uses **symbolic reasoning and semantic understanding to prevent the model from hallucinating**.
+There are six components in the algorithm: the AI Agent, the Magentic MCP, the Magentic Graph Database, the AI Embedder, the Magentic Vector Database, and the Magento source. It works with any standard AI agent solution that implements MCP, such as *Anthropic Claude, OpenAI Codex, Google Antigravity*, and others.
+
+- Magentic watches your source for file changes and runs a partial update or a full reindex.
+- It understands the PHP abstract syntax tree and pushes it into the graph database.
+- It understands the Magento configurations and pushes them into the vector database.
+- Your AI agent talks to the Magentic MCP, and Magentic searches the graph, and the vector database for it.
 
 ## Setup
 
@@ -56,6 +63,17 @@ flowchart TD
 - **MacOS**: [OrbStack](https://orbstack.dev/) (recommended) or [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 - **Windows**: [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine installed in WSL2 with the Compose plugin
 - **Linux**: [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine with the Compose plugin
+
+**Minimum system requirements:**
+
+| Resource | Minimum | Recommended |
+| --- | --- | --- |
+| CPU | 4 cores (x86-64 or Apple Silicon / arm64) | 8 cores |
+| RAM | 8 GB | 16 GB |
+| GPU | Not required; the bundled embedder runs on CPU | Optional — an external GPU-backed embedder (e.g. LM Studio) speeds up indexing |
+| Free storage | 10 GB | 20 GB or more for large codebases |
+
+Indexing a full Magento install is memory- and CPU-intensive (Neo4j alone reserves about 2 GB of heap, and embedding runs on the CPU by default), so more RAM and cores directly shorten indexing time.
 
 ### 2. Download
 
@@ -92,7 +110,7 @@ The graph is empty until you index your source.
 
 1. Open `http://localhost:8081`.
 2. Go to **Settings**.
-3. Under **Indexing Pipeline**, click **Reset & reindex**.
+3. Under **Indexing Pipeline**, click **Reset & reindex all**.
 
 Indexing time depends on your machine and the size of the codebase. It can take from about a minute on a capable machine to around half an hour on a slow one. You can keep using the app while it runs, and the status updates when it finishes.
 
@@ -152,6 +170,10 @@ Open **Settings → MCP Config** and add:
 
 ### Troubleshooting
 
+#### Replacing the AI model
+
+Magentic comes with the Embedding Gemma AI model that transforms text into vectors inside a Docker container. You can replace it with your own AI, for example by running the LM Studio desktop app on your local machine. Once your embedding model is running, you can switch to it from the Settings menu in Magentic. A model in LM Studio is expected to be faster than one in a container, because it can also access the GPU.
+
 #### Update Magentic
 
 Pull the latest project files and images, then recreate the containers from the project folder:
@@ -208,6 +230,10 @@ See [`AGENTS.md`](AGENTS.md) for the full architecture and contributor guide.
 - [`docs/architecture_world_mapping.md`](docs/architecture_world_mapping.md) covers how source is indexed into the graph.
 - [`docs/architecture_mcp.md`](docs/architecture_mcp.md) covers the MCP service and its tools.
 - [`docs/architecture_auth.md`](docs/architecture_auth.md) covers the access-control design.
+- [`docs/plan_magento_xml_indexing.md`](docs/plan_magento_xml_indexing.md) covers the Magento XML config indexing pipeline.
+- [`docs/plan_vector_config_search.md`](docs/plan_vector_config_search.md) covers the semantic store-config search pipeline.
 - [`docs/test_system_sanity.md`](docs/test_system_sanity.md) covers runtime and integration checks.
 - [`docs/README-performance.md`](docs/README-performance.md) covers analyzer performance notes.
+- [`research/2026-06-26-semantic-config-search-feasibility.md`](research/2026-06-26-semantic-config-search-feasibility.md) is a feasibility snapshot on semantic search over Magento `system.xml` configuration.
+- [`research/2026-06-28-semantic-code-search-feasibility.md`](research/2026-06-28-semantic-code-search-feasibility.md) is a feasibility snapshot on semantic search over Magento code (class and interface descriptions).
 - [`AGENTS.md`](AGENTS.md) is the contributor and development guide.

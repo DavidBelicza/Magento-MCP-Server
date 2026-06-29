@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<config>
+    <system>
+        <tab id="acme">
+            <label>Acme</label>
+        </tab>
+        <section id="payment_demo">
+            <tab>acme</tab>
+            <label>Payment Methods</label>
+            <group id="settings">
+                <label>Settings</label>
+                <field id="api_gateway">
+                    <label>API Gateway</label>
+                    <comment>Set API gateway here, only for production.</comment>
+                </field>
+                <field id="mode">
+                    <label>Mode</label>
+                    <config_path>acme_demo/integration/mode</config_path>
+                </field>
+                <group id="advanced">
+                    <label>Advanced</label>
+                    <field id="timeout">
+                        <label>Timeout</label>
+                    </field>
+                </group>
+            </group>
+            <include path="Acme_Demo::system/notifications.xml"/>
+        </section>
+    </system>
+</config>

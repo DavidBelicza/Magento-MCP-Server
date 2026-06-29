@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<include>
+    <section id="reporting">
+        <tab>acme</tab>
+        <label>Reporting</label>
+        <group id="general">
+            <label>General</label>
+            <field id="enabled">
+                <label>Enabled</label>
+            </field>
+        </group>
+    </section>
+</include>

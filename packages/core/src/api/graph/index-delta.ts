@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { Redis } from "ioredis";
-import { isFullIndexLocked } from "../../modules/index-lock.js";
+import { isGraphIndexLocked } from "../../modules/index-lock.js";
 import { isConfigXml } from "../../modules/processing/magento-xml/discovery.js";
 
 type Dependencies = {
@@ -11,10 +11,10 @@ export function registerIndexDeltaRoute(app: FastifyInstance, deps: Dependencies
   const { redis } = deps;
 
   app.post<{ Body: { operation?: unknown; paths?: unknown } }>("/api/graph/index/delta", async (request, reply) => {
-    if (await isFullIndexLocked(redis)) {
+    if (await isGraphIndexLocked(redis)) {
       return reply.status(409).send({
         ok: false,
-        error: "a reset or full reindex is in progress; delta updates are paused"
+        error: "a graph reindex or reset is in progress; delta updates are paused"
       });
     }
 
@@ -59,10 +59,10 @@ export function registerIndexDeltaRoute(app: FastifyInstance, deps: Dependencies
     }
 
     if (Object.keys(dispatched).length === 0) {
-      return reply.status(400).send({
-        ok: false,
-        error: "no applicable paths in request",
-        skipped: routed.skipped
+      return reply.status(200).send({
+        ok: true,
+        skipped: routed.skipped,
+        message: "No graph-relevant paths in request."
       });
     }
 

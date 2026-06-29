@@ -26,8 +26,8 @@ function logError(...args: unknown[]): void {
   console.error(new Date().toISOString(), "[watcher]", ...args);
 }
 
-async function sendDelta(operation: "upsert" | "delete", paths: string[]): Promise<void> {
-  log(`delta ${operation}: ${paths.length} path(s)`);
+async function sendGraphDelta(operation: "upsert" | "delete", paths: string[]): Promise<void> {
+  log(`graph delta ${operation}: ${paths.length} path(s)`);
 
   try {
     const response = await fetch(`${backendUrl}/api/graph/index/delta`, {
@@ -37,13 +37,32 @@ async function sendDelta(operation: "upsert" | "delete", paths: string[]): Promi
     });
 
     if (response.status === 409) {
-      log(`delta ${operation} skipped: a full reindex is in progress`);
+      log(`graph delta ${operation} skipped: a full reindex is in progress`);
     } else if (!response.ok) {
       const body = await response.text().catch(() => "");
-      logError(`delta ${operation} rejected: ${response.status} ${body}`);
+      logError(`graph delta ${operation} rejected: ${response.status} ${body}`);
     }
   } catch (error) {
-    logError(`delta ${operation} request failed:`, error);
+    logError(`graph delta ${operation} request failed:`, error);
+  }
+}
+
+async function sendVectorDelta(paths: string[]): Promise<void> {
+  try {
+    const response = await fetch(`${backendUrl}/api/vector/index/delta`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paths })
+    });
+
+    if (response.status === 409) {
+      log("vector delta skipped: a full vector reindex is in progress");
+    } else if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      logError(`vector delta rejected: ${response.status} ${body}`);
+    }
+  } catch (error) {
+    logError("vector delta request failed:", error);
   }
 }
 
@@ -94,18 +113,23 @@ function record(event: string, path: string): void {
 
     const upserts: string[] = [];
     const deletes: string[] = [];
+    const allPaths: string[] = [];
 
     for (const [path, event] of batch) {
-      (event === "unlink" ? deletes : upserts).push(toRelative(path));
+      const relative = toRelative(path);
+      allPaths.push(relative);
+      (event === "unlink" ? deletes : upserts).push(relative);
     }
 
     if (upserts.length > 0) {
-      void sendDelta("upsert", upserts);
+      void sendGraphDelta("upsert", upserts);
     }
 
     if (deletes.length > 0) {
-      void sendDelta("delete", deletes);
+      void sendGraphDelta("delete", deletes);
     }
+
+    void sendVectorDelta(allPaths);
   }, debounceMs);
 }
 

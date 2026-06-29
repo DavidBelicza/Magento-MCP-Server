@@ -4,7 +4,7 @@ import { createRedisConnectionOptions } from "../connections.js";
 export type IndexPackagesJob = {
   analyzedSourcePath: string;
   requestedAt: string;
-  fullIndexFlow?: boolean;
+  graphIndexFlow?: boolean;
 };
 
 export const indexPackagesQueueName = "index-packages";

@@ -1,6 +1,6 @@
 export type DeleteGraphJob = {
   requestedAt: string;
-  fullIndexFlow?: boolean;
+  graphIndexFlow?: boolean;
 };
 
 export const deleteGraphQueueName = "delete-graph";
