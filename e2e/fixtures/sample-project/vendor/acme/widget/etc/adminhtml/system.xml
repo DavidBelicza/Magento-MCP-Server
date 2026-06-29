@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<config>
+    <system>
+        <tab id="acme" translate="label" sortOrder="100">
+            <label>Acme</label>
+        </tab>
+        <section id="widget" translate="label" type="text" sortOrder="10" showInDefault="1">
+            <label>Widget Settings</label>
+            <tab>acme</tab>
+            <resource>Acme_Widget::config</resource>
+            <group id="general" translate="label" sortOrder="10" showInDefault="1">
+                <label>General</label>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1">
+                    <label>Enable Widget</label>
+                    <comment>Turns the widget on or off across the entire storefront.</comment>
+                </field>
+            </group>
+            <group id="payment" translate="label" sortOrder="20" showInDefault="1">
+                <label>Payment Gateway</label>
+                <field id="api_key" translate="label comment" type="obscure" sortOrder="10" showInDefault="1">
+                    <label>Gateway API Key</label>
+                    <comment>The secret key used to authenticate with the payment gateway provider.</comment>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>
